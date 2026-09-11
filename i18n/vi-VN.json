@@ -1638,7 +1638,8 @@
 			"in-review": "Đang xem xét",
 			"done": "Hoàn thành",
 			"archived": "Đã lưu trữ",
-			"planned": "Đã lên kế hoạch"
+			"planned": "Đã lên kế hoạch",
+			"blocked": "Blocked"
 		},
 		"priority": {
 			"label": "Mức ưu tiên",

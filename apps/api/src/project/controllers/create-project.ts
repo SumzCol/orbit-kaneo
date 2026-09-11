@@ -2,11 +2,14 @@ import { eq, max, sql } from "drizzle-orm";
 import db from "../../database";
 import { columnTable, projectTable } from "../../database/schema";
 
+// Keep in sync with DEFAULT_COLUMNS in src/migrations/column-migration.ts, which
+// seeds the same set for legacy projects that have no columns at all.
 export const DEFAULT_PROJECT_COLUMNS = [
   { name: "To Do", slug: "to-do", position: 0, isFinal: false },
   { name: "In Progress", slug: "in-progress", position: 1, isFinal: false },
   { name: "In Review", slug: "in-review", position: 2, isFinal: false },
   { name: "Done", slug: "done", position: 3, isFinal: true },
+  { name: "Blocked", slug: "blocked", position: 4, isFinal: false },
 ] as const;
 
 async function createProject(

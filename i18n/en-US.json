@@ -1640,6 +1640,7 @@
 			"label": "Status",
 			"to-do": "To Do",
 			"in-progress": "In Progress",
+			"blocked": "Blocked",
 			"in-review": "In Review",
 			"done": "Done",
 			"archived": "Archived",

@@ -15,6 +15,8 @@ const STATUS_CLASSES: Record<string, string> = {
     "border-slate-500/35 bg-slate-500/15 hover:border-slate-500/50 hover:bg-slate-500/20",
   "in-progress":
     "border-blue-500/35 bg-blue-500/15 hover:border-blue-500/50 hover:bg-blue-500/20",
+  blocked:
+    "border-rose-500/35 bg-rose-500/15 hover:border-rose-500/50 hover:bg-rose-500/20",
   "in-review":
     "border-amber-500/40 bg-amber-500/15 hover:border-amber-500/55 hover:bg-amber-500/20",
   done: "border-emerald-500/35 bg-emerald-500/15 hover:border-emerald-500/50 hover:bg-emerald-500/20",
