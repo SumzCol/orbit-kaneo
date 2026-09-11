@@ -1639,7 +1639,7 @@
 			"done": "Selesai",
 			"archived": "Diarsipkan",
 			"planned": "Direncanakan",
-			"blocked": "Blocked"
+			"blocked": "Diblokir"
 		},
 		"priority": {
 			"label": "Prioritas",

@@ -1639,7 +1639,7 @@
 			"done": "Hoàn thành",
 			"archived": "Đã lưu trữ",
 			"planned": "Đã lên kế hoạch",
-			"blocked": "Blocked"
+			"blocked": "Bị chặn"
 		},
 		"priority": {
 			"label": "Mức ưu tiên",

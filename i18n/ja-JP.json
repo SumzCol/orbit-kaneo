@@ -1639,7 +1639,7 @@
 			"done": "完了",
 			"archived": "アーカイブ済み",
 			"planned": "計画中",
-			"blocked": "Blocked"
+			"blocked": "ブロック中"
 		},
 		"priority": {
 			"label": "優先度",

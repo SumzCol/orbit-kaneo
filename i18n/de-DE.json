@@ -1644,7 +1644,7 @@
 			"done": "Erledigt",
 			"archived": "Archiviert",
 			"planned": "Geplant",
-			"blocked": "Blocked"
+			"blocked": "Blockiert"
 		},
 		"priority": {
 			"label": "Priorität",

@@ -2236,7 +2236,7 @@
 			"label": "Status",
 			"planned": "Zaplanowane",
 			"to-do": "Do zrobienia",
-			"blocked": "Blocked"
+			"blocked": "Zablokowane"
 		},
 		"subtasks": {
 			"addAction": "Dodaj",

@@ -1644,7 +1644,7 @@
 			"done": "Завршено",
 			"archived": "Архивирано",
 			"planned": "Планирано",
-			"blocked": "Blocked"
+			"blocked": "Блокирано"
 		},
 		"priority": {
 			"label": "Приоритет",

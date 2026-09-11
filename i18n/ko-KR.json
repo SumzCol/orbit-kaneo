@@ -1639,7 +1639,7 @@
 			"done": "완료",
 			"archived": "보관됨",
 			"planned": "계획됨",
-			"blocked": "Blocked"
+			"blocked": "차단됨"
 		},
 		"priority": {
 			"label": "우선순위",

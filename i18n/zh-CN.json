@@ -1639,7 +1639,7 @@
 			"done": "已完成",
 			"archived": "已归档",
 			"planned": "已计划",
-			"blocked": "Blocked"
+			"blocked": "已阻塞"
 		},
 		"priority": {
 			"label": "优先级",

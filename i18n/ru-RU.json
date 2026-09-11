@@ -1662,7 +1662,7 @@
 			"done": "Готово",
 			"archived": "В архиве",
 			"planned": "Запланировано",
-			"blocked": "Blocked"
+			"blocked": "Заблокировано"
 		},
 		"priority": {
 			"label": "Приоритет",

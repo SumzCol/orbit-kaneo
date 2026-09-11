@@ -1644,7 +1644,7 @@
 			"done": "Tamamlandı",
 			"archived": "Arşivlendi",
 			"planned": "Planlandı",
-			"blocked": "Blocked"
+			"blocked": "Engellendi"
 		},
 		"priority": {
 			"label": "Öncelik",

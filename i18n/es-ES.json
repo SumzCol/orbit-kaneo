@@ -1649,7 +1649,7 @@
 			"done": "Hecho",
 			"archived": "Archivado",
 			"planned": "Planeado",
-			"blocked": "Blocked"
+			"blocked": "Bloqueado"
 		},
 		"priority": {
 			"label": "Prioridad",
