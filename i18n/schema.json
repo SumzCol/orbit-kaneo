@@ -6628,6 +6628,9 @@
 						"in-progress": {
 							"type": "string"
 						},
+						"blocked": {
+							"type": "string"
+						},
 						"in-review": {
 							"type": "string"
 						},
@@ -6645,6 +6648,7 @@
 						"label",
 						"to-do",
 						"in-progress",
+						"blocked",
 						"in-review",
 						"done",
 						"archived",
