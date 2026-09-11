@@ -22,6 +22,10 @@ jobs:
     uses: ./.github/workflows/build-images.yml
     secrets: inherit
     with:
+      # Scopes the packages to this fork. Without it the images land on the
+      # org-wide names `api` and `web`, which any other SumzCol repository
+      # would push straight into.
+      image_prefix: orbit-
       # `orbit` is what deployments track; the SHA tag is what makes a rollback
       # possible, since `orbit` alone has no history to roll back to.
       tags: |
