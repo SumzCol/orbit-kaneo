@@ -93,6 +93,7 @@ describe("CalendarTaskBar", () => {
   it.each([
     ["to-do", "bg-slate-500/15"],
     ["in-progress", "bg-blue-500/15"],
+    ["blocked", "bg-rose-500/15"],
     ["in-review", "bg-amber-500/15"],
     ["done", "bg-emerald-500/15"],
     ["custom-status", "bg-primary/12"],
