@@ -1,0 +1,29 @@
+# Fork-only. Builds the images this instance runs from; there is no versioned
+# release. The reusable build stamps a version only when one is passed, so
+# omitting it builds the tree as-is, and it derives the registry from the
+# repository owner — so these publish to this fork, never upstream.
+name: Deploy
+
+on:
+  push:
+    branches: [orbit]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  images:
+    name: Build and publish images
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-images.yml
+    secrets: inherit
+    with:
+      # `orbit` is what deployments track; the SHA tag is what makes a rollback
+      # possible, since `orbit` alone has no history to roll back to.
+      tags: |
+        type=raw,value=orbit
+        type=sha,format=long

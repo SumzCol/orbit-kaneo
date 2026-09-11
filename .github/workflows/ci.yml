@@ -2,13 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # `orbit` is this fork's integration branch; `main` mirrors upstream.
+    branches: [main, orbit]
   pull_request:
   workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/orbit' }}
 
 permissions:
   contents: read
