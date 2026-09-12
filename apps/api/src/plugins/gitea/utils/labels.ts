@@ -8,13 +8,14 @@ const labelColors: Record<string, string> = {
   "priority:urgent": "EF4444",
   "status:to-do": "6B7280",
   "status:in-progress": "3B82F6",
+  "status:blocked": "F43F5E",
   "status:in-review": "8B5CF6",
   "status:done": "10B981",
   "status:planned": "8B5CF6",
   "status:archived": "6B7280",
 };
 
-function getLabelColor(labelName: string): string {
+export function getLabelColor(labelName: string): string {
   return labelColors[labelName] || "6B7280";
 }
 
