@@ -5,8 +5,12 @@ import type { BoardBundle, PlankaClient } from "./planka.js";
 
 type Call = { method: string; args: unknown[] };
 
+// Mirrors IMPORT_PLACEHOLDER_COLUMN in migrate.ts.
+const PLACEHOLDER_NAME = "PLANKA import in progress";
+
 function fakeKaneo(calls: Call[]) {
   let taskCounter = 0;
+  let columnCounter = 0;
   const record = (method: string, ...args: unknown[]) => {
     calls.push({ method, args });
   };
@@ -37,7 +41,8 @@ function fakeKaneo(calls: Call[]) {
     },
     async createColumn(_projectId: string, input: unknown) {
       record("createColumn", input);
-      return { id: "c_new", name: "x", slug: "x" };
+      columnCounter++;
+      return { id: `c_new_${columnCounter}`, name: "x", slug: "x" };
     },
     async createTask(_projectId: string, input: unknown) {
       record("createTask", input);
@@ -179,20 +184,68 @@ describe("migrate (write)", () => {
       skipComments: false,
     });
 
-    const sequence = calls.map((call) => call.method);
-    const lastDelete = sequence.lastIndexOf("deleteColumn");
-    const firstCreate = sequence.indexOf("createColumn");
+    const seededIds = ["c_default_1", "c_default_2"];
+    const isPlaceholder = (call: Call) =>
+      (call.args[0] as { name: string }).name === PLACEHOLDER_NAME;
 
-    expect(sequence.filter((m) => m === "deleteColumn")).toHaveLength(2);
-    expect(lastDelete).toBeLessThan(firstCreate);
+    // A column's slug comes from its name, so every seeded column has to be
+    // gone before the PLANKA ones are created or a list named "To Do" would
+    // collide with the seeded "To Do".
+    const lastSeededDelete = calls.reduce(
+      (last, call, index) =>
+        call.method === "deleteColumn" &&
+        seededIds.includes(call.args[0] as string)
+          ? index
+          : last,
+      -1,
+    );
+    const firstImportedCreate = calls.findIndex(
+      (call) => call.method === "createColumn" && !isPlaceholder(call),
+    );
+
+    expect(lastSeededDelete).toBeGreaterThan(-1);
+    expect(lastSeededDelete).toBeLessThan(firstImportedCreate);
 
     const created = calls
       .filter((call) => call.method === "createColumn")
       .map((call) => call.args[0]);
     expect(created).toEqual([
+      { name: PLACEHOLDER_NAME, isFinal: false },
       { name: "Backlog", isFinal: false },
       { name: "Shipped", isFinal: true },
     ]);
+  });
+
+  it("never leaves the project without a column during the swap", async () => {
+    const calls: Call[] = [];
+    await migrate({
+      planka: fakePlanka(bundleWith({})),
+      kaneo: fakeKaneo(calls),
+      workspaceId: "ws_1",
+      targets: [target],
+      dryRun: false,
+      skipComments: false,
+    });
+
+    // Replay the column mutations. Kaneo refuses to delete a project's last
+    // column, so a run that dips to zero would fail against a real API.
+    let open = 2; // the seeded columns the fake client reports
+    let fewest = open;
+    const live = new Set(["c_default_1", "c_default_2"]);
+
+    for (const call of calls) {
+      if (call.method === "createColumn") {
+        open++;
+      } else if (call.method === "deleteColumn") {
+        open--;
+        fewest = Math.min(fewest, open);
+        live.delete(call.args[0] as string);
+      }
+    }
+
+    expect(fewest).toBeGreaterThan(0);
+    // The throwaway column is cleaned up, leaving only the PLANKA columns.
+    expect(open).toBe(2);
   });
 
   it("avoids a project key that is already taken in the workspace", async () => {

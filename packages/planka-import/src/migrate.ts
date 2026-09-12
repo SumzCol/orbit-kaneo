@@ -19,6 +19,11 @@ import {
   type PlankaUser,
 } from "./planka.js";
 
+// Transient column that keeps a project from being momentarily column-less
+// while the seeded columns are swapped for the imported ones. Named so it is
+// recognisable if an import fails midway and leaves it behind.
+const IMPORT_PLACEHOLDER_COLUMN = "PLANKA import in progress";
+
 export type BoardTarget = {
   project: PlankaProject;
   board: PlankaBoard;
@@ -237,16 +242,32 @@ async function migrateBoard(context: {
   });
   report.kaneoProjectId = project.id;
 
-  // Kaneo seeds default columns on create; drop them while still empty.
-  for (const existing of await kaneo.listColumns(project.id)) {
-    await kaneo.deleteColumn(existing.id);
-  }
+  // The seeded columns still have to go before the PLANKA ones are created,
+  // because a column's slug comes from its name and a list named "To Do" would
+  // collide with the seeded "To Do". Kaneo now refuses to delete a project's
+  // last column, so a throwaway column holds the project open across the swap.
+  // A board with no lists keeps the seeded columns rather than ending up with
+  // an empty board.
+  const seededColumns = await kaneo.listColumns(project.id);
 
-  for (const column of columns) {
-    await kaneo.createColumn(project.id, {
-      name: column.name,
-      isFinal: column.isFinal,
+  if (columns.length > 0) {
+    const placeholder = await kaneo.createColumn(project.id, {
+      name: IMPORT_PLACEHOLDER_COLUMN,
+      isFinal: false,
     });
+
+    for (const seeded of seededColumns) {
+      await kaneo.deleteColumn(seeded.id);
+    }
+
+    for (const column of columns) {
+      await kaneo.createColumn(project.id, {
+        name: column.name,
+        isFinal: column.isFinal,
+      });
+    }
+
+    await kaneo.deleteColumn(placeholder.id);
   }
 
   const labelIdByPlankaId = new Map<string, { name: string; color: string }>();
