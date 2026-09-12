@@ -200,6 +200,26 @@ const scrTasks: TaskWithExtras[] = [
     assigneeImage: null,
     labels: [{ id: "lbl-2", name: "sales", color: "#6366f1" }],
   },
+  {
+    id: "t-108",
+    number: 8,
+    title: "Replace the third-floor copier",
+    description:
+      "Corporate has not approved the purchase order. Toby says to wait. We are waiting.",
+    priority: "low",
+    status: "blocked",
+    position: 1,
+    startDate: d(-1),
+    dueDate: d(9),
+    userId: "u-4",
+    projectId: SCR_ID,
+    workspaceId: WS_ID,
+    createdAt: CREATED_AT,
+    updatedAt: UPDATED_AT,
+    assigneeName: "Pam Beesly",
+    assigneeImage: null,
+    labels: [{ id: "lbl-3", name: "hr", color: "#10b981" }],
+  },
 ];
 
 export const WEB_PROJECT: ProjectWithTasks = {
@@ -244,6 +264,14 @@ export const WEB_PROJECT: ProjectWithTasks = {
       isFinal: true,
       projectId: SCR_ID,
       tasks: scrTasks.filter((t) => t.status === "done"),
+    },
+    {
+      id: "blocked",
+      name: "Blocked",
+      order: 4,
+      isFinal: false,
+      projectId: SCR_ID,
+      tasks: scrTasks.filter((t) => t.status === "blocked"),
     },
   ],
 };
@@ -355,6 +383,26 @@ const tlmTasks: TaskWithExtras[] = [
     assigneeImage: null,
     labels: [{ id: "lbl-5", name: "cinema", color: "#8b5cf6" }],
   },
+  {
+    id: "t-206",
+    number: 6,
+    title: "Re-shoot the hockey rink sequence",
+    description:
+      "The rink is booked through the winter. Nothing moves until Dwight secures the ice.",
+    priority: "high",
+    status: "blocked",
+    position: 1,
+    startDate: d(-2),
+    dueDate: d(12),
+    userId: "u-2",
+    projectId: TLM_ID,
+    workspaceId: WS_ID,
+    createdAt: CREATED_AT,
+    updatedAt: UPDATED_AT,
+    assigneeName: "Dwight Schrute",
+    assigneeImage: null,
+    labels: [{ id: "lbl-5", name: "cinema", color: "#8b5cf6" }],
+  },
 ];
 
 export const MOB_PROJECT: ProjectWithTasks = {
@@ -399,6 +447,14 @@ export const MOB_PROJECT: ProjectWithTasks = {
       isFinal: true,
       projectId: TLM_ID,
       tasks: tlmTasks.filter((t) => t.status === "done"),
+    },
+    {
+      id: "blocked",
+      name: "Blocked",
+      order: 4,
+      isFinal: false,
+      projectId: TLM_ID,
+      tasks: tlmTasks.filter((t) => t.status === "blocked"),
     },
   ],
 };
