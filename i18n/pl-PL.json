@@ -2235,7 +2235,8 @@
 			"in-review": "Do przeglądu",
 			"label": "Status",
 			"planned": "Zaplanowane",
-			"to-do": "Do zrobienia"
+			"to-do": "Do zrobienia",
+			"blocked": "Zablokowane"
 		},
 		"subtasks": {
 			"addAction": "Dodaj",

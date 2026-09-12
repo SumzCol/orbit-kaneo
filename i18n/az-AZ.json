@@ -1643,7 +1643,8 @@
 			"in-review": "Yoxlanılır",
 			"done": "Hazırdır",
 			"archived": "Arxivlənmiş",
-			"planned": "Planlaşdırılmış"
+			"planned": "Planlaşdırılmış",
+			"blocked": "Bloklanmış"
 		},
 		"priority": {
 			"label": "Prioritet",

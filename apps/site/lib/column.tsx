@@ -1,4 +1,10 @@
-import { CheckCircle2, Circle, CircleDot, Search } from "lucide-react";
+import {
+  CheckCircle2,
+  Circle,
+  CircleDot,
+  CircleSlash,
+  Search,
+} from "lucide-react";
 
 export const getColumnIcon = (columnId: string, isFinal?: boolean) => {
   switch (columnId) {
@@ -10,6 +16,8 @@ export const getColumnIcon = (columnId: string, isFinal?: boolean) => {
       return <Search className="w-4 h-4 text-muted-foreground" />;
     case "done":
       return <CheckCircle2 className="w-4 h-4 text-muted-foreground" />;
+    case "blocked":
+      return <CircleSlash className="w-4 h-4 text-muted-foreground" />;
     default:
       return isFinal ? (
         <CheckCircle2 className="w-4 h-4 text-muted-foreground" />

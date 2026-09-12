@@ -23,6 +23,7 @@ describe("github labels helpers", () => {
   it("returns explicit and fallback colors", () => {
     expect(getLabelColor("priority:urgent")).toBe("EF4444");
     expect(getLabelColor("status:done")).toBe("10B981");
+    expect(getLabelColor("status:blocked")).toBe("F43F5E");
     expect(getLabelColor("custom:label")).toBe("6B7280");
   });
 

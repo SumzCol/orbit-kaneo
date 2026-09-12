@@ -1638,7 +1638,8 @@
 			"in-review": "Dalam Review",
 			"done": "Selesai",
 			"archived": "Diarsipkan",
-			"planned": "Direncanakan"
+			"planned": "Direncanakan",
+			"blocked": "Diblokir"
 		},
 		"priority": {
 			"label": "Prioritas",

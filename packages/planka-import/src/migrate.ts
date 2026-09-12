@@ -237,7 +237,7 @@ async function migrateBoard(context: {
   });
   report.kaneoProjectId = project.id;
 
-  // Kaneo seeds four default columns on create; drop them while still empty.
+  // Kaneo seeds default columns on create; drop them while still empty.
   for (const existing of await kaneo.listColumns(project.id)) {
     await kaneo.deleteColumn(existing.id);
   }

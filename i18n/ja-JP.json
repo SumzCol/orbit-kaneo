@@ -1638,7 +1638,8 @@
 			"in-review": "レビュー中",
 			"done": "完了",
 			"archived": "アーカイブ済み",
-			"planned": "計画中"
+			"planned": "計画中",
+			"blocked": "ブロック中"
 		},
 		"priority": {
 			"label": "優先度",

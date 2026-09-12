@@ -1643,7 +1643,8 @@
 			"in-review": "Ter beoordeling",
 			"done": "Gereed",
 			"archived": "Gearchiveerd",
-			"planned": "Gepland"
+			"planned": "Gepland",
+			"blocked": "Geblokkeerd"
 		},
 		"priority": {
 			"label": "Prioriteit",

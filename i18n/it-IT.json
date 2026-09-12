@@ -1648,7 +1648,8 @@
 			"in-review": "In Revisione",
 			"done": "Completato",
 			"archived": "Archiviato",
-			"planned": "Pianificato"
+			"planned": "Pianificato",
+			"blocked": "Bloccato"
 		},
 		"priority": {
 			"label": "Priorità",
