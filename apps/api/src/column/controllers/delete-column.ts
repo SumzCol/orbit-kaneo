@@ -24,6 +24,21 @@ async function deleteColumn(id: string) {
     });
   }
 
+  // A project with no columns has an unusable board, and the startup column
+  // migration treats a column-less project as never initialized and re-seeds
+  // the defaults into it. Refusing the last column keeps both from happening.
+  const [columnCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(columnTable)
+    .where(eq(columnTable.projectId, existing.projectId));
+
+  if (columnCount && columnCount.count <= 1) {
+    throw new HTTPException(409, {
+      message:
+        "Cannot delete the last column of a project. Create another column first.",
+    });
+  }
+
   await db.delete(columnTable).where(eq(columnTable.id, id));
 
   return existing;

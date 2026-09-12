@@ -130,7 +130,7 @@ const deleteColumnRoute = createRoute({
   tags: ["Columns"],
   summary: "Delete column",
   description:
-    "Delete an empty column. A column holding tasks is refused until they are moved or deleted.",
+    "Delete an empty column. A column holding tasks is refused until they are moved or deleted, and a project's last remaining column is refused so the board is never left without one.",
   middleware: [
     workspaceAccess.fromColumn("id"),
     requireWorkspacePermission({ project: ["update"] }),
@@ -144,7 +144,9 @@ const deleteColumnRoute = createRoute({
     403: errorResponse(
       "No workspace access, or missing project:update permission",
     ),
-    409: errorResponse("The column still contains tasks"),
+    409: errorResponse(
+      "The column still contains tasks, or is the project's last column",
+    ),
   },
 });
 
