@@ -21,6 +21,9 @@ jobs:
     uses: ./.github/workflows/build-images.yml
     secrets: inherit
     with:
+      # Fork-only. Without the prefix these land on the org-wide names
+      # `kaneo`, `api` and `web`; see nightly.yml.
+      image_prefix: orbit-
       version: ${{ inputs.version }}
       tags: |
         type=raw,value=${{ inputs.version }}

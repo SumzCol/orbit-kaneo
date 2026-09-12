@@ -81,6 +81,12 @@ jobs:
     uses: ./.github/workflows/build-images.yml
     secrets: inherit
     with:
+      # Fork-only, and deliberately divergent from upstream. GHCR packages are
+      # owner-scoped, so without this the images land on the org-wide names
+      # `kaneo`, `api` and `web`, which any other SumzCol repository would push
+      # into. This workflow is disabled here; the prefix is what keeps a
+      # re-enable or a manual dispatch from reclaiming those names.
+      image_prefix: orbit-
       tags: |
         type=raw,value=nightly
         type=raw,value=nightly-{{date 'YYYYMMDD'}}
