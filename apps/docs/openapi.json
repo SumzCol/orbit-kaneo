@@ -13458,7 +13458,7 @@
           "Invitations"
         ],
         "summary": "Get pending invitations",
-        "description": "Get the current user's unexpired, unaccepted invitations. Returns an empty list until the user's email is verified.",
+        "description": "Get the current user's unexpired, unaccepted invitations, matched on the session's email address.",
         "responses": {
           "200": {
             "description": "List of pending invitations",

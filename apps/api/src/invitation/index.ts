@@ -14,7 +14,7 @@ const getPendingRoute = createRoute({
   tags: ["Invitations"],
   summary: "Get pending invitations",
   description:
-    "Get the current user's unexpired, unaccepted invitations. Returns an empty list until the user's email is verified.",
+    "Get the current user's unexpired, unaccepted invitations, matched on the session's email address.",
   responses: {
     200: jsonResponse(
       "List of pending invitations",
@@ -38,13 +38,9 @@ const getInvitationRoute = createRoute({
 });
 
 const invitation = apiRouter()
-  .openapi(getPendingRoute, async (c) => {
-    const user = c.get("user");
-    if (!user?.emailVerified) {
-      return c.json([], 200);
-    }
-    return c.json(await getUserPendingInvitations(c.get("userEmail")), 200);
-  })
+  .openapi(getPendingRoute, async (c) =>
+    c.json(await getUserPendingInvitations(c.get("userEmail")), 200),
+  )
   .openapi(getInvitationRoute, async (c) =>
     c.json(await getInvitationDetailsController(c.req.valid("param").id), 200),
   );
