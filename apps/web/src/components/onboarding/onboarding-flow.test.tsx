@@ -146,6 +146,22 @@ describe("OnboardingFlow", () => {
     expect(restricted()).not.toBeInTheDocument();
   });
 
+  it("still decides when the role refresh fails", async () => {
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    refetchUser.mockRejectedValueOnce(new Error("network"));
+
+    render(<OnboardingFlow />);
+    await settled();
+    await settled();
+
+    // The cached role stands, the screen resolves, and the failure does not
+    // escape as a global error.
+    expect(creationForm()).toBeInTheDocument();
+    expect(unhandled).not.toHaveBeenCalled();
+    process.off("unhandledRejection", unhandled);
+  });
+
   it("claims nothing while the config is still loading", async () => {
     // `undefined` is the pending state. Showing the restriction here would
     // flash a false statement before a working form resolves, and showing the

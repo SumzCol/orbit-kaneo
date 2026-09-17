@@ -68,7 +68,19 @@ export function OnboardingFlow() {
   useEffect(() => {
     if (roleRefreshStarted.current) return;
     roleRefreshStarted.current = true;
-    void Promise.resolve(refetchUser()).finally(() => setRoleRefreshed(true));
+
+    void (async () => {
+      try {
+        await refetchUser();
+      } catch {
+        // A refresh that fails leaves the cached role in place, which is the
+        // same position this screen was in before. Swallowing it keeps that
+        // fallback deliberate rather than surfacing as an unhandled rejection,
+        // and the API still refuses a creation the role does not allow.
+      } finally {
+        setRoleRefreshed(true);
+      }
+    })();
   }, [refetchUser]);
 
   // The setting restricts creation to instance admins, and the API enforces it
