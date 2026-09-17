@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OnboardingFlow } from "./onboarding-flow";
 
 const config = vi.fn();
-const session = vi.fn();
+const authUser = vi.fn();
+const refetchUser = vi.fn();
 
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-router")>()),
@@ -23,7 +24,7 @@ vi.mock("@/hooks/queries/config/use-get-config", () => ({
 }));
 
 vi.mock("@/lib/auth-client", () => ({
-  authClient: { useSession: () => session() },
+  authClient: { organization: { setActive: vi.fn() } },
 }));
 
 vi.mock("@/hooks/queries/workspace/use-create-workspace", () => ({
@@ -31,7 +32,7 @@ vi.mock("@/hooks/queries/workspace/use-create-workspace", () => ({
 }));
 
 vi.mock("@/components/providers/auth-provider/hooks/use-auth", () => ({
-  default: () => ({ user: { id: "u1", name: "Sam" } }),
+  default: () => ({ user: authUser(), refetchUser }),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -41,8 +42,11 @@ vi.mock("react-i18next", () => ({
 }));
 
 beforeEach(() => {
-  session.mockReturnValue({ data: { user: { role: "user" } } });
-  config.mockReturnValue({ data: { disableWorkspaceCreation: false } });
+  authUser.mockReturnValue({ id: "u1", name: "Sam", role: "user" });
+  config.mockReturnValue({
+    data: { disableWorkspaceCreation: false },
+    isPending: false,
+  });
 });
 
 afterEach(() => {
@@ -72,7 +76,10 @@ describe("OnboardingFlow", () => {
   });
 
   it("explains the restriction instead of offering a form that would fail", () => {
-    config.mockReturnValue({ data: { disableWorkspaceCreation: true } });
+    config.mockReturnValue({
+      data: { disableWorkspaceCreation: true },
+      isPending: false,
+    });
 
     render(<OnboardingFlow />);
 
@@ -88,8 +95,11 @@ describe("OnboardingFlow", () => {
   });
 
   it("still offers the form to an instance admin when creation is restricted", () => {
-    config.mockReturnValue({ data: { disableWorkspaceCreation: true } });
-    session.mockReturnValue({ data: { user: { role: "admin" } } });
+    config.mockReturnValue({
+      data: { disableWorkspaceCreation: true },
+      isPending: false,
+    });
+    authUser.mockReturnValue({ id: "u1", name: "Sam", role: "admin" });
 
     render(<OnboardingFlow />);
 
@@ -101,11 +111,29 @@ describe("OnboardingFlow", () => {
     // `undefined` is the pending state. Showing the restriction here would
     // flash a false statement before a working form resolves, and showing the
     // form would invite a submit that fails.
-    config.mockReturnValue({ data: undefined });
+    config.mockReturnValue({ data: undefined, isPending: true });
 
     render(<OnboardingFlow />);
 
     expect(creationForm()).not.toBeInTheDocument();
     expect(restricted()).not.toBeInTheDocument();
+  });
+
+  it("falls back to the form when the config request fails", () => {
+    // Settled with no data is an error, not a restriction. Claiming a
+    // restriction here would be untrue, and the API still has the final say.
+    config.mockReturnValue({ data: undefined, isPending: false });
+
+    render(<OnboardingFlow />);
+
+    expect(creationForm()).toBeInTheDocument();
+    expect(restricted()).not.toBeInTheDocument();
+  });
+
+  it("re-reads the role, which the session may report stale", () => {
+    render(<OnboardingFlow />);
+
+    // The first admin of an instance is promoted after the session is cached.
+    expect(refetchUser).toHaveBeenCalled();
   });
 });

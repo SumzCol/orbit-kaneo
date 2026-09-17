@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, MailQuestion } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Trans, useTranslation } from "react-i18next";
 import { z } from "zod/v4";
@@ -49,25 +49,38 @@ export function OnboardingFlow() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { mutateAsync: createWorkspace, isPending } = useCreateWorkspace();
-  const { user } = useAuth();
-  const { data: session } = authClient.useSession();
-  const { data: config } = useGetConfig();
+  const { user, refetchUser } = useAuth();
+  const { data: config, isPending: configPending } = useGetConfig();
+
+  // The session role can be up to five minutes stale: `auth.ts` notes that the
+  // first-user bootstrap promotes to admin after the session is already
+  // cached. Elsewhere a stale role only hides a button; here it would send the
+  // first administrator of an instance to a screen telling them to ask
+  // someone for an invitation. Re-read it once, bypassing that cache.
+  useEffect(() => {
+    void refetchUser();
+  }, [refetchUser]);
 
   // The setting restricts creation to instance admins, and the API enforces it
   // through `allowUserToCreateOrganization`. Without this the form is still
   // offered to a user whose only way here is having nowhere to go, and
   // submitting it fails.
   //
-  // Neither view is shown until the config resolves. The switcher can hide a
-  // button while it loads, but this screen would be asserting something: a
+  // Neither view is shown while the config is still loading. The switcher can
+  // hide a button meanwhile, but this screen would be asserting something: a
   // flash of "you need an invitation" before a working form is worse than a
   // blank moment.
-  const isInstanceAdmin = session?.user?.role === "admin";
-  const canCreateWorkspace =
-    isInstanceAdmin ||
-    (config !== undefined && !config.disableWorkspaceCreation);
+  //
+  // A failed config request is not a restriction, though. Falling back to the
+  // form leaves the API with the final say, which it has either way, rather
+  // than stranding the user on a screen with nothing on it.
+  const isInstanceAdmin =
+    (user as { role?: string | null } | null | undefined)?.role === "admin";
   const isCreationRestricted =
-    !isInstanceAdmin && config !== undefined && config.disableWorkspaceCreation;
+    !isInstanceAdmin &&
+    !configPending &&
+    config?.disableWorkspaceCreation === true;
+  const isDecided = isInstanceAdmin || !configPending;
 
   const workspaceSchema = useMemo(
     () =>
@@ -285,7 +298,10 @@ export function OnboardingFlow() {
       <PageTitle title={t("auth:onboarding.workspacePageTitle")} />
       <div className="min-h-screen w-full bg-background flex flex-col items-center justify-center p-4">
         <AnimatePresence mode="wait">
-          {step === "workspace" && canCreateWorkspace && renderWorkspaceStep()}
+          {step === "workspace" &&
+            isDecided &&
+            !isCreationRestricted &&
+            renderWorkspaceStep()}
           {step === "workspace" &&
             isCreationRestricted &&
             renderRestrictedStep()}

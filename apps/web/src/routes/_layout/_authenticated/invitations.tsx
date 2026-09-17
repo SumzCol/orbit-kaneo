@@ -177,9 +177,14 @@ function InvitationsPage() {
               <p className="text-sm text-muted-foreground max-w-md mb-6">
                 {t("invitations:noPendingDescription")}
               </p>
-              <Button onClick={handleSkip} variant="default">
-                {t("invitations:continueToSetup")}
-              </Button>
+              {canCreateWorkspace && (
+                // Without creation rights there is no setup to continue to,
+                // and this would bounce back to the onboarding screen that
+                // sent the user here.
+                <Button onClick={handleSkip} variant="default">
+                  {t("invitations:continueToSetup")}
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-6">
