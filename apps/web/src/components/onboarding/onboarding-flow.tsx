@@ -2,7 +2,7 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, MailQuestion } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Trans, useTranslation } from "react-i18next";
@@ -20,6 +20,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import useGetConfig from "@/hooks/queries/config/use-get-config";
 import useCreateWorkspace from "@/hooks/queries/workspace/use-create-workspace";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/lib/toast";
@@ -49,6 +50,24 @@ export function OnboardingFlow() {
   const queryClient = useQueryClient();
   const { mutateAsync: createWorkspace, isPending } = useCreateWorkspace();
   const { user } = useAuth();
+  const { data: session } = authClient.useSession();
+  const { data: config } = useGetConfig();
+
+  // The setting restricts creation to instance admins, and the API enforces it
+  // through `allowUserToCreateOrganization`. Without this the form is still
+  // offered to a user whose only way here is having nowhere to go, and
+  // submitting it fails.
+  //
+  // Neither view is shown until the config resolves. The switcher can hide a
+  // button while it loads, but this screen would be asserting something: a
+  // flash of "you need an invitation" before a working form is worse than a
+  // blank moment.
+  const isInstanceAdmin = session?.user?.role === "admin";
+  const canCreateWorkspace =
+    isInstanceAdmin ||
+    (config !== undefined && !config.disableWorkspaceCreation);
+  const isCreationRestricted =
+    !isInstanceAdmin && config !== undefined && config.disableWorkspaceCreation;
 
   const workspaceSchema = useMemo(
     () =>
@@ -221,12 +240,51 @@ export function OnboardingFlow() {
     </motion.div>
   );
 
+  const renderRestrictedStep = () => (
+    <motion.div
+      key="restricted"
+      variants={fadeTransition}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+      className="w-full max-w-sm mx-auto"
+    >
+      <Logo className="mx-auto mb-6 w-full flex items-end justify-center" />
+
+      <div className="rounded-xl border border-border bg-card p-6 shadow-sm text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+          <MailQuestion className="h-6 w-6 text-muted-foreground" />
+        </div>
+
+        <h1 className="text-xl font-semibold text-foreground mb-2">
+          {t("auth:onboarding.restrictedTitle")}
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          {t("auth:onboarding.restrictedSubtitle")}
+        </p>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-6 w-full"
+          onClick={() => navigate({ to: "/invitations" })}
+        >
+          {t("auth:onboarding.restrictedCheckInvitations")}
+        </Button>
+      </div>
+    </motion.div>
+  );
+
   return (
     <>
       <PageTitle title={t("auth:onboarding.workspacePageTitle")} />
       <div className="min-h-screen w-full bg-background flex flex-col items-center justify-center p-4">
         <AnimatePresence mode="wait">
-          {step === "workspace" && renderWorkspaceStep()}
+          {step === "workspace" && canCreateWorkspace && renderWorkspaceStep()}
+          {step === "workspace" &&
+            isCreationRestricted &&
+            renderRestrictedStep()}
           {step === "success" && renderSuccessStep()}
         </AnimatePresence>
       </div>

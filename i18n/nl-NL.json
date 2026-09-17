@@ -320,7 +320,10 @@
 			},
 			"validation": {
 				"workspaceNameRequired": "Werkruimtenaam is verplicht"
-			}
+			},
+			"restrictedCheckInvitations": "Uitnodigingen bekijken",
+			"restrictedSubtitle": "Alleen een instantiebeheerder kan hier workspaces aanmaken. Vraag om een uitnodiging en laad deze pagina opnieuw.",
+			"restrictedTitle": "Je hebt een uitnodiging nodig"
 		},
 		"profileSetup": {
 			"pageTitle": "Profiel Voltooien",
