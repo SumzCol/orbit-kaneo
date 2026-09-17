@@ -321,7 +321,6 @@
 			"validation": {
 				"workspaceNameRequired": "Workspace-Name ist erforderlich"
 			},
-			"restrictedCheckInvitations": "Einladungen prüfen",
 			"restrictedSubtitle": "Nur eine Instanzadministration kann hier Workspaces anlegen. Bitte um eine Einladung und lade diese Seite neu.",
 			"restrictedTitle": "Du brauchst eine Einladung"
 		},

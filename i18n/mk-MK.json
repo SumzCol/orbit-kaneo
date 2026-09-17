@@ -321,7 +321,6 @@
 			"validation": {
 				"workspaceNameRequired": "Името на работниот простор е задолжително"
 			},
-			"restrictedCheckInvitations": "Провери покани",
 			"restrictedSubtitle": "Овде само администратор на инстанцата може да создава работни простори. Побарајте покана и освежете ја страницата.",
 			"restrictedTitle": "Ви треба покана"
 		},

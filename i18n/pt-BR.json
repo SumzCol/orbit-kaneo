@@ -321,7 +321,6 @@
 			"validation": {
 				"workspaceNameRequired": "O nome do espaço de trabalho é obrigatório"
 			},
-			"restrictedCheckInvitations": "Ver convites",
 			"restrictedSubtitle": "Aqui apenas um administrador da instância pode criar espaços de trabalho. Peça um convite e recarregue esta página.",
 			"restrictedTitle": "Você precisa de um convite"
 		},

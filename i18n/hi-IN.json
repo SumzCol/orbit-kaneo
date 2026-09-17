@@ -321,7 +321,6 @@
 			"validation": {
 				"workspaceNameRequired": "वर्कस्पेस का नाम आवश्यक है"
 			},
-			"restrictedCheckInvitations": "आमंत्रण देखें",
 			"restrictedSubtitle": "यहाँ केवल इंस्टेंस व्यवस्थापक ही कार्यक्षेत्र बना सकता है। आमंत्रण के लिए कहें, फिर यह पृष्ठ पुनः लोड करें।",
 			"restrictedTitle": "आपको आमंत्रण चाहिए"
 		},

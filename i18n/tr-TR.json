@@ -321,7 +321,6 @@
 			"validation": {
 				"workspaceNameRequired": "Çalışma alanı adı gereklidir"
 			},
-			"restrictedCheckInvitations": "Davetleri görüntüle",
 			"restrictedSubtitle": "Burada yalnızca örnek yöneticisi çalışma alanı oluşturabilir. Davet isteyin, ardından bu sayfayı yenileyin.",
 			"restrictedTitle": "Davet gerekiyor"
 		},

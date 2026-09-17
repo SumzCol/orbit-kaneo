@@ -240,6 +240,9 @@ export function OnboardingFlow() {
     </motion.div>
   );
 
+  // No action offered on purpose. The invitations screen has nothing to show
+  // a user who has not been invited, and its only control returns here, so a
+  // link would be a loop. The text says what to do instead.
   const renderRestrictedStep = () => (
     <motion.div
       key="restricted"
@@ -263,15 +266,6 @@ export function OnboardingFlow() {
         <p className="text-muted-foreground text-sm">
           {t("auth:onboarding.restrictedSubtitle")}
         </p>
-
-        <Button
-          type="button"
-          variant="outline"
-          className="mt-6 w-full"
-          onClick={() => navigate({ to: "/invitations" })}
-        >
-          {t("auth:onboarding.restrictedCheckInvitations")}
-        </Button>
       </div>
     </motion.div>
   );

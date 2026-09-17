@@ -321,7 +321,6 @@
 			"validation": {
 				"workspaceNameRequired": "Cần có tên không gian làm việc"
 			},
-			"restrictedCheckInvitations": "Xem lời mời",
 			"restrictedSubtitle": "Tại đây chỉ quản trị viên hệ thống mới có thể tạo không gian làm việc. Hãy xin lời mời rồi tải lại trang này.",
 			"restrictedTitle": "Bạn cần một lời mời"
 		},
