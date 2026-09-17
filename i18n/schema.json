@@ -1231,6 +1231,9 @@
 						"restrictedSubtitle": {
 							"type": "string"
 						},
+						"restrictedCheckInvitations": {
+							"type": "string"
+						},
 						"workspaceCreatedTitle": {
 							"type": "string"
 						},
@@ -1274,6 +1277,7 @@
 						"createWorkspace",
 						"restrictedTitle",
 						"restrictedSubtitle",
+						"restrictedCheckInvitations",
 						"workspaceCreatedTitle",
 						"redirectingToWorkspace",
 						"toast",

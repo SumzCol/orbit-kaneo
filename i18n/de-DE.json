@@ -322,6 +322,7 @@
 				"workspaceNameRequired": "Workspace-Name ist erforderlich"
 			},
 			"restrictedSubtitle": "Nur eine Instanzadministration kann hier Workspaces anlegen. Bitte um eine Einladung und lade diese Seite neu.",
+			"restrictedCheckInvitations": "Einladungen prüfen",
 			"restrictedTitle": "Du brauchst eine Einladung"
 		},
 		"profileSetup": {

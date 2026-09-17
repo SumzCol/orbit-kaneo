@@ -80,9 +80,11 @@ describe("OnboardingFlow", () => {
     // produces an error at submit time.
     expect(restricted()).toBeInTheDocument();
     expect(creationForm()).not.toBeInTheDocument();
-    // No link to the invitations screen: it has nothing to show an uninvited
-    // user, and its only control navigates back here.
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    // Reaching this screen with an invitation waiting is possible, so it has
+    // to offer a route back to it.
+    expect(
+      screen.getByText("auth:onboarding.restrictedCheckInvitations"),
+    ).toBeInTheDocument();
   });
 
   it("still offers the form to an instance admin when creation is restricted", () => {

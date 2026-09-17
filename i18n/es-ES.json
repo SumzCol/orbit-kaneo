@@ -322,6 +322,7 @@
 				"workspaceNameRequired": "El nombre del espacio de trabajo es obligatorio"
 			},
 			"restrictedSubtitle": "Aquí solo un administrador de la instancia puede crear espacios de trabajo. Pide que te inviten y recarga esta página.",
+			"restrictedCheckInvitations": "Ver invitaciones",
 			"restrictedTitle": "Necesitas una invitación"
 		},
 		"profileSetup": {

@@ -240,9 +240,6 @@ export function OnboardingFlow() {
     </motion.div>
   );
 
-  // No action offered on purpose. The invitations screen has nothing to show
-  // a user who has not been invited, and its only control returns here, so a
-  // link would be a loop. The text says what to do instead.
   const renderRestrictedStep = () => (
     <motion.div
       key="restricted"
@@ -266,6 +263,19 @@ export function OnboardingFlow() {
         <p className="text-muted-foreground text-sm">
           {t("auth:onboarding.restrictedSubtitle")}
         </p>
+
+        {/* The way back. Reaching this screen with an invitation waiting is
+            possible, and without this the only route to it is editing the
+            URL. The invitations screen hides its own skip control while
+            creation is restricted, so this does not bounce. */}
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-6 w-full"
+          onClick={() => navigate({ to: "/invitations" })}
+        >
+          {t("auth:onboarding.restrictedCheckInvitations")}
+        </Button>
       </div>
     </motion.div>
   );

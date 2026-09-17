@@ -322,6 +322,7 @@
 				"workspaceNameRequired": "Nama ruang kerja wajib diisi"
 			},
 			"restrictedSubtitle": "Hanya administrator instance yang dapat membuat ruang kerja di sini. Minta undangan, lalu muat ulang halaman ini.",
+			"restrictedCheckInvitations": "Lihat undangan",
 			"restrictedTitle": "Anda perlu undangan"
 		},
 		"profileSetup": {
