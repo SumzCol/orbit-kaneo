@@ -1,12 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render as rtlRender, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render as rtlRender,
+  screen,
+} from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OnboardingFlow } from "./onboarding-flow";
 
 const config = vi.fn();
 const authUser = vi.fn();
-const refetchUser = vi.fn();
+const refetchUser = vi.fn(async () => {});
 
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-router")>()),
@@ -32,7 +37,15 @@ vi.mock("@/hooks/queries/workspace/use-create-workspace", () => ({
 }));
 
 vi.mock("@/components/providers/auth-provider/hooks/use-auth", () => ({
-  default: () => ({ user: authUser(), refetchUser }),
+  // A fresh function identity per call, as the real provider produces: it
+  // builds the context value inline, so every provider render yields a new
+  // refetchUser. A stable mock here cannot reproduce the refetch loop.
+  default: () => ({
+    user: authUser(),
+    refetchUser: async () => {
+      await refetchUser();
+    },
+  }),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -60,28 +73,40 @@ function render(ui: ReactNode) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return rtlRender(createElement(QueryClientProvider, { client }, ui) as never);
+  const wrap = (node: ReactNode) =>
+    createElement(QueryClientProvider, { client }, node) as never;
+  const result = rtlRender(wrap(ui));
+  // RTL's own rerender drops the wrapper, which the component needs.
+  return {
+    ...result,
+    rerender: (next: ReactNode) => result.rerender(wrap(next)),
+  };
 }
 
 const creationForm = () =>
   screen.queryByText("auth:onboarding.createWorkspaceTitle");
 const restricted = () => screen.queryByText("auth:onboarding.restrictedTitle");
 
+// Nothing decides until the one-shot role refresh settles.
+const settled = () => act(async () => {});
+
 describe("OnboardingFlow", () => {
-  it("offers the creation form when anyone may create a workspace", () => {
+  it("offers the creation form when anyone may create a workspace", async () => {
     render(<OnboardingFlow />);
+    await settled();
 
     expect(creationForm()).toBeInTheDocument();
     expect(restricted()).not.toBeInTheDocument();
   });
 
-  it("explains the restriction instead of offering a form that would fail", () => {
+  it("explains the restriction instead of offering a form that would fail", async () => {
     config.mockReturnValue({
       data: { disableWorkspaceCreation: true },
       isPending: false,
     });
 
     render(<OnboardingFlow />);
+    await settled();
 
     // The API refuses creation for non-admins, so offering the form here only
     // produces an error at submit time.
@@ -94,7 +119,7 @@ describe("OnboardingFlow", () => {
     ).toBeInTheDocument();
   });
 
-  it("still offers the form to an instance admin when creation is restricted", () => {
+  it("still offers the form to an instance admin when creation is restricted", async () => {
     config.mockReturnValue({
       data: { disableWorkspaceCreation: true },
       isPending: false,
@@ -102,38 +127,58 @@ describe("OnboardingFlow", () => {
     authUser.mockReturnValue({ id: "u1", name: "Sam", role: "admin" });
 
     render(<OnboardingFlow />);
+    await settled();
 
     expect(creationForm()).toBeInTheDocument();
     expect(restricted()).not.toBeInTheDocument();
   });
 
-  it("claims nothing while the config is still loading", () => {
+  it("claims nothing while the config is still loading", async () => {
     // `undefined` is the pending state. Showing the restriction here would
     // flash a false statement before a working form resolves, and showing the
     // form would invite a submit that fails.
     config.mockReturnValue({ data: undefined, isPending: true });
 
     render(<OnboardingFlow />);
+    await settled();
 
     expect(creationForm()).not.toBeInTheDocument();
     expect(restricted()).not.toBeInTheDocument();
   });
 
-  it("falls back to the form when the config request fails", () => {
+  it("falls back to the form when the config request fails", async () => {
     // Settled with no data is an error, not a restriction. Claiming a
     // restriction here would be untrue, and the API still has the final say.
     config.mockReturnValue({ data: undefined, isPending: false });
 
     render(<OnboardingFlow />);
+    await settled();
 
     expect(creationForm()).toBeInTheDocument();
     expect(restricted()).not.toBeInTheDocument();
   });
 
-  it("re-reads the role, which the session may report stale", () => {
+  it("re-reads the role, which the session may report stale", async () => {
     render(<OnboardingFlow />);
+    await settled();
 
     // The first admin of an instance is promoted after the session is cached.
     expect(refetchUser).toHaveBeenCalled();
+  });
+
+  it("re-reads the role only once, however often the provider rerenders", async () => {
+    const { rerender } = render(<OnboardingFlow />);
+    await settled();
+
+    // The provider builds refetchUser inline, so it is a new function on each
+    // of its renders and refetching rerenders it. Keying the effect on that
+    // identity alone would refetch forever.
+    refetchUser.mockClear();
+    rerender(<OnboardingFlow />);
+    await settled();
+    rerender(<OnboardingFlow />);
+    await settled();
+
+    expect(refetchUser).not.toHaveBeenCalled();
   });
 });

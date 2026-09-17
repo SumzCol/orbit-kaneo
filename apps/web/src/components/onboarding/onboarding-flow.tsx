@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, MailQuestion } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Trans, useTranslation } from "react-i18next";
 import { z } from "zod/v4";
@@ -57,8 +57,18 @@ export function OnboardingFlow() {
   // cached. Elsewhere a stale role only hides a button; here it would send the
   // first administrator of an instance to a screen telling them to ask
   // someone for an invitation. Re-read it once, bypassing that cache.
+  //
+  // Guarded by a ref rather than the dependency array: the provider builds
+  // `refetchUser` inline in its context value, so it is a new function on
+  // every provider render, and refetching rerenders the provider. Depending
+  // on it alone would refetch in a loop.
+  const roleRefreshStarted = useRef(false);
+  const [roleRefreshed, setRoleRefreshed] = useState(false);
+
   useEffect(() => {
-    void refetchUser();
+    if (roleRefreshStarted.current) return;
+    roleRefreshStarted.current = true;
+    void Promise.resolve(refetchUser()).finally(() => setRoleRefreshed(true));
   }, [refetchUser]);
 
   // The setting restricts creation to instance admins, and the API enforces it
@@ -76,11 +86,14 @@ export function OnboardingFlow() {
   // than stranding the user on a screen with nothing on it.
   const isInstanceAdmin =
     (user as { role?: string | null } | null | undefined)?.role === "admin";
+  // Nothing renders until the role refresh settles. Deciding on the cached
+  // role would flash the restricted screen at the one user who can fix it.
   const isCreationRestricted =
+    roleRefreshed &&
     !isInstanceAdmin &&
     !configPending &&
     config?.disableWorkspaceCreation === true;
-  const isDecided = isInstanceAdmin || !configPending;
+  const isDecided = roleRefreshed && (isInstanceAdmin || !configPending);
 
   const workspaceSchema = useMemo(
     () =>

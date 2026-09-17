@@ -36,9 +36,12 @@ function InvitationsPage() {
   const { user } = useAuth();
   const { data: session } = authClient.useSession();
   const { data: config } = useGetConfig();
+  // Unknown is not restricted. This page has no fallback view, so treating a
+  // failed config request as a restriction would leave it with no action at
+  // all; the API refuses the creation anyway if it really is restricted.
   const canCreateWorkspace =
     session?.user?.role === "admin" ||
-    (config !== undefined && !config.disableWorkspaceCreation);
+    config?.disableWorkspaceCreation !== true;
 
   const handleSkip = () => {
     if (!user?.name) {
