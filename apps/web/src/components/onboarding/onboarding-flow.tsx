@@ -76,10 +76,15 @@ export function OnboardingFlow() {
   // offered to a user whose only way here is having nowhere to go, and
   // submitting it fails.
   //
-  // Neither view is shown while the config is still loading. The switcher can
-  // hide a button meanwhile, but this screen would be asserting something: a
-  // flash of "you need an invitation" before a working form is worse than a
-  // blank moment.
+  // A non-admin sees neither view while the config is still loading. The
+  // switcher can hide a button meanwhile, but this screen would be asserting
+  // something: a flash of "you need an invitation" before a working form is
+  // worse than a blank moment.
+  //
+  // An instance admin does not wait for it. The setting cannot restrict them —
+  // `allowUserToCreateOrganization` returns true for admins whatever it says —
+  // so the answer cannot change their outcome, and waiting would only delay a
+  // form they are always entitled to.
   //
   // A failed config request is not a restriction, though. Falling back to the
   // form leaves the API with the final say, which it has either way, rather

@@ -133,6 +133,19 @@ describe("OnboardingFlow", () => {
     expect(restricted()).not.toBeInTheDocument();
   });
 
+  it("does not make an instance admin wait for the config", async () => {
+    // The setting cannot restrict an admin, so its value cannot change what
+    // they are shown. Waiting would delay a form they always get.
+    config.mockReturnValue({ data: undefined, isPending: true });
+    authUser.mockReturnValue({ id: "u1", name: "Sam", role: "admin" });
+
+    render(<OnboardingFlow />);
+    await settled();
+
+    expect(creationForm()).toBeInTheDocument();
+    expect(restricted()).not.toBeInTheDocument();
+  });
+
   it("claims nothing while the config is still loading", async () => {
     // `undefined` is the pending state. Showing the restriction here would
     // flash a false statement before a working form resolves, and showing the
