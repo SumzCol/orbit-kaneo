@@ -43,11 +43,17 @@ function ProjectAnalytics() {
     data: breakdown,
     isPending: breakdownPending,
     isError: breakdownFailed,
+    error: breakdownError,
+    refetch: refetchBreakdown,
   } = useGetProjectBreakdown(projectId, groupBy);
   // Which state each status belongs to, so the chart can colour a status the
   // same as the bar above colours its state. `isFinal` and `position` are not
   // in the breakdown response and this is already cached for the board.
-  const { data: columns, isError: columnsFailed } = useGetColumns(projectId, {
+  const {
+    data: columns,
+    isError: columnsFailed,
+    refetch: refetchColumns,
+  } = useGetColumns(projectId, {
     refetchOnMount: true,
     // Column edits publish no WebSocket event, and this view stays open.
     refetchInterval: 5 * 60 * 1000,
@@ -112,6 +118,13 @@ function ProjectAnalytics() {
               isError={
                 breakdownFailed || (groupBy === "status" && columnsFailed)
               }
+              error={breakdownError}
+              onRetry={() => {
+                // Either request can be the one that failed, and retrying the
+                // other is harmless when it has not.
+                void refetchBreakdown();
+                void refetchColumns();
+              }}
               columns={columns}
             />
           </Card>

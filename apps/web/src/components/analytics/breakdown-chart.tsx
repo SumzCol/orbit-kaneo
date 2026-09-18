@@ -1,6 +1,7 @@
 import { CircleUser } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ErrorDisplay } from "@/components/ui/error-display";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BreakdownGroupBy } from "@/fetchers/analytics/get-project-breakdown";
 import { getInitials } from "@/lib/get-initials";
@@ -64,12 +65,16 @@ export function BreakdownChart({
   groupBy,
   isLoading,
   isError = false,
+  error,
+  onRetry,
   columns,
 }: {
   buckets: BreakdownBucket[] | undefined;
   groupBy: BreakdownGroupBy;
   isLoading: boolean;
   isError?: boolean;
+  error?: unknown;
+  onRetry?: () => void;
   /** Undefined until the project's columns have loaded. */
   columns?: StatusColumn[];
 }) {
@@ -78,10 +83,14 @@ export function BreakdownChart({
   // Checked before the loading branch: a failed request leaves the data
   // undefined too, so without this the skeleton stands in for the error.
   if (isError) {
+    // The same treatment the summary gets. A failure the reader can retry
+    // where it happened beats one that only a reload clears.
     return (
-      <p className="py-8 text-center text-destructive-foreground text-sm">
-        {t("analytics:breakdown.loadError")}
-      </p>
+      <ErrorDisplay
+        error={error}
+        onRetry={onRetry}
+        title={t("analytics:breakdown.loadError")}
+      />
     );
   }
 

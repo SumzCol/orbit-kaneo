@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BreakdownChart } from "./breakdown-chart";
 
@@ -212,23 +212,25 @@ describe("BreakdownChart", () => {
     );
   });
 
-  it("says a failed request failed instead of showing a skeleton", () => {
+  it("offers a retry when the request fails, rather than a skeleton", () => {
+    const onRetry = vi.fn();
     render(
       <BreakdownChart
         buckets={undefined}
         groupBy="status"
         isLoading={false}
         isError={true}
+        error={new Error("boom")}
+        onRetry={onRetry}
       />,
     );
 
     // A failed request leaves the data undefined just as a pending one does,
     // so without an explicit branch the skeleton stands in for the error and
-    // never resolves.
-    expect(
-      screen.getByText("analytics:breakdown.loadError"),
-    ).toBeInTheDocument();
+    // never resolves. The summary offers a retry; so should this.
     expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+    fireEvent.click(screen.getByText("common:error.tryAgain"));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   it("reports that it is loading", () => {
