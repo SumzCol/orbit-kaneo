@@ -30,7 +30,13 @@ async function getProjectSummary(projectId: string) {
     .select({
       total: sql<number>`count(*)::int`,
       backlog: countWhere(sql`${taskTable.status} = 'planned'`),
-      unstarted: countWhere(sql`${columnTable.slug} = 'to-do'`),
+      // `isFinal` is editable on every column, the seeded `to-do` included, so
+      // the slug alone does not make these exclusive: a final to-do column
+      // would count its tasks as unstarted and completed both, the five states
+      // would exceed the total, and the bar drawn from them would overflow.
+      unstarted: countWhere(
+        sql`${columnTable.slug} = 'to-do' and ${columnTable.isFinal} = false`,
+      ),
       started: countWhere(
         sql`${taskTable.columnId} is not null
             and ${columnTable.slug} <> 'to-do'

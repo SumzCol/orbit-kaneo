@@ -1,3 +1,4 @@
+import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import db, { schema } from "../../apps/api/src/database";
 import { createApp } from "../../apps/api/src/index";
@@ -107,6 +108,37 @@ describe("API integration: project analytics", () => {
       archived: 1,
     });
     // The property the dashboard rests on: the row reconciles.
+    expect(
+      summary.backlog +
+        summary.unstarted +
+        summary.started +
+        summary.completed +
+        summary.archived,
+    ).toBe(summary.total);
+  });
+
+  it("keeps the groups exclusive when To Do is marked final", async () => {
+    const { project } = await signedInProject();
+
+    // `isFinal` is editable per column, so a project can legitimately mark its
+    // first column terminal. Matching on the slug alone counted such a task
+    // twice and pushed the five states past the total.
+    await db
+      .update(schema.columnTable)
+      .set({ isFinal: true })
+      .where(
+        and(
+          eq(schema.columnTable.projectId, project.id),
+          eq(schema.columnTable.slug, "to-do"),
+        ),
+      );
+
+    await seedTask(project.id, "to-do");
+
+    const summary = (await (await fetchSummary(project.id)).json()) as Summary;
+
+    expect(summary.completed).toBe(1);
+    expect(summary.unstarted).toBe(0);
     expect(
       summary.backlog +
         summary.unstarted +

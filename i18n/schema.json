@@ -9613,17 +9613,51 @@
 				"title": {
 					"type": "string"
 				},
+				"headline": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"totalTasks": {
+							"type": "string"
+						},
+						"complete": {
+							"type": "string"
+						},
+						"onTrack": {
+							"type": "string"
+						},
+						"ofCount": {
+							"type": "string"
+						},
+						"ofCount_zero": {
+							"type": "string"
+						},
+						"ofCount_one": {
+							"type": "string"
+						},
+						"ofCount_two": {
+							"type": "string"
+						},
+						"ofCount_few": {
+							"type": "string"
+						},
+						"ofCount_many": {
+							"type": "string"
+						},
+						"ofCount_other": {
+							"type": "string"
+						},
+						"ofTotal": {
+							"type": "string"
+						}
+					},
+					"required": ["totalTasks", "complete", "onTrack", "ofTotal"]
+				},
 				"summary": {
 					"type": "object",
 					"additionalProperties": false,
 					"properties": {
 						"byStateTitle": {
-							"type": "string"
-						},
-						"acrossStatesTitle": {
-							"type": "string"
-						},
-						"acrossStatesHint": {
 							"type": "string"
 						},
 						"addsUpTo_one": {
@@ -9668,8 +9702,6 @@
 					},
 					"required": [
 						"byStateTitle",
-						"acrossStatesTitle",
-						"acrossStatesHint",
 						"backlog",
 						"unstarted",
 						"started",
@@ -9728,7 +9760,7 @@
 					]
 				}
 			},
-			"required": ["title", "summary", "breakdown"]
+			"required": ["title", "headline", "summary", "breakdown"]
 		}
 	},
 	"required": [
