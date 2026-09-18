@@ -2,10 +2,9 @@ import { CircleUser } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import labelColors from "@/constants/label-colors";
 import type { BreakdownGroupBy } from "@/fetchers/analytics/get-project-breakdown";
 import { getInitials } from "@/lib/get-initials";
-import { resolveLabelColor } from "@/lib/label-color";
+import { bucketColor } from "./bucket-colors";
 
 export type BreakdownBucket = {
   key: string | null;
@@ -19,12 +18,6 @@ export type BreakdownBucket = {
 // here is the fix.
 const SUMS_PAST_TOTAL: BreakdownGroupBy[] = ["label"];
 
-// The workspace label palette, reused so a chart bar is the same family of
-// colour as the rest of the app rather than a second opinion about colour.
-// Statuses and labels carry a stored colour; assignees and priorities do not,
-// and fall back to a position in this palette.
-const PALETTE = labelColors.map((entry) => entry.color);
-
 // A bar that rounds to nothing reads as absent rather than small.
 const MIN_VISIBLE_PERCENT = 1.5;
 
@@ -37,14 +30,6 @@ function bucketLabel(
   return groupBy === "label"
     ? t("analytics:breakdown.unlabelled")
     : t("analytics:breakdown.unassigned");
-}
-
-// A stored colour is a choice someone made in the workspace, so it wins.
-// `resolveLabelColor` is what the rest of the app uses to turn one into CSS:
-// the values are palette names like `purple`, not colours.
-function bucketColor(bucket: BreakdownBucket, index: number) {
-  if (bucket.color) return resolveLabelColor(bucket.color);
-  return PALETTE[index % PALETTE.length];
 }
 
 export function BreakdownChart({
@@ -85,7 +70,7 @@ export function BreakdownChart({
       {/* Rows rather than columns: the names here are people and labels, and a
           column narrow enough to fit many of them is too narrow to hold one. */}
       <ul className="flex flex-col gap-2.5">
-        {buckets.map((bucket, index) => {
+        {buckets.map((bucket) => {
           const label = bucketLabel(bucket, groupBy, t);
           const percent = Math.max(
             (bucket.count / largest) * 100,
@@ -117,7 +102,7 @@ export function BreakdownChart({
                   className="h-full rounded-sm"
                   style={{
                     width: `${percent}%`,
-                    backgroundColor: bucketColor(bucket, index),
+                    backgroundColor: bucketColor(bucket, groupBy),
                   }}
                 />
               </div>

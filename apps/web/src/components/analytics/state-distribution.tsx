@@ -7,12 +7,25 @@ import type { ProjectSummary } from "./types";
 // The five states partition the project and sum to the total, which is the
 // only reason a single bar can represent all of them honestly. Drop one and
 // the bar stops filling while every segment still claims a share.
+//
+// These are groups rather than columns, so no stored colour describes them and
+// the board has no vocabulary to borrow — it distinguishes its columns by icon.
+// Semantic tokens rather than raw palette values, so the ramp carries meaning
+// (work in flight is informational, finished work is a success) and both
+// themes resolve it: a literal picked against the dark background would be
+// wrong on the light one.
 const STATES = [
-  { key: "backlog", color: "var(--color-stone-500)" },
-  { key: "unstarted", color: "var(--color-slate-400)" },
-  { key: "started", color: "var(--color-blue-500)" },
-  { key: "completed", color: "var(--color-emerald-500)" },
-  { key: "archived", color: "var(--color-violet-500)" },
+  { key: "backlog", color: "var(--color-muted-foreground)" },
+  {
+    key: "unstarted",
+    color: "color-mix(in srgb, var(--color-info) 45%, transparent)",
+  },
+  { key: "started", color: "var(--color-info)" },
+  { key: "completed", color: "var(--color-success)" },
+  {
+    key: "archived",
+    color: "color-mix(in srgb, var(--color-muted-foreground) 45%, transparent)",
+  },
 ] as const;
 
 export function StateDistribution({
