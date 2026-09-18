@@ -11,7 +11,7 @@ import { OnboardingFlow } from "./onboarding-flow";
 
 const config = vi.fn();
 const authUser = vi.fn();
-const refetchUser = vi.fn(async () => {});
+const getSession = vi.fn();
 
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-router")>()),
@@ -29,7 +29,10 @@ vi.mock("@/hooks/queries/config/use-get-config", () => ({
 }));
 
 vi.mock("@/lib/auth-client", () => ({
-  authClient: { organization: { setActive: vi.fn() } },
+  authClient: {
+    organization: { setActive: vi.fn() },
+    getSession: (options: unknown) => getSession(options),
+  },
 }));
 
 vi.mock("@/hooks/queries/workspace/use-create-workspace", () => ({
@@ -37,15 +40,7 @@ vi.mock("@/hooks/queries/workspace/use-create-workspace", () => ({
 }));
 
 vi.mock("@/components/providers/auth-provider/hooks/use-auth", () => ({
-  // A fresh function identity per call, as the real provider produces: it
-  // builds the context value inline, so every provider render yields a new
-  // refetchUser. A stable mock here cannot reproduce the refetch loop.
-  default: () => ({
-    user: authUser(),
-    refetchUser: async () => {
-      await refetchUser();
-    },
-  }),
+  default: () => ({ user: authUser(), refetchUser: vi.fn() }),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -56,6 +51,12 @@ vi.mock("react-i18next", () => ({
 
 beforeEach(() => {
   authUser.mockReturnValue({ id: "u1", name: "Sam", role: "user" });
+  // Better Auth resolves with `{ data, error }` and does not reject, which is
+  // the whole reason the hook reads `error` rather than catching.
+  getSession.mockResolvedValue({
+    data: { user: { id: "u1", role: "user" } },
+    error: null,
+  });
   config.mockReturnValue({
     data: { disableWorkspaceCreation: false },
     isPending: false,
@@ -124,7 +125,10 @@ describe("OnboardingFlow", () => {
       data: { disableWorkspaceCreation: true },
       isPending: false,
     });
-    authUser.mockReturnValue({ id: "u1", name: "Sam", role: "admin" });
+    getSession.mockResolvedValue({
+      data: { user: { id: "u1", role: "admin" } },
+      error: null,
+    });
 
     render(<OnboardingFlow />);
     await settled();
@@ -137,7 +141,10 @@ describe("OnboardingFlow", () => {
     // The setting cannot restrict an admin, so its value cannot change what
     // they are shown. Waiting would delay a form they always get.
     config.mockReturnValue({ data: undefined, isPending: true });
-    authUser.mockReturnValue({ id: "u1", name: "Sam", role: "admin" });
+    getSession.mockResolvedValue({
+      data: { user: { id: "u1", role: "admin" } },
+      error: null,
+    });
 
     render(<OnboardingFlow />);
     await settled();
@@ -149,7 +156,7 @@ describe("OnboardingFlow", () => {
   it("still decides when the role refresh fails", async () => {
     const unhandled = vi.fn();
     process.on("unhandledRejection", unhandled);
-    refetchUser.mockRejectedValueOnce(new Error("network"));
+    getSession.mockResolvedValue({ data: null, error: { status: 500 } });
 
     render(<OnboardingFlow />);
     await settled();
@@ -160,6 +167,40 @@ describe("OnboardingFlow", () => {
     expect(creationForm()).toBeInTheDocument();
     expect(unhandled).not.toHaveBeenCalled();
     process.off("unhandledRejection", unhandled);
+  });
+
+  it("offers the form when the role refresh fails under a restriction", async () => {
+    // The cached role cannot be trusted to take the form away: the one user
+    // whose role is most likely wrong here is the freshly promoted first
+    // administrator, who is entitled to it. The API still refuses the
+    // creation if the role really is `user`.
+    config.mockReturnValue({
+      data: { disableWorkspaceCreation: true },
+      isPending: false,
+    });
+    // The request failed; the session store would keep the stale role and
+    // report it alongside the error rather than rejecting.
+    getSession.mockResolvedValue({
+      data: null,
+      error: { status: 500, message: "network" },
+    });
+
+    render(<OnboardingFlow />);
+    await settled();
+    await settled();
+
+    expect(creationForm()).toBeInTheDocument();
+    expect(restricted()).not.toBeInTheDocument();
+  });
+
+  it("shows progress while the decision is pending", async () => {
+    config.mockReturnValue({ data: undefined, isPending: true });
+
+    render(<OnboardingFlow />);
+    await settled();
+
+    // Neither branch renders yet, and an empty page is not an answer.
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   it("claims nothing while the config is still loading", async () => {
@@ -187,27 +228,45 @@ describe("OnboardingFlow", () => {
     expect(restricted()).not.toBeInTheDocument();
   });
 
-  it("re-reads the role, which the session may report stale", async () => {
+  it("re-reads the role past the cookie cache", async () => {
     render(<OnboardingFlow />);
     await settled();
 
-    // The first admin of an instance is promoted after the session is cached.
-    expect(refetchUser).toHaveBeenCalled();
+    // The first admin of an instance is promoted after the session is cached,
+    // so the cached copy is exactly the one that cannot be trusted here.
+    expect(getSession).toHaveBeenCalledWith({
+      query: { disableCookieCache: true },
+    });
   });
 
-  it("re-reads the role only once, however often the provider rerenders", async () => {
+  it("prefers the re-read role over the cached one", async () => {
+    // The promotion the cached session has not caught up with yet.
+    config.mockReturnValue({
+      data: { disableWorkspaceCreation: true },
+      isPending: false,
+    });
+    getSession.mockResolvedValue({
+      data: { user: { id: "u1", role: "admin" } },
+      error: null,
+    });
+
+    render(<OnboardingFlow />);
+    await settled();
+
+    expect(creationForm()).toBeInTheDocument();
+    expect(restricted()).not.toBeInTheDocument();
+  });
+
+  it("re-reads the role only once, however often it rerenders", async () => {
     const { rerender } = render(<OnboardingFlow />);
     await settled();
 
-    // The provider builds refetchUser inline, so it is a new function on each
-    // of its renders and refetching rerenders it. Keying the effect on that
-    // identity alone would refetch forever.
-    refetchUser.mockClear();
+    getSession.mockClear();
     rerender(<OnboardingFlow />);
     await settled();
     rerender(<OnboardingFlow />);
     await settled();
 
-    expect(refetchUser).not.toHaveBeenCalled();
+    expect(getSession).not.toHaveBeenCalled();
   });
 });
