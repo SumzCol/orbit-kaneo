@@ -2347,7 +2347,7 @@
 			"totalTasks": "Tarefas no total",
 			"complete": "Concluído",
 			"onTrack": "No prazo",
-			"ofCount": "{{count}} de {{total}}",
+			"ofCount": "{{count}} de {{total}} ativas",
 			"ofTotal": "de {{total}}"
 		},
 		"summary": {

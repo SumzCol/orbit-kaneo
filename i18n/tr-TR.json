@@ -2338,7 +2338,7 @@
 			"totalTasks": "Toplam görev",
 			"complete": "Tamamlanan",
 			"onTrack": "Yolunda",
-			"ofCount": "{{total}} içinden {{count}}",
+			"ofCount": "{{total}} aktif görevden {{count}}",
 			"ofTotal": "/ {{total}}"
 		},
 		"summary": {

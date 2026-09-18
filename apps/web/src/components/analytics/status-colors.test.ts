@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { stateOfStatus, statusColorMap } from "./status-colors";
+import {
+  sortStatusBuckets,
+  stateOfStatus,
+  statusColorMap,
+} from "./status-colors";
 
 const columns = [
   { slug: "to-do", position: 0, isFinal: false },
@@ -43,6 +47,15 @@ describe("statusColorMap", () => {
     expect(colors.get("in-progress")).toBe("var(--state-started)");
   });
 
+  it("gives a later sibling a token, not a mix against the background", () => {
+    const colors = statusColorMap(columns);
+
+    // Mixing toward transparent composites over the card, which made this
+    // darker than In Progress in dark mode and lighter in light: the same
+    // status appearing to move within the ramp depending on the theme.
+    expect(colors.get("in-review")).toBe("var(--state-started-alt)");
+  });
+
   it("reserves red for the one status that asks for action", () => {
     const colors = statusColorMap(columns);
 
@@ -73,5 +86,44 @@ describe("statusColorMap", () => {
     const colors = statusColorMap(shuffled);
 
     expect(colors.get("in-progress")).toBe("var(--state-started)");
+  });
+});
+
+describe("sortStatusBuckets", () => {
+  const bucket = (key: string) => ({ key });
+
+  it("orders by lifecycle rather than by count", () => {
+    // The endpoint sorts by count and breaks ties alphabetically, which put
+    // Archived second and Planned last.
+    const sorted = sortStatusBuckets(
+      [
+        bucket("archived"),
+        bucket("done"),
+        bucket("to-do"),
+        bucket("planned"),
+        bucket("in-review"),
+        bucket("blocked"),
+        bucket("in-progress"),
+      ],
+      columns,
+    );
+
+    expect(sorted.map((entry) => entry.key)).toEqual([
+      // Planned is the backlog status: it precedes To Do rather than
+      // following it, which is why it carries the least-progressed colour.
+      "planned",
+      "to-do",
+      "in-progress",
+      "in-review",
+      "blocked",
+      "done",
+      "archived",
+    ]);
+  });
+
+  it("leaves the caller's array alone", () => {
+    const given = [bucket("done"), bucket("to-do")];
+    sortStatusBuckets(given, columns);
+    expect(given.map((entry) => entry.key)).toEqual(["done", "to-do"]);
   });
 });

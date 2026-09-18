@@ -2329,7 +2329,7 @@
 			"totalTasks": "Total tugas",
 			"complete": "Selesai",
 			"onTrack": "Sesuai rencana",
-			"ofCount": "{{count}} dari {{total}}",
+			"ofCount": "{{count}} dari {{total}} aktif",
 			"ofTotal": "dari {{total}}"
 		},
 		"summary": {

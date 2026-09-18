@@ -5,7 +5,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { BreakdownGroupBy } from "@/fetchers/analytics/get-project-breakdown";
 import { getInitials } from "@/lib/get-initials";
 import { assignBucketColors } from "./bucket-colors";
-import { type StatusColumn, statusColorMap } from "./status-colors";
+import {
+  type StatusColumn,
+  sortStatusBuckets,
+  statusColorMap,
+} from "./status-colors";
 
 export type BreakdownBucket = {
   key: string | null;
@@ -83,14 +87,19 @@ export function BreakdownChart({
   // Scaled to the largest bucket rather than the project total, so a long tail
   // of small groups stays readable instead of collapsing to invisible slivers.
   const largest = Math.max(...buckets.map((bucket) => bucket.count), 1);
-  const colors = assignBucketColors(buckets, groupBy, statusColorMap(columns));
+  // Count order is the right order for people and labels, where nothing else
+  // ranks them. Statuses have a lifecycle, and sorting those by count scatters
+  // the colour groups the ramp just gathered.
+  const ordered =
+    groupBy === "status" ? sortStatusBuckets(buckets, columns) : buckets;
+  const colors = assignBucketColors(ordered, groupBy, statusColorMap(columns));
 
   return (
     <div className="flex flex-col gap-3">
       {/* Rows rather than columns: the names here are people and labels, and a
           column narrow enough to fit many of them is too narrow to hold one. */}
       <ul className="flex flex-col gap-2.5">
-        {buckets.map((bucket, index) => {
+        {ordered.map((bucket, index) => {
           const label = bucketLabel(bucket, groupBy, t);
           const percent = Math.max(
             (bucket.count / largest) * 100,

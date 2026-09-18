@@ -2356,7 +2356,7 @@
 			"totalTasks": "Усього задач",
 			"complete": "Завершено",
 			"onTrack": "За графіком",
-			"ofCount": "{{count}} з {{total}}",
+			"ofCount": "{{count}} з {{total}} активних",
 			"ofTotal": "з {{total}}"
 		},
 		"summary": {

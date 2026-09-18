@@ -2329,7 +2329,7 @@
 			"totalTasks": "タスク総数",
 			"complete": "完了",
 			"onTrack": "順調",
-			"ofCount": "{{total}} 件中 {{count}} 件",
+			"ofCount": "アクティブ {{total}} 件中 {{count}} 件",
 			"ofTotal": "/ {{total}}"
 		},
 		"summary": {

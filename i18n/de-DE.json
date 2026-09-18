@@ -2338,7 +2338,7 @@
 			"totalTasks": "Aufgaben gesamt",
 			"complete": "Abgeschlossen",
 			"onTrack": "Im Plan",
-			"ofCount": "{{count}} von {{total}}",
+			"ofCount": "{{count}} von {{total}} aktiven",
 			"ofTotal": "von {{total}}"
 		},
 		"summary": {

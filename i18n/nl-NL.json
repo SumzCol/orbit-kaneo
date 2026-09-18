@@ -2338,7 +2338,7 @@
 			"totalTasks": "Taken totaal",
 			"complete": "Afgerond",
 			"onTrack": "Op schema",
-			"ofCount": "{{count}} van {{total}}",
+			"ofCount": "{{count}} van {{total}} actieve",
 			"ofTotal": "van {{total}}"
 		},
 		"summary": {

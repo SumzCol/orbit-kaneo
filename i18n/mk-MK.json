@@ -2338,7 +2338,7 @@
 			"totalTasks": "Вкупно задачи",
 			"complete": "Завршено",
 			"onTrack": "По план",
-			"ofCount": "{{count}} од {{total}}",
+			"ofCount": "{{count}} од {{total}} активни",
 			"ofTotal": "од {{total}}"
 		},
 		"summary": {

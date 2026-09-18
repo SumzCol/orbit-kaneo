@@ -2338,7 +2338,7 @@
 			"totalTasks": "Ümumi tapşırıq",
 			"complete": "Tamamlanıb",
 			"onTrack": "Qrafik üzrə",
-			"ofCount": "{{total}} tapşırıqdan {{count}}",
+			"ofCount": "{{total}} aktivdən {{count}}",
 			"ofTotal": "/ {{total}}"
 		},
 		"summary": {

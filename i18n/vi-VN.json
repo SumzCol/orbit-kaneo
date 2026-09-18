@@ -2329,7 +2329,7 @@
 			"totalTasks": "Tổng công việc",
 			"complete": "Hoàn thành",
 			"onTrack": "Đúng tiến độ",
-			"ofCount": "{{count}} trên {{total}}",
+			"ofCount": "{{count}} trên {{total}} đang hoạt động",
 			"ofTotal": "trên {{total}}"
 		},
 		"summary": {

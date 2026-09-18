@@ -2338,7 +2338,7 @@
 			"totalTasks": "कुल कार्य",
 			"complete": "पूर्ण",
 			"onTrack": "समय पर",
-			"ofCount": "{{total}} में से {{count}}",
+			"ofCount": "{{total}} सक्रिय में से {{count}}",
 			"ofTotal": "{{total}} में से"
 		},
 		"summary": {

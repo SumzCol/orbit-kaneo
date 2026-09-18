@@ -2347,7 +2347,7 @@
 			"totalTasks": "Attività totali",
 			"complete": "Completato",
 			"onTrack": "In linea",
-			"ofCount": "{{count}} su {{total}}",
+			"ofCount": "{{count}} su {{total}} attive",
 			"ofTotal": "su {{total}}"
 		},
 		"summary": {

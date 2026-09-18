@@ -2329,7 +2329,7 @@
 			"totalTasks": "任务总数",
 			"complete": "已完成",
 			"onTrack": "进展正常",
-			"ofCount": "{{total}} 个中的 {{count}} 个",
+			"ofCount": "{{total}} 个活跃任务中的 {{count}} 个",
 			"ofTotal": "/ {{total}}"
 		},
 		"summary": {

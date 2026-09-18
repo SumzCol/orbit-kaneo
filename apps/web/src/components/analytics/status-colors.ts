@@ -19,6 +19,27 @@ const STATE_COLOR: Record<TaskState, string> = {
   archived: "var(--state-archived)",
 };
 
+// The second status in a stage gets a token of its own rather than a mix, so
+// "later in the stage" reads as lighter on both grounds. Mixing toward
+// transparent composited over the card instead, which made In Review darker
+// than In Progress in dark mode and lighter in light: the same status
+// appearing to move within the ramp depending on the theme.
+const STATE_COLOR_ALT: Partial<Record<TaskState, string>> = {
+  unstarted: "var(--state-unstarted-alt)",
+  started: "var(--state-started-alt)",
+};
+
+// Lifecycle order, which is also the order the distribution bar reads in.
+// Sorting by count instead put Archived second and Planned last, scattering
+// the colour groups.
+const STATE_ORDER: TaskState[] = [
+  "backlog",
+  "unstarted",
+  "started",
+  "completed",
+  "archived",
+];
+
 // Blocked is not a sixth state — it is a started column, and the summary counts
 // it as one. It takes the exceptional colour anyway, because it is the only
 // status on the board that asks somebody to do something. Matched by the
@@ -45,10 +66,16 @@ export function stateOfStatus(
 // transparent rather than toward a literal keeps that working on both grounds:
 // over a dark card it reads darker, over a light one lighter, and in each case
 // as the same colour carrying less weight.
-function sibling(color: string, index: number) {
-  if (index === 0) return color;
-  const strength = Math.max(100 - index * 30, 40);
-  return `color-mix(in srgb, ${color} ${strength}%, transparent)`;
+function sibling(state: TaskState, index: number) {
+  const base = STATE_COLOR[state];
+  if (index === 0) return base;
+  const alt = STATE_COLOR_ALT[state];
+  if (index === 1 && alt) return alt;
+  // A third status in one stage is possible with custom columns and has no
+  // token of its own. Fading the alt keeps the hue and the direction.
+  const from = alt ?? base;
+  const strength = Math.max(100 - (index - 1) * 25, 45);
+  return `color-mix(in srgb, ${from} ${strength}%, transparent)`;
 }
 
 /**
@@ -72,7 +99,7 @@ export function statusColorMap(columns: StatusColumn[]): Map<string, string> {
   for (const [state, group] of byState) {
     const ordered = [...group].sort((a, b) => a.position - b.position);
     ordered.forEach((column, index) => {
-      colors.set(column.slug, sibling(STATE_COLOR[state], index));
+      colors.set(column.slug, sibling(state, index));
     });
   }
 
@@ -83,6 +110,27 @@ export function statusColorMap(columns: StatusColumn[]): Map<string, string> {
   colors.set("archived", STATE_COLOR.archived);
 
   return colors;
+}
+
+/**
+ * Buckets in lifecycle order: by the state each status belongs to, then by
+ * column position within it. Leaves the colour groups adjacent and puts the
+ * muted archived bucket last, where the eye stops.
+ */
+export function sortStatusBuckets<T extends { key: string | null }>(
+  buckets: T[],
+  columns: StatusColumn[],
+): T[] {
+  const positionOf = (slug: string) =>
+    columns.find((column) => column.slug === slug)?.position ??
+    Number.MAX_SAFE_INTEGER;
+
+  return [...buckets].sort((a, b) => {
+    const stateA = STATE_ORDER.indexOf(stateOfStatus(a.key ?? "", columns));
+    const stateB = STATE_ORDER.indexOf(stateOfStatus(b.key ?? "", columns));
+    if (stateA !== stateB) return stateA - stateB;
+    return positionOf(a.key ?? "") - positionOf(b.key ?? "");
+  });
 }
 
 export { STATE_COLOR };

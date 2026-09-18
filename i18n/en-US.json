@@ -2338,7 +2338,7 @@
 			"totalTasks": "Total tasks",
 			"complete": "Complete",
 			"onTrack": "On track",
-			"ofCount": "{{count}} of {{total}}",
+			"ofCount": "{{count}} of {{total}} active",
 			"ofTotal": "of {{total}}"
 		},
 		"summary": {

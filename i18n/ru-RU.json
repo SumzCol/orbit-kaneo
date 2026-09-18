@@ -2412,7 +2412,7 @@
 			"totalTasks": "Всего задач",
 			"complete": "Завершено",
 			"onTrack": "В графике",
-			"ofCount": "{{count}} из {{total}}",
+			"ofCount": "{{count}} из {{total}} активных",
 			"ofTotal": "из {{total}}"
 		},
 		"summary": {

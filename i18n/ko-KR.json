@@ -2329,7 +2329,7 @@
 			"totalTasks": "전체 작업",
 			"complete": "완료",
 			"onTrack": "정상 진행",
-			"ofCount": "{{total}}개 중 {{count}}개",
+			"ofCount": "활성 {{total}}개 중 {{count}}개",
 			"ofTotal": "/ {{total}}"
 		},
 		"summary": {

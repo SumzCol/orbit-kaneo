@@ -2338,7 +2338,7 @@
 			"totalTasks": "Σύνολο εργασιών",
 			"complete": "Ολοκληρωμένο",
 			"onTrack": "Εντός χρονοδιαγράμματος",
-			"ofCount": "{{count}} από {{total}}",
+			"ofCount": "{{count}} από {{total}} ενεργές",
 			"ofTotal": "από {{total}}"
 		},
 		"summary": {
