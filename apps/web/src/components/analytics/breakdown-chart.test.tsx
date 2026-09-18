@@ -189,6 +189,29 @@ describe("BreakdownChart", () => {
     expect(screen.getByText("Ada")).toBeInTheDocument();
   });
 
+  it("colours a status the columns cannot explain from its state", () => {
+    render(
+      <BreakdownChart
+        buckets={[
+          { key: "to-do", label: "To Do", color: null, count: 2 },
+          // Its column is gone. The summary counts it as started; a palette
+          // slot here would say nothing and match nothing.
+          { key: "ghost", label: "ghost", color: null, count: 1 },
+        ]}
+        groupBy="status"
+        isLoading={false}
+        columns={[
+          { slug: "to-do", position: 0, isFinal: false, name: "To Do" },
+        ]}
+      />,
+    );
+
+    const rows = screen.getAllByRole("listitem");
+    expect(barOf(rows[1] as HTMLElement)?.style.backgroundColor).toBe(
+      "var(--state-started)",
+    );
+  });
+
   it("says a failed request failed instead of showing a skeleton", () => {
     render(
       <BreakdownChart

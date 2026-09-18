@@ -120,7 +120,13 @@ export function BreakdownChart({
   const colors = assignBucketColors(
     ordered,
     groupBy,
-    statusColorMap(columns ?? []),
+    // The keys matter as much as the columns: a status the columns cannot
+    // explain has no entry unless it is named here, and would fall through to
+    // a palette slot instead of the state colour the bar above it uses.
+    statusColorMap(
+      columns ?? [],
+      ordered.map((bucket) => bucket.key ?? ""),
+    ),
   );
 
   return (
