@@ -214,6 +214,71 @@ describe("API integration: project analytics", () => {
     expect(summary.overdue).toBe(1);
   });
 
+  it("waits a full day before calling a task late, as the badges do", async () => {
+    const { project } = await signedInProject();
+
+    const recent = await seedTask(project.id, "to-do");
+    await db.execute(
+      sql`update task set due_date = now() - interval '2 hours' where id = ${recent.id}`,
+    );
+
+    const summary = (await (await fetchSummary(project.id)).json()) as Summary;
+
+    // `getDueDateStatus` takes the gap in whole days, so a due time a couple
+    // of hours ago is not late there yet. The picker only produces midnight
+    // values, where this is the same as an earlier calendar day, but the API
+    // accepts a time and the two screens have to agree about it.
+    expect(summary.overdue).toBe(0);
+  });
+
+  it("keeps the five groups exclusive when a status and its column disagree", async () => {
+    const { project } = await signedInProject();
+
+    const done = await db.query.columnTable.findFirst({
+      where: (table, { and: andOp, eq: eqOp }) =>
+        andOp(eqOp(table.projectId, project.id), eqOp(table.slug, "done")),
+    });
+    const task = await seedTask(project.id, "to-do");
+    // No writer produces this today — each resolves the column from the status
+    // — but nothing in the schema forbids it, and the bar is drawn on the
+    // assumption that the five groups add up.
+    await db
+      .update(schema.taskTable)
+      .set({ status: "archived", columnId: done?.id })
+      .where(eq(schema.taskTable.id, task.id));
+
+    const summary = (await (await fetchSummary(project.id)).json()) as Summary;
+
+    expect(summary.archived).toBe(1);
+    expect(summary.completed).toBe(0);
+    expect(
+      summary.backlog +
+        summary.unstarted +
+        summary.started +
+        summary.completed +
+        summary.archived,
+    ).toBe(summary.total);
+  });
+
+  it("still adds up when a task has no column at all", async () => {
+    const { project } = await signedInProject();
+
+    // `task.column_id` is `on delete set null`, so an orphan is reachable in
+    // principle. Started absorbs it rather than the row vanishing from a bar
+    // that claims to cover everything.
+    await seedTask(project.id, "to-do", { columnId: null });
+
+    const summary = (await (await fetchSummary(project.id)).json()) as Summary;
+
+    expect(
+      summary.backlog +
+        summary.unstarted +
+        summary.started +
+        summary.completed +
+        summary.archived,
+    ).toBe(summary.total);
+  });
+
   it("counts unassigned across every group, not just the open ones", async () => {
     const { member, project } = await signedInProject();
 
