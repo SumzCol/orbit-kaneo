@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BreakdownChart } from "@/components/analytics/breakdown-chart";
-import { SummaryTiles } from "@/components/analytics/summary-tiles";
+import { HeadlineMetrics } from "@/components/analytics/headline-metrics";
+import { StateDistribution } from "@/components/analytics/state-distribution";
 import ProjectLayout from "@/components/common/project-layout";
 import PageTitle from "@/components/page-title";
 import { Card } from "@/components/ui/card";
@@ -41,34 +42,41 @@ function ProjectAnalytics() {
       activeView="analytics"
     >
       <PageTitle title={t("analytics:title")} />
-      <div className="flex flex-col gap-6 overflow-y-auto p-4">
-        <SummaryTiles summary={summary} isLoading={summaryPending} />
+      <div className="overflow-y-auto p-4">
+        {/* Capped rather than full-bleed. The board and backlog fill the width
+            because their content does; a handful of counts does not, and
+            stretched across a wide screen the padding becomes the subject. */}
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+          <HeadlineMetrics summary={summary} isLoading={summaryPending} />
 
-        <Card className="gap-4 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-medium text-sm">
-              {t("analytics:breakdown.title")}
-            </h2>
-            <Tabs
-              value={groupBy}
-              onValueChange={(next) => setGroupBy(next as BreakdownGroupBy)}
-            >
-              <TabsList>
-                {GROUPINGS.map((grouping) => (
-                  <TabsTrigger key={grouping} value={grouping}>
-                    {t(`analytics:breakdown.groupBy.${grouping}`)}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          </div>
+          <StateDistribution summary={summary} isLoading={summaryPending} />
 
-          <BreakdownChart
-            buckets={breakdown?.buckets}
-            groupBy={groupBy}
-            isLoading={breakdownPending}
-          />
-        </Card>
+          <Card className="gap-4 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-medium text-sm">
+                {t("analytics:breakdown.title")}
+              </h2>
+              <Tabs
+                value={groupBy}
+                onValueChange={(next) => setGroupBy(next as BreakdownGroupBy)}
+              >
+                <TabsList>
+                  {GROUPINGS.map((grouping) => (
+                    <TabsTrigger key={grouping} value={grouping}>
+                      {t(`analytics:breakdown.groupBy.${grouping}`)}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+
+            <BreakdownChart
+              buckets={breakdown?.buckets}
+              groupBy={groupBy}
+              isLoading={breakdownPending}
+            />
+          </Card>
+        </div>
       </div>
     </ProjectLayout>
   );

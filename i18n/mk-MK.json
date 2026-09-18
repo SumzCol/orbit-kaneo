@@ -2334,10 +2334,15 @@
 	},
 	"analytics": {
 		"title": "Аналитика",
+		"headline": {
+			"totalTasks": "Вкупно задачи",
+			"complete": "Завршено",
+			"onTrack": "По план",
+			"ofCount": "{{count}} од {{total}}",
+			"ofTotal": "од {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Работа по состојба",
-			"acrossStatesTitle": "Низ сите состојби",
-			"acrossStatesHint": "Пресметано од сè погоре",
 			"addsUpTo_one": "Вкупно {{count}} задача",
 			"addsUpTo_other": "Вкупно {{count}} задачи",
 			"backlog": "Беклог",

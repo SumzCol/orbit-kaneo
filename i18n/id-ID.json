@@ -2325,10 +2325,15 @@
 	},
 	"analytics": {
 		"title": "Analitik",
+		"headline": {
+			"totalTasks": "Total tugas",
+			"complete": "Selesai",
+			"onTrack": "Sesuai rencana",
+			"ofCount": "{{count}} dari {{total}}",
+			"ofTotal": "dari {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Pekerjaan menurut status",
-			"acrossStatesTitle": "Di seluruh status",
-			"acrossStatesHint": "Dihitung dari semua di atas",
 			"addsUpTo_one": "{{count}} tugas seluruhnya",
 			"addsUpTo_other": "{{count}} tugas seluruhnya",
 			"backlog": "Backlog",

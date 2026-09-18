@@ -2334,10 +2334,15 @@
 	},
 	"analytics": {
 		"title": "Analitika",
+		"headline": {
+			"totalTasks": "Ümumi tapşırıq",
+			"complete": "Tamamlanıb",
+			"onTrack": "Qrafik üzrə",
+			"ofCount": "{{total}} tapşırıqdan {{count}}",
+			"ofTotal": "/ {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Vəziyyətə görə iş",
-			"acrossStatesTitle": "Bütün vəziyyətlər üzrə",
-			"acrossStatesHint": "Yuxarıdakıların hamısından hesablanır",
 			"addsUpTo_one": "Ümumilikdə {{count}} tapşırıq",
 			"addsUpTo_other": "Ümumilikdə {{count}} tapşırıq",
 			"backlog": "Backlog",

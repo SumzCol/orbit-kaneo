@@ -2334,10 +2334,15 @@
 	},
 	"analytics": {
 		"title": "Analiz",
+		"headline": {
+			"totalTasks": "Toplam görev",
+			"complete": "Tamamlanan",
+			"onTrack": "Yolunda",
+			"ofCount": "{{total}} içinden {{count}}",
+			"ofTotal": "/ {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Duruma göre iş",
-			"acrossStatesTitle": "Tüm durumlarda",
-			"acrossStatesHint": "Yukarıdakilerin tamamından sayılır",
 			"addsUpTo_one": "Toplam {{count}} görev",
 			"addsUpTo_other": "Toplam {{count}} görev",
 			"backlog": "Backlog",

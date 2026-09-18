@@ -2325,10 +2325,15 @@
 	},
 	"analytics": {
 		"title": "Phân tích",
+		"headline": {
+			"totalTasks": "Tổng công việc",
+			"complete": "Hoàn thành",
+			"onTrack": "Đúng tiến độ",
+			"ofCount": "{{count}} trên {{total}}",
+			"ofTotal": "trên {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Công việc theo trạng thái",
-			"acrossStatesTitle": "Trên mọi trạng thái",
-			"acrossStatesHint": "Tính từ tất cả mục trên",
 			"addsUpTo_one": "Tổng {{count}} công việc",
 			"addsUpTo_other": "Tổng {{count}} công việc",
 			"backlog": "Backlog",

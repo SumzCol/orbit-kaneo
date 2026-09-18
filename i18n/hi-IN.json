@@ -2334,10 +2334,15 @@
 	},
 	"analytics": {
 		"title": "विश्लेषण",
+		"headline": {
+			"totalTasks": "कुल कार्य",
+			"complete": "पूर्ण",
+			"onTrack": "समय पर",
+			"ofCount": "{{total}} में से {{count}}",
+			"ofTotal": "{{total}} में से"
+		},
 		"summary": {
 			"byStateTitle": "स्थिति के अनुसार कार्य",
-			"acrossStatesTitle": "सभी स्थितियों में",
-			"acrossStatesHint": "ऊपर के सभी से गिना गया",
 			"addsUpTo_one": "कुल {{count}} कार्य",
 			"addsUpTo_other": "कुल {{count}} कार्य",
 			"backlog": "बैकलॉग",

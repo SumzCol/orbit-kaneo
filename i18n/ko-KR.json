@@ -2325,10 +2325,15 @@
 	},
 	"analytics": {
 		"title": "분석",
+		"headline": {
+			"totalTasks": "전체 작업",
+			"complete": "완료",
+			"onTrack": "정상 진행",
+			"ofCount": "{{total}}개 중 {{count}}개",
+			"ofTotal": "/ {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "상태별 작업",
-			"acrossStatesTitle": "모든 상태 통틀어",
-			"acrossStatesHint": "위 항목 전체에서 집계",
 			"addsUpTo_one": "전체 {{count}}개 작업",
 			"addsUpTo_other": "전체 {{count}}개 작업",
 			"backlog": "백로그",

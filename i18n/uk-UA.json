@@ -2352,10 +2352,15 @@
 	},
 	"analytics": {
 		"title": "Аналітика",
+		"headline": {
+			"totalTasks": "Усього задач",
+			"complete": "Завершено",
+			"onTrack": "За графіком",
+			"ofCount": "{{count}} з {{total}}",
+			"ofTotal": "з {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Робота за станом",
-			"acrossStatesTitle": "За всіма станами",
-			"acrossStatesHint": "Рахується з усього вище",
 			"addsUpTo_one": "{{count}} задача загалом",
 			"addsUpTo_few": "{{count}} задачі загалом",
 			"addsUpTo_many": "{{count}} задач загалом",

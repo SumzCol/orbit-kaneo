@@ -2343,10 +2343,15 @@
 	},
 	"analytics": {
 		"title": "Analisi",
+		"headline": {
+			"totalTasks": "Attività totali",
+			"complete": "Completato",
+			"onTrack": "In linea",
+			"ofCount": "{{count}} su {{total}}",
+			"ofTotal": "su {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Lavoro per stato",
-			"acrossStatesTitle": "Su tutti gli stati",
-			"acrossStatesHint": "Conteggiato su tutto quanto sopra",
 			"addsUpTo_one": "{{count}} attività in totale",
 			"addsUpTo_many": "{{count}} attività in totale",
 			"addsUpTo_other": "{{count}} attività in totale",

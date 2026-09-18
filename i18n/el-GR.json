@@ -2334,10 +2334,15 @@
 	},
 	"analytics": {
 		"title": "Αναλυτικά",
+		"headline": {
+			"totalTasks": "Σύνολο εργασιών",
+			"complete": "Ολοκληρωμένο",
+			"onTrack": "Εντός χρονοδιαγράμματος",
+			"ofCount": "{{count}} από {{total}}",
+			"ofTotal": "από {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Εργασία ανά κατάσταση",
-			"acrossStatesTitle": "Σε όλες τις καταστάσεις",
-			"acrossStatesHint": "Υπολογίζεται από όλα τα παραπάνω",
 			"addsUpTo_one": "{{count}} εργασία συνολικά",
 			"addsUpTo_other": "{{count}} εργασίες συνολικά",
 			"backlog": "Backlog",

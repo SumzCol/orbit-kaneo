@@ -2334,10 +2334,15 @@
 	},
 	"analytics": {
 		"title": "Auswertung",
+		"headline": {
+			"totalTasks": "Aufgaben gesamt",
+			"complete": "Abgeschlossen",
+			"onTrack": "Im Plan",
+			"ofCount": "{{count}} von {{total}}",
+			"ofTotal": "von {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Arbeit nach Status",
-			"acrossStatesTitle": "Über alle Status hinweg",
-			"acrossStatesHint": "Aus allen oben genannten gezählt",
 			"addsUpTo_one": "{{count}} Aufgabe insgesamt",
 			"addsUpTo_other": "{{count}} Aufgaben insgesamt",
 			"backlog": "Backlog",

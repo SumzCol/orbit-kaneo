@@ -2334,10 +2334,15 @@
 	},
 	"analytics": {
 		"title": "Analyse",
+		"headline": {
+			"totalTasks": "Taken totaal",
+			"complete": "Afgerond",
+			"onTrack": "Op schema",
+			"ofCount": "{{count}} van {{total}}",
+			"ofTotal": "van {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Werk per status",
-			"acrossStatesTitle": "Over alle statussen",
-			"acrossStatesHint": "Geteld over alles hierboven",
 			"addsUpTo_one": "{{count}} taak in totaal",
 			"addsUpTo_other": "{{count}} taken in totaal",
 			"backlog": "Backlog",

@@ -2352,10 +2352,15 @@
 	},
 	"analytics": {
 		"title": "Analityka",
+		"headline": {
+			"totalTasks": "Zadania łącznie",
+			"complete": "Ukończone",
+			"onTrack": "Zgodnie z planem",
+			"ofCount": "{{count}} z {{total}}",
+			"ofTotal": "z {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Praca według stanu",
-			"acrossStatesTitle": "We wszystkich stanach",
-			"acrossStatesHint": "Liczone ze wszystkiego powyżej",
 			"addsUpTo_one": "{{count}} zadanie łącznie",
 			"addsUpTo_few": "{{count}} zadania łącznie",
 			"addsUpTo_many": "{{count}} zadań łącznie",

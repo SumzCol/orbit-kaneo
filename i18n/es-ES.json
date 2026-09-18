@@ -2343,10 +2343,15 @@
 	},
 	"analytics": {
 		"title": "Analítica",
+		"headline": {
+			"totalTasks": "Tareas totales",
+			"complete": "Completado",
+			"onTrack": "En marcha",
+			"ofCount": "{{count}} de {{total}}",
+			"ofTotal": "de {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Trabajo por estado",
-			"acrossStatesTitle": "En todos los estados",
-			"acrossStatesHint": "Contado sobre todo lo anterior",
 			"addsUpTo_one": "{{count}} tarea en total",
 			"addsUpTo_many": "{{count}} tareas en total",
 			"addsUpTo_other": "{{count}} tareas en total",

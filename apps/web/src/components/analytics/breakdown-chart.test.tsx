@@ -61,8 +61,8 @@ describe("BreakdownChart", () => {
 
     // 6 of 6 fills the track; 2 of 6 is a third of it. Scaling to the sum
     // would make a long tail of small groups invisible.
-    expect(barOf(rows[0] as HTMLElement)?.style.height).toBe("100%");
-    expect(barOf(rows[1] as HTMLElement)?.style.height).toMatch(/^33\.3/);
+    expect(barOf(rows[0] as HTMLElement)?.style.width).toBe("100%");
+    expect(barOf(rows[1] as HTMLElement)?.style.width).toMatch(/^33\.3/);
   });
 
   it("gives each bar its own colour, and a stored one wins", () => {

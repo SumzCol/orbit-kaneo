@@ -1,7 +1,10 @@
+import { CircleUser } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import labelColors from "@/constants/label-colors";
 import type { BreakdownGroupBy } from "@/fetchers/analytics/get-project-breakdown";
+import { getInitials } from "@/lib/get-initials";
 import { resolveLabelColor } from "@/lib/label-color";
 
 export type BreakdownBucket = {
@@ -23,7 +26,7 @@ const SUMS_PAST_TOTAL: BreakdownGroupBy[] = ["label"];
 const PALETTE = labelColors.map((entry) => entry.color);
 
 // A bar that rounds to nothing reads as absent rather than small.
-const MIN_VISIBLE_PERCENT = 2;
+const MIN_VISIBLE_PERCENT = 1.5;
 
 function bucketLabel(
   bucket: BreakdownBucket,
@@ -57,13 +60,9 @@ export function BreakdownChart({
 
   if (isLoading || !buckets) {
     return (
-      <div className="flex h-56 items-end gap-3" aria-busy="true">
-        {["a", "b", "c", "d", "e"].map((key, index) => (
-          <Skeleton
-            key={key}
-            className="w-14 shrink-0 rounded-sm"
-            style={{ height: `${40 + index * 12}%` }}
-          />
+      <div className="flex flex-col gap-2.5" aria-busy="true">
+        {["a", "b", "c"].map((key) => (
+          <Skeleton key={key} className="h-6 rounded-md" />
         ))}
       </div>
     );
@@ -83,10 +82,9 @@ export function BreakdownChart({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* A project can have more assignees or labels than fit the width, and
-          squeezing them would make every bar unreadable rather than just the
-          ones past the edge. */}
-      <ul className="flex items-end gap-3 overflow-x-auto pb-1">
+      {/* Rows rather than columns: the names here are people and labels, and a
+          column narrow enough to fit many of them is too narrow to hold one. */}
+      <ul className="flex flex-col gap-2.5">
         {buckets.map((bucket, index) => {
           const label = bucketLabel(bucket, groupBy, t);
           const percent = Math.max(
@@ -96,25 +94,36 @@ export function BreakdownChart({
           return (
             <li
               key={bucket.key ?? "__unset__"}
-              className="flex w-14 shrink-0 flex-col items-center gap-1.5"
+              className="grid grid-cols-[minmax(7rem,14rem)_1fr_2.5rem] items-center gap-3"
             >
-              <span className="text-muted-foreground text-xs tabular-nums">
-                {bucket.count}
-              </span>
-              <div className="flex h-40 w-full items-end rounded-sm bg-muted/40">
+              <div className="flex min-w-0 items-center gap-2">
+                {groupBy === "assignee" &&
+                  (bucket.key === null ? (
+                    <CircleUser className="size-5 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <Avatar className="size-5 shrink-0">
+                      <AvatarFallback className="text-[10px]">
+                        {getInitials(label, "?")}
+                      </AvatarFallback>
+                    </Avatar>
+                  ))}
+                <span className="truncate text-sm" title={label}>
+                  {label}
+                </span>
+              </div>
+
+              <div className="h-5 w-full overflow-hidden rounded-sm bg-muted/40">
                 <div
-                  className="w-full rounded-sm"
+                  className="h-full rounded-sm"
                   style={{
-                    height: `${percent}%`,
+                    width: `${percent}%`,
                     backgroundColor: bucketColor(bucket, index),
                   }}
                 />
               </div>
-              <span
-                className="w-full truncate text-center text-xs"
-                title={label}
-              >
-                {label}
+
+              <span className="text-right font-medium text-sm tabular-nums">
+                {bucket.count}
               </span>
             </li>
           );

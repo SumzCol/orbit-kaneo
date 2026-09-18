@@ -2408,10 +2408,15 @@
 	},
 	"analytics": {
 		"title": "Аналитика",
+		"headline": {
+			"totalTasks": "Всего задач",
+			"complete": "Завершено",
+			"onTrack": "В графике",
+			"ofCount": "{{count}} из {{total}}",
+			"ofTotal": "из {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Работа по состоянию",
-			"acrossStatesTitle": "По всем состояниям",
-			"acrossStatesHint": "Считается по всему выше",
 			"addsUpTo_one": "{{count}} задача всего",
 			"addsUpTo_few": "{{count}} задачи всего",
 			"addsUpTo_many": "{{count}} задач всего",

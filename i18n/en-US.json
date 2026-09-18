@@ -2334,10 +2334,15 @@
 	},
 	"analytics": {
 		"title": "Analytics",
+		"headline": {
+			"totalTasks": "Total tasks",
+			"complete": "Complete",
+			"onTrack": "On track",
+			"ofCount": "{{count}} of {{total}}",
+			"ofTotal": "of {{total}}"
+		},
 		"summary": {
 			"byStateTitle": "Work by state",
-			"acrossStatesTitle": "Across every state",
-			"acrossStatesHint": "Counted from all of the above",
 			"addsUpTo_one": "{{count}} task in total",
 			"addsUpTo_other": "{{count}} tasks in total",
 			"backlog": "Backlog",
