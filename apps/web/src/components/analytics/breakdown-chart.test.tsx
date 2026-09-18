@@ -8,6 +8,8 @@ vi.mock("react-i18next", () => ({
 
 afterEach(cleanup);
 
+const barOf = (row: HTMLElement) => row.querySelector<HTMLElement>("[style]");
+
 const buckets = [
   { key: "u1", label: "Ada", color: null, count: 6 },
   { key: null, label: "", color: null, count: 2 },
@@ -55,14 +57,35 @@ describe("BreakdownChart", () => {
       <BreakdownChart buckets={buckets} groupBy="assignee" isLoading={false} />,
     );
 
-    const barWidth = (row: HTMLElement) =>
-      row.querySelector<HTMLElement>("[style]")?.style.width;
     const rows = screen.getAllByRole("listitem");
 
     // 6 of 6 fills the track; 2 of 6 is a third of it. Scaling to the sum
     // would make a long tail of small groups invisible.
-    expect(barWidth(rows[0] as HTMLElement)).toBe("100%");
-    expect(barWidth(rows[1] as HTMLElement)).toMatch(/^33\.3/);
+    expect(barOf(rows[0] as HTMLElement)?.style.height).toBe("100%");
+    expect(barOf(rows[1] as HTMLElement)?.style.height).toMatch(/^33\.3/);
+  });
+
+  it("gives each bar its own colour, and a stored one wins", () => {
+    render(
+      <BreakdownChart
+        buckets={[
+          { key: "a", label: "A", color: null, count: 3 },
+          { key: "b", label: "B", color: null, count: 2 },
+          // Labels store a palette name rather than a colour, so passing it
+          // straight to CSS would render the wrong shade.
+          { key: "c", label: "C", color: "purple", count: 1 },
+        ]}
+        groupBy="label"
+        isLoading={false}
+      />,
+    );
+
+    const colours = screen
+      .getAllByRole("listitem")
+      .map((row) => barOf(row)?.style.backgroundColor);
+
+    expect(new Set(colours).size).toBe(3);
+    expect(colours[2]).toBe("var(--color-violet-500)");
   });
 
   it("shows an empty state rather than an empty chart", () => {

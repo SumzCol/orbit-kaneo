@@ -1,6 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { Skeleton } from "@/components/ui/skeleton";
+import labelColors from "@/constants/label-colors";
 import type { BreakdownGroupBy } from "@/fetchers/analytics/get-project-breakdown";
+import { resolveLabelColor } from "@/lib/label-color";
 
 export type BreakdownBucket = {
   key: string | null;
@@ -14,6 +16,15 @@ export type BreakdownBucket = {
 // here is the fix.
 const SUMS_PAST_TOTAL: BreakdownGroupBy[] = ["label"];
 
+// The workspace label palette, reused so a chart bar is the same family of
+// colour as the rest of the app rather than a second opinion about colour.
+// Statuses and labels carry a stored colour; assignees and priorities do not,
+// and fall back to a position in this palette.
+const PALETTE = labelColors.map((entry) => entry.color);
+
+// A bar that rounds to nothing reads as absent rather than small.
+const MIN_VISIBLE_PERCENT = 2;
+
 function bucketLabel(
   bucket: BreakdownBucket,
   groupBy: BreakdownGroupBy,
@@ -23,6 +34,14 @@ function bucketLabel(
   return groupBy === "label"
     ? t("analytics:breakdown.unlabelled")
     : t("analytics:breakdown.unassigned");
+}
+
+// A stored colour is a choice someone made in the workspace, so it wins.
+// `resolveLabelColor` is what the rest of the app uses to turn one into CSS:
+// the values are palette names like `purple`, not colours.
+function bucketColor(bucket: BreakdownBucket, index: number) {
+  if (bucket.color) return resolveLabelColor(bucket.color);
+  return PALETTE[index % PALETTE.length];
 }
 
 export function BreakdownChart({
@@ -38,9 +57,13 @@ export function BreakdownChart({
 
   if (isLoading || !buckets) {
     return (
-      <div className="flex flex-col gap-2" aria-busy="true">
-        {["a", "b", "c", "d"].map((key) => (
-          <Skeleton key={key} className="h-8 rounded-md" />
+      <div className="flex h-56 items-end gap-3" aria-busy="true">
+        {["a", "b", "c", "d", "e"].map((key, index) => (
+          <Skeleton
+            key={key}
+            className="w-14 shrink-0 rounded-sm"
+            style={{ height: `${40 + index * 12}%` }}
+          />
         ))}
       </div>
     );
@@ -60,27 +83,39 @@ export function BreakdownChart({
 
   return (
     <div className="flex flex-col gap-3">
-      <ul className="flex flex-col gap-2">
-        {buckets.map((bucket) => {
+      {/* A project can have more assignees or labels than fit the width, and
+          squeezing them would make every bar unreadable rather than just the
+          ones past the edge. */}
+      <ul className="flex items-end gap-3 overflow-x-auto pb-1">
+        {buckets.map((bucket, index) => {
           const label = bucketLabel(bucket, groupBy, t);
+          const percent = Math.max(
+            (bucket.count / largest) * 100,
+            MIN_VISIBLE_PERCENT,
+          );
           return (
             <li
               key={bucket.key ?? "__unset__"}
-              className="grid grid-cols-[minmax(6rem,9rem)_1fr_auto] items-center gap-3"
+              className="flex w-14 shrink-0 flex-col items-center gap-1.5"
             >
-              <span className="truncate text-sm" title={label}>
-                {label}
+              <span className="text-muted-foreground text-xs tabular-nums">
+                {bucket.count}
               </span>
-              <div className="h-5 w-full overflow-hidden rounded-sm bg-muted/50">
+              <div className="flex h-40 w-full items-end rounded-sm bg-muted/40">
                 <div
-                  className="h-full rounded-sm bg-primary"
+                  className="w-full rounded-sm"
                   style={{
-                    width: `${(bucket.count / largest) * 100}%`,
-                    backgroundColor: bucket.color ?? undefined,
+                    height: `${percent}%`,
+                    backgroundColor: bucketColor(bucket, index),
                   }}
                 />
               </div>
-              <span className="text-sm tabular-nums">{bucket.count}</span>
+              <span
+                className="w-full truncate text-center text-xs"
+                title={label}
+              >
+                {label}
+              </span>
             </li>
           );
         })}
