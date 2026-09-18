@@ -2364,7 +2364,8 @@
 			"unassigned": "Təyin edilməyib",
 			"unlabelled": "Etiketsiz",
 			"labelNote": "Tapşırıq daşıdığı hər etiket üçün bir dəfə sayılır, ona görə cəm layihədəkindən çoxdur.",
-			"empty": "Hələ göstəriləcək tapşırıq yoxdur."
+			"empty": "Hələ göstəriləcək tapşırıq yoxdur.",
+			"loadError": "Bu bölgü yüklənə bilmədi."
 		}
 	}
 }

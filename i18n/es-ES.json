@@ -2374,7 +2374,8 @@
 			"unassigned": "Sin asignar",
 			"unlabelled": "Sin etiqueta",
 			"labelNote": "Cada tarea se cuenta una vez por etiqueta, así que la suma supera el total del proyecto.",
-			"empty": "Todavía no hay tareas que mostrar."
+			"empty": "Todavía no hay tareas que mostrar.",
+			"loadError": "No se pudo cargar este desglose."
 		}
 	}
 }

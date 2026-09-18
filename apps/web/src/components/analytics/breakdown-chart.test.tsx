@@ -109,6 +109,25 @@ describe("BreakdownChart", () => {
     expect(screen.getByText("analytics:breakdown.empty")).toBeInTheDocument();
   });
 
+  it("says a failed request failed instead of showing a skeleton", () => {
+    render(
+      <BreakdownChart
+        buckets={undefined}
+        groupBy="status"
+        isLoading={false}
+        isError={true}
+      />,
+    );
+
+    // A failed request leaves the data undefined just as a pending one does,
+    // so without an explicit branch the skeleton stands in for the error and
+    // never resolves.
+    expect(
+      screen.getByText("analytics:breakdown.loadError"),
+    ).toBeInTheDocument();
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
   it("reports that it is loading", () => {
     render(
       <BreakdownChart buckets={undefined} groupBy="status" isLoading={true} />,

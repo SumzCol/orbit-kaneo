@@ -2374,7 +2374,8 @@
 			"unassigned": "Non attribuée",
 			"unlabelled": "Sans étiquette",
 			"labelNote": "Une tâche est comptée une fois par étiquette, le total dépasse donc celui du projet.",
-			"empty": "Aucune tâche à afficher pour l’instant."
+			"empty": "Aucune tâche à afficher pour l’instant.",
+			"loadError": "Impossible de charger cette répartition."
 		}
 	}
 }

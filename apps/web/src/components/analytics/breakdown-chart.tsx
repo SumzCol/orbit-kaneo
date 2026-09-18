@@ -57,14 +57,26 @@ export function BreakdownChart({
   buckets,
   groupBy,
   isLoading,
+  isError = false,
   columns = [],
 }: {
   buckets: BreakdownBucket[] | undefined;
   groupBy: BreakdownGroupBy;
   isLoading: boolean;
+  isError?: boolean;
   columns?: StatusColumn[];
 }) {
   const { t } = useTranslation();
+
+  // Checked before the loading branch: a failed request leaves the data
+  // undefined too, so without this the skeleton stands in for the error.
+  if (isError) {
+    return (
+      <p className="py-8 text-center text-destructive-foreground text-sm">
+        {t("analytics:breakdown.loadError")}
+      </p>
+    );
+  }
 
   if (isLoading || !buckets) {
     return (
@@ -107,7 +119,9 @@ export function BreakdownChart({
           );
           return (
             <li
-              key={bucket.key ?? "__unset__"}
+              // Namespaced: a sentinel on its own would collide with a
+              // label actually named after it.
+              key={bucket.key === null ? "bucket:unset" : `key:${bucket.key}`}
               className="grid grid-cols-[minmax(7rem,14rem)_1fr_2.5rem] items-center gap-3"
             >
               <div className="flex min-w-0 items-center gap-2">

@@ -9748,6 +9748,9 @@
 						},
 						"empty": {
 							"type": "string"
+						},
+						"loadError": {
+							"type": "string"
 						}
 					},
 					"required": [
@@ -9756,7 +9759,8 @@
 						"unassigned",
 						"unlabelled",
 						"labelNote",
-						"empty"
+						"empty",
+						"loadError"
 					]
 				}
 			},

@@ -21,13 +21,19 @@ async function byLabel(projectId: string) {
     .select({
       key: labelTable.name,
       label: labelTable.name,
-      color: labelTable.color,
+      // Grouped by name alone. A label row belongs to one task and is unique
+      // only by `(taskId, name)`, so the same name can carry different colours
+      // on different tasks; grouping by the colour as well split one label
+      // into several buckets that all came back under the same key. The colour
+      // is a display detail here, so any one of them will do as long as the
+      // same one comes back every time.
+      color: sql<string | null>`min(${labelTable.color})`,
       count,
     })
     .from(taskTable)
     .leftJoin(labelTable, eq(labelTable.taskId, taskTable.id))
     .where(eq(taskTable.projectId, projectId))
-    .groupBy(labelTable.name, labelTable.color)
+    .groupBy(labelTable.name)
     .orderBy(desc(count), labelTable.name);
 }
 

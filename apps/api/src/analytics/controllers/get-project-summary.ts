@@ -45,8 +45,14 @@ async function getProjectSummary(projectId: string) {
       completed: countWhere(sql`${columnTable.isFinal} = true`),
       archived: countWhere(sql`${taskTable.status} = 'archived'`),
       unassigned: countWhere(sql`${taskTable.userId} is null`),
+      // By calendar day, not by instant. Due dates are date-only — the picker
+      // stores local midnight — and `getDueDateStatus` rounds to whole days,
+      // so the task views do not call something due today late. Comparing
+      // against `now()` would, from midnight onward, and the same task would
+      // be overdue here and on time there.
       overdue: countWhere(
-        sql`${taskTable.dueDate} < now() and not ${isFinished}`,
+        sql`${taskTable.dueDate} < date_trunc('day', now() at time zone 'utc')
+            and not ${isFinished}`,
       ),
     })
     .from(taskTable)

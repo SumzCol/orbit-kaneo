@@ -2374,7 +2374,8 @@
 			"unassigned": "Non assegnata",
 			"unlabelled": "Senza etichetta",
 			"labelNote": "Ogni attività è contata una volta per etichetta, quindi la somma supera il totale del progetto.",
-			"empty": "Ancora nessuna attività da mostrare."
+			"empty": "Ancora nessuna attività da mostrare.",
+			"loadError": "Impossibile caricare questa suddivisione."
 		}
 	}
 }

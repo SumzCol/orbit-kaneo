@@ -2364,7 +2364,8 @@
 			"unassigned": "Atanmamış",
 			"unlabelled": "Etiketsiz",
 			"labelNote": "Bir görev taşıdığı her etiket için bir kez sayılır, bu yüzden toplam projedekinden fazladır.",
-			"empty": "Henüz gösterilecek görev yok."
+			"empty": "Henüz gösterilecek görev yok.",
+			"loadError": "Bu dağılım yüklenemedi."
 		}
 	}
 }

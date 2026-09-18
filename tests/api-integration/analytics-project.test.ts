@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import db, { schema } from "../../apps/api/src/database";
 import { createApp } from "../../apps/api/src/index";
@@ -190,6 +190,30 @@ describe("API integration: project analytics", () => {
     expect(summary.overdue).toBe(1);
   });
 
+  it("does not call a task due today overdue", async () => {
+    const { project } = await signedInProject();
+
+    const today = await seedTask(project.id, "to-do");
+    const yesterday = await seedTask(project.id, "to-do");
+    // Set from the database clock so the assertion cannot straddle midnight or
+    // depend on the timezone the test runner happens to be in.
+    await db.execute(
+      sql`update task set due_date = date_trunc('day', now() at time zone 'utc')
+          where id = ${today.id}`,
+    );
+    await db.execute(
+      sql`update task set due_date = date_trunc('day', now() at time zone 'utc') - interval '1 day'
+          where id = ${yesterday.id}`,
+    );
+
+    const summary = (await (await fetchSummary(project.id)).json()) as Summary;
+
+    // `getDueDateStatus` rounds to whole days, so the task views treat
+    // something due today as still due. Counting by instant would have made
+    // it late from midnight and disagreed with every other screen.
+    expect(summary.overdue).toBe(1);
+  });
+
   it("counts unassigned across every group, not just the open ones", async () => {
     const { member, project } = await signedInProject();
 
@@ -292,6 +316,38 @@ describe("API integration: project analytics", () => {
     expect(breakdown.buckets.find((bucket) => bucket.key === null)?.count).toBe(
       1,
     );
+  });
+
+  it("returns one bucket per label name, whatever colours it carries", async () => {
+    const { member, project } = await signedInProject();
+    const first = await seedTask(project.id, "to-do");
+    const second = await seedTask(project.id, "to-do");
+
+    // A label row belongs to one task and is unique only by (taskId, name), so
+    // the same name legitimately carries different colours on different tasks.
+    await db.insert(schema.labelTable).values([
+      {
+        taskId: first.id,
+        workspaceId: member.workspace.id,
+        name: "bug",
+        color: "#f00",
+      },
+      {
+        taskId: second.id,
+        workspaceId: member.workspace.id,
+        name: "bug",
+        color: "#00f",
+      },
+    ]);
+
+    const breakdown = (await (
+      await fetchBreakdown(project.id, "label")
+    ).json()) as Breakdown;
+
+    // One bucket, not two sharing a key.
+    const bug = breakdown.buckets.filter((bucket) => bucket.key === "bug");
+    expect(bug).toHaveLength(1);
+    expect(bug[0]?.count).toBe(2);
   });
 
   it("refuses a caller with no access to the workspace", async () => {
