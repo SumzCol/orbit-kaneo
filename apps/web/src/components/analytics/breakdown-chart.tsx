@@ -69,12 +69,13 @@ export function BreakdownChart({
   groupBy,
   isLoading,
   isError = false,
-  columns = [],
+  columns,
 }: {
   buckets: BreakdownBucket[] | undefined;
   groupBy: BreakdownGroupBy;
   isLoading: boolean;
   isError?: boolean;
+  /** Undefined until the project's columns have loaded. */
   columns?: StatusColumn[];
 }) {
   const { t } = useTranslation();
@@ -89,7 +90,13 @@ export function BreakdownChart({
     );
   }
 
-  if (isLoading || !buckets) {
+  // Grouping by status is classified and ordered from the columns, so without
+  // them every status would be drawn as unstarted work in fallback colours.
+  // The breakdown request can resolve first, so waiting on the data rather
+  // than on a pending flag is what keeps that off the screen.
+  const awaitingColumns = groupBy === "status" && !columns;
+
+  if (isLoading || awaitingColumns || !buckets) {
     return (
       <div className="flex flex-col gap-2.5" aria-busy="true">
         {["a", "b", "c"].map((key) => (
@@ -114,8 +121,12 @@ export function BreakdownChart({
   // ranks them. Statuses have a lifecycle, and sorting those by count scatters
   // the colour groups the ramp just gathered.
   const ordered =
-    groupBy === "status" ? sortStatusBuckets(buckets, columns) : buckets;
-  const colors = assignBucketColors(ordered, groupBy, statusColorMap(columns));
+    groupBy === "status" ? sortStatusBuckets(buckets, columns ?? []) : buckets;
+  const colors = assignBucketColors(
+    ordered,
+    groupBy,
+    statusColorMap(columns ?? []),
+  );
 
   return (
     <div className="flex flex-col gap-3">

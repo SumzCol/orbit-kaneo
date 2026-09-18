@@ -106,6 +106,10 @@ describe("BreakdownChart", () => {
         ]}
         groupBy="status"
         isLoading={false}
+        columns={[
+          { slug: "to-do", position: 0, isFinal: false },
+          { slug: "in-progress", position: 1, isFinal: false },
+        ]}
       />,
     );
 
@@ -114,6 +118,46 @@ describe("BreakdownChart", () => {
       screen.getByText("display(in-progress,En cours)"),
     ).toBeInTheDocument();
     expect(screen.getByText("status(planned)")).toBeInTheDocument();
+  });
+
+  it("waits for the columns before drawing a status breakdown", () => {
+    const { rerender } = render(
+      <BreakdownChart
+        buckets={[{ key: "to-do", label: "To Do", color: null, count: 3 }]}
+        groupBy="status"
+        isLoading={false}
+      />,
+    );
+
+    // The breakdown request can resolve before the columns one. Drawing then
+    // would classify and order every status as though nothing were final, so
+    // the first thing on screen would be wrong rather than absent.
+    expect(document.querySelector('[aria-busy="true"]')).toBeInTheDocument();
+    expect(screen.queryByText("To Do")).not.toBeInTheDocument();
+
+    rerender(
+      <BreakdownChart
+        buckets={[{ key: "to-do", label: "To Do", color: null, count: 3 }]}
+        groupBy="status"
+        isLoading={false}
+        columns={[{ slug: "to-do", position: 0, isFinal: false }]}
+      />,
+    );
+
+    expect(screen.getByText("display(to-do,To Do)")).toBeInTheDocument();
+  });
+
+  it("does not wait for columns when grouping by something else", () => {
+    render(
+      <BreakdownChart
+        buckets={[{ key: "u1", label: "Ada", color: null, count: 2 }]}
+        groupBy="assignee"
+        isLoading={false}
+      />,
+    );
+
+    // Only the status grouping is derived from them.
+    expect(screen.getByText("Ada")).toBeInTheDocument();
   });
 
   it("says a failed request failed instead of showing a skeleton", () => {

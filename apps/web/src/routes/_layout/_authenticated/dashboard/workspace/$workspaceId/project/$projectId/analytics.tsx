@@ -112,7 +112,7 @@ function ProjectAnalytics() {
               isError={
                 breakdownFailed || (groupBy === "status" && columnsFailed)
               }
-              columns={columns ?? []}
+              columns={columns}
             />
           </Card>
         </div>
