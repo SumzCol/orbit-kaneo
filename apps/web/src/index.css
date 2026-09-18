@@ -154,15 +154,20 @@ input:-webkit-autofill:active {
      of memorising its legend. Dimmer means further from the work in hand,
      which on a light ground means lighter and on a dark one means darker. */
   --state-backlog: var(--color-zinc-500);
-  --state-unstarted: var(--color-slate-500);
-  --state-unstarted-alt: var(--color-slate-400);
+  /* Lighter and cooler than the backlog grey it sits next to. Against black
+     the steel picks up enough blue to separate itself; on white it collapsed
+     into the grey, and the first two segments of the bar read as one. */
+  --state-unstarted: var(--color-slate-400);
+  --state-unstarted-alt: var(--color-slate-300);
   --state-started: var(--color-blue-500);
   --state-started-alt: var(--color-blue-400);
   --state-completed: var(--color-emerald-500);
   --state-archived: var(--color-zinc-300);
-  /* red-500 glows on white. The app's own --destructive does the same thing
-     in reverse, lightening in dark mode rather than darkening in light. */
-  --state-blocked: var(--color-red-600);
+  /* red-500 glows on white, and red-600 is still the most saturated thing on
+     the page. Taken down toward neutral rather than darkened further, so it
+     stays clearly red without being the first thing the eye lands on. The
+     app's own --destructive mixes the other way for dark mode. */
+  --state-blocked: color-mix(in srgb, var(--color-red-600) 92%, var(--color-neutral-500));
   --chart-1: var(--color-orange-600);
   --chart-2: var(--color-teal-600);
   --chart-3: var(--color-cyan-900);
