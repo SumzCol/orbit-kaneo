@@ -74,4 +74,23 @@ describe("assignBucketColors", () => {
     expect(colors).toHaveLength(14);
     expect(colors.every(Boolean)).toBe(true);
   });
+
+  it("gives a key the same colour whatever order the buckets arrive in", () => {
+    // `user-1` and `user-10` hash to the same palette slot, so one of them has
+    // to probe forward. Buckets arrive sorted by count, and resolving the
+    // collision in arrival order swapped their colours the moment their counts
+    // changed places — the instability the hash exists to prevent.
+    const [firstA, firstB] = assignBucketColors(
+      [bucket("user-1"), bucket("user-10")],
+      "assignee",
+    );
+    const [secondB, secondA] = assignBucketColors(
+      [bucket("user-10"), bucket("user-1")],
+      "assignee",
+    );
+
+    expect(firstA).not.toBe(firstB);
+    expect(firstA).toBe(secondA);
+    expect(firstB).toBe(secondB);
+  });
 });

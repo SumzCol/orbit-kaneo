@@ -5,11 +5,16 @@ export const projectSummarySchema = z
   .object({
     total: z.number().int().describe("Every task in the project."),
     backlog: z.number().int().describe("Status `planned`; holds no column."),
-    unstarted: z.number().int().describe("In the `to-do` column."),
+    unstarted: z
+      .number()
+      .int()
+      .describe("In the `to-do` column, while that column is not final."),
     started: z
       .number()
       .int()
-      .describe("In a column that is neither `to-do` nor final."),
+      .describe(
+        "Everything the other four groups do not claim, so the five always sum to the total. Ordinarily a column that is neither `to-do` nor final; also a task left without a column.",
+      ),
     completed: z.number().int().describe("In a column flagged `isFinal`."),
     archived: z.number().int().describe("Status `archived`; holds no column."),
     unassigned: z
@@ -20,7 +25,7 @@ export const projectSummarySchema = z
       .number()
       .int()
       .describe(
-        "Past its due date and not finished, where finished means a final column or the archived status. Cuts across the five groups above.",
+        "Past due by a full day and not finished, where finished means a final column or the archived status. The whole-day rule matches the task views, which do not call something due today late. Cuts across the five groups above.",
       ),
   })
   .openapi("ProjectAnalyticsSummary");

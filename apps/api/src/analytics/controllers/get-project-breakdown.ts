@@ -60,14 +60,18 @@ async function byStatus(projectId: string) {
   return db
     .select({
       key: taskTable.status,
-      label: sql<string>`coalesce(${columnTable.name}, ${taskTable.status})`,
-      color: columnTable.color,
+      // Grouped by status alone. Two tasks can share a status while pointing
+      // at different columns — the summary is built to survive that — and
+      // grouping by the column's name and colour as well split one status
+      // into rows that all came back under the same key.
+      label: sql<string>`coalesce(min(${columnTable.name}), ${taskTable.status})`,
+      color: sql<string | null>`min(${columnTable.color})`,
       count,
     })
     .from(taskTable)
     .leftJoin(columnTable, eq(columnTable.id, taskTable.columnId))
     .where(eq(taskTable.projectId, projectId))
-    .groupBy(taskTable.status, columnTable.name, columnTable.color)
+    .groupBy(taskTable.status)
     .orderBy(desc(count), taskTable.status);
 }
 

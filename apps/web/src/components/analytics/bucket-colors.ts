@@ -79,20 +79,32 @@ export function assignBucketColors(
     return meaningful;
   });
 
-  return assigned.map((colour, index) => {
-    if (colour) return colour;
-    const key = buckets[index]?.key ?? "";
+  // Fallbacks are allocated over the keys sorted, not over the rows as they
+  // arrive. Buckets come back ordered by count, so probing forward from a
+  // collision in that order would swap two people's colours the moment their
+  // counts changed — the instability the hash exists to avoid.
+  const fallbackKeys = buckets
+    .map((bucket, index) => ({ key: bucket.key ?? "", index }))
+    .filter(({ index }) => !assigned[index])
+    .sort((a, b) => a.key.localeCompare(b.key));
+
+  const resolved = [...assigned];
+  for (const { key, index } of fallbackKeys) {
     const start = stableIndex(key);
+    let chosen = PALETTE[start] as string;
     for (let step = 0; step < PALETTE.length; step += 1) {
       const candidate = PALETTE[(start + step) % PALETTE.length] as string;
       if (!taken.has(candidate)) {
-        taken.add(candidate);
-        return candidate;
+        chosen = candidate;
+        break;
       }
     }
-    // More buckets than the palette holds. Repeating beats leaving a bar
+    // More buckets than the palette holds: repeating beats leaving a bar
     // uncoloured, and by here the chart is long enough that adjacency has
     // stopped carrying the comparison anyway.
-    return PALETTE[start] as string;
-  });
+    taken.add(chosen);
+    resolved[index] = chosen;
+  }
+
+  return resolved as string[];
 }

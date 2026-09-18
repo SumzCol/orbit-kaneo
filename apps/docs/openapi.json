@@ -2751,11 +2751,11 @@
           },
           "unstarted": {
             "type": "integer",
-            "description": "In the `to-do` column."
+            "description": "In the `to-do` column, while that column is not final."
           },
           "started": {
             "type": "integer",
-            "description": "In a column that is neither `to-do` nor final."
+            "description": "Everything the other four groups do not claim, so the five always sum to the total. Ordinarily a column that is neither `to-do` nor final; also a task left without a column."
           },
           "completed": {
             "type": "integer",
@@ -2771,7 +2771,7 @@
           },
           "overdue": {
             "type": "integer",
-            "description": "Past its due date and not finished, where finished means a final column or the archived status. Cuts across the five groups above."
+            "description": "Past due by a full day and not finished, where finished means a final column or the archived status. The whole-day rule matches the task views, which do not call something due today late. Cuts across the five groups above."
           }
         },
         "required": [
@@ -13097,7 +13097,7 @@
           "Analytics"
         ],
         "summary": "Get a project's headline counts",
-        "description": "Five counts that partition the project — backlog, unstarted, started, completed and archived, which sum to the total — plus unassigned and overdue, which cut across them. Unstarted is the `to-do` column, started is any other non-final column, and completed is any column flagged `isFinal`. Overdue excludes finished work, meaning a final column or the archived status.",
+        "description": "Five counts that partition the project — backlog, unstarted, started, completed and archived, which sum to the total exactly — plus unassigned and overdue, which cut across them. Unstarted is a non-final `to-do` column, completed is any column flagged `isFinal`, and started is the remainder, so a task whose column was removed is still counted somewhere. Overdue is work past due by a full day that is neither in a final column nor archived, matching the rule the task views apply.",
         "parameters": [
           {
             "schema": {

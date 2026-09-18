@@ -47,8 +47,10 @@ function ProjectAnalytics() {
   // Which state each status belongs to, so the chart can colour a status the
   // same as the bar above colours its state. `isFinal` and `position` are not
   // in the breakdown response and this is already cached for the board.
-  const { data: columns } = useGetColumns(projectId, {
+  const { data: columns, isError: columnsFailed } = useGetColumns(projectId, {
     refetchOnMount: true,
+    // Column edits publish no WebSocket event, and this view stays open.
+    refetchInterval: 5 * 60 * 1000,
   });
 
   return (
@@ -104,7 +106,12 @@ function ProjectAnalytics() {
               buckets={breakdown?.buckets}
               groupBy={groupBy}
               isLoading={breakdownPending}
-              isError={breakdownFailed}
+              // Without the columns the status grouping cannot tell which
+              // state a status belongs to, so it would colour and order every
+              // row as though nothing were final — wrong rather than plain.
+              isError={
+                breakdownFailed || (groupBy === "status" && columnsFailed)
+              }
               columns={columns ?? []}
             />
           </Card>

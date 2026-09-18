@@ -19,7 +19,7 @@ const getProjectSummaryRoute = createRoute({
   tags: ["Analytics"],
   summary: "Get a project's headline counts",
   description:
-    "Five counts that partition the project — backlog, unstarted, started, completed and archived, which sum to the total — plus unassigned and overdue, which cut across them. Unstarted is the `to-do` column, started is any other non-final column, and completed is any column flagged `isFinal`. Overdue excludes finished work, meaning a final column or the archived status.",
+    "Five counts that partition the project — backlog, unstarted, started, completed and archived, which sum to the total exactly — plus unassigned and overdue, which cut across them. Unstarted is a non-final `to-do` column, completed is any column flagged `isFinal`, and started is the remainder, so a task whose column was removed is still counted somewhere. Overdue is work past due by a full day that is neither in a final column nor archived, matching the rule the task views apply.",
   middleware: [
     workspaceAccess.fromProject("projectId"),
     requireWorkspacePermission({ task: ["read"] }),

@@ -70,6 +70,16 @@ export function syncTaskLabelsInTasksCache(
       );
     },
   );
+
+  // Writing through the task cache leaves the analytics counts untouched, and
+  // the label mutations invalidate only their own `["labels", ...]` keys. The
+  // project id is not in scope here, so this reaches every cached analytics
+  // query rather than one project's: there are at most a couple, and a label
+  // moving between tasks changes the label breakdown either way.
+  queryClient.invalidateQueries({
+    predicate: (query) =>
+      query.queryKey[0] === "tasks" && query.queryKey[2] === "analytics",
+  });
 }
 
 export function addLabelToTaskInTasksCache(
