@@ -89,8 +89,6 @@ export function statusColorMap(
   columns: StatusColumn[],
   statuses: string[] = [],
 ): Map<string, string> {
-  const byState = new Map<TaskState, StatusColumn[]>();
-
   // `isFinal` is editable on every column, Blocked included. A project that
   // marks it final means it as a terminal state, and the summary counts those
   // tasks as completed; colouring them red anyway would put the chart at odds
@@ -98,20 +96,39 @@ export function statusColorMap(
   const blocked = columns.find((column) => column.slug === BLOCKED_SLUG);
   const blockedIsExceptional = blocked ? !blocked.isFinal : true;
 
-  for (const column of columns) {
-    if (blockedIsExceptional && column.slug === BLOCKED_SLUG) continue;
-    const state = stateOfStatus(column.slug, columns);
-    const bucket = byState.get(state) ?? [];
-    bucket.push(column);
-    byState.set(state, bucket);
+  const bySlug = new Map(columns.map((column) => [column.slug, column]));
+  const byState = new Map<TaskState, string[]>();
+  const place = (slug: string) => {
+    if (blockedIsExceptional && slug === BLOCKED_SLUG) return;
+    if (slug === "planned" || slug === "archived") return;
+    const state = stateOfStatus(slug, columns);
+    const group = byState.get(state) ?? [];
+    if (!group.includes(slug)) group.push(slug);
+    byState.set(state, group);
+  };
+
+  // Columns first, earliest in the workflow first, so the weight ordering
+  // follows the board.
+  for (const column of [...columns].sort((a, b) => a.position - b.position)) {
+    place(column.slug);
+  }
+
+  // Then any status the column list cannot explain — one whose column was
+  // removed, say. Sorted, because it has no position to order it by and the
+  // arrival order is the count order, which moves.
+  //
+  // These join their state's group rather than taking its base colour: a
+  // project with `in-progress` and an orphan both in started would otherwise
+  // paint two different bars the same, and `assignBucketColors` treats a
+  // colour from this map as deliberate and never probes past a collision.
+  for (const status of [...statuses].sort()) {
+    if (!bySlug.has(status)) place(status);
   }
 
   const colors = new Map<string, string>();
-
   for (const [state, group] of byState) {
-    const ordered = [...group].sort((a, b) => a.position - b.position);
-    ordered.forEach((column, index) => {
-      colors.set(column.slug, sibling(state, index));
+    group.forEach((slug, index) => {
+      colors.set(slug, sibling(state, index));
     });
   }
 
@@ -122,16 +139,6 @@ export function statusColorMap(
   // task can hold, and the summary counts them as their own states.
   colors.set("planned", STATE_COLOR.backlog);
   colors.set("archived", STATE_COLOR.archived);
-
-  // A status the column list does not explain — one whose column was removed,
-  // say — still has to be drawn. `stateOfStatus` calls it started, which is
-  // where the summary counts it, so take the colour from there rather than
-  // leaving it to a palette slot that means nothing.
-  for (const status of statuses) {
-    if (!colors.has(status)) {
-      colors.set(status, STATE_COLOR[stateOfStatus(status, columns)]);
-    }
-  }
 
   return colors;
 }

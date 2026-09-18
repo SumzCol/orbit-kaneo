@@ -98,7 +98,25 @@ describe("statusColorMap", () => {
     // calls it started, which is where the summary counts it.
     const colors = statusColorMap(columns, ["ghost"]);
 
-    expect(colors.get("ghost")).toBe("var(--state-started)");
+    // Same hue as the state the summary counts it in, but its own weight:
+    // taking the base colour outright made it identical to In Progress, and
+    // `assignBucketColors` trusts anything from this map and never probes
+    // past a collision, so the two bars became indistinguishable.
+    expect(colors.get("ghost")).toContain("--state-started");
+    expect(colors.get("ghost")).not.toBe(colors.get("in-progress"));
+    expect(colors.get("ghost")).not.toBe(colors.get("in-review"));
+  });
+
+  it("gives an unexplained status the same colour whatever order it arrives in", () => {
+    // Buckets arrive in count order, which moves. These have no column
+    // position to order them by, so without sorting they would swap weights
+    // whenever their counts changed places.
+    const one = statusColorMap(columns, ["ghost", "phantom"]);
+    const two = statusColorMap(columns, ["phantom", "ghost"]);
+
+    expect(one.get("ghost")).toBe(two.get("ghost"));
+    expect(one.get("phantom")).toBe(two.get("phantom"));
+    expect(one.get("ghost")).not.toBe(one.get("phantom"));
   });
 
   it("orders siblings by column position, not by the order given", () => {
