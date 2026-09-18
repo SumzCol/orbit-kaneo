@@ -1,5 +1,9 @@
+import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
-import { updateTaskLabelsInProject } from "./sync-task-labels-cache";
+import {
+  syncTaskLabelsInTasksCache,
+  updateTaskLabelsInProject,
+} from "./sync-task-labels-cache";
 
 describe("updateTaskLabelsInProject", () => {
   it("adds a label to the matching task without changing other tasks", () => {
@@ -175,5 +179,20 @@ describe("updateTaskLabelsInProject", () => {
         color: "red",
       },
     ]);
+  });
+
+  it("leaves a cached value that is not a project untouched", () => {
+    const client = new QueryClient();
+    // Analytics is cached beneath a project's task key so that the
+    // invalidation every task mutation performs reaches it. `setQueriesData`
+    // matches by prefix, so this updater sees it too, and it has no columns.
+    const analyticsKey = ["tasks", "project-1", "analytics", "summary"];
+    const summary = { total: 4, completed: 1 };
+    client.setQueryData(analyticsKey, summary);
+
+    expect(() =>
+      syncTaskLabelsInTasksCache(client, "task-1", (labels) => labels),
+    ).not.toThrow();
+    expect(client.getQueryData(analyticsKey)).toEqual(summary);
   });
 });

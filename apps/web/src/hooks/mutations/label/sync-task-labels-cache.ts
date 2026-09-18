@@ -51,10 +51,24 @@ export function syncTaskLabelsInTasksCache(
     {
       queryKey: ["tasks"],
     },
-    (existingProject) =>
-      existingProject
-        ? updateTaskLabelsInProject(existingProject, taskId, updater)
-        : existingProject,
+    (existing) => {
+      // `setQueriesData` matches by prefix, and not everything cached under
+      // ["tasks"] is a project: the analytics queries live beneath a project's
+      // task key so that the invalidation every task mutation already performs
+      // reaches them too. Checking the shape rather than the key keeps this
+      // correct for whatever else is nested there later — the alternative is
+      // that the next such key throws here on the first label change.
+      if (
+        !Array.isArray((existing as { columns?: unknown } | undefined)?.columns)
+      ) {
+        return existing;
+      }
+      return updateTaskLabelsInProject(
+        existing as ProjectWithTasks,
+        taskId,
+        updater,
+      );
+    },
   );
 }
 
