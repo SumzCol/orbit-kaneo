@@ -65,10 +65,12 @@ export default function MobileProjectNav({
             <p className="px-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               View
             </p>
-            {/* Five options since Analytics joined the four. A four-column
-                grid left it alone on a second row, where a nowrap label beside
-                an icon overflows a quarter-width cell. */}
-            <div className="grid grid-cols-3 gap-1 sm:grid-cols-5">
+            {/* Five options since Analytics joined the four. The popover is a
+                fixed w-72, so columns do not get wider with the screen: four
+                gave about 65px a cell and five would give 51, too narrow for
+                an icon beside a translated label. Three gives 88 and wraps to
+                a second row of two. */}
+            <div className="grid grid-cols-3 gap-1">
               <button
                 type="button"
                 onClick={onSelectBacklog}
