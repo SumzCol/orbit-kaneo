@@ -2738,6 +2738,104 @@
           "updatedAt"
         ]
       },
+      "ProjectAnalyticsSummary": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Every task in the project."
+          },
+          "backlog": {
+            "type": "integer",
+            "description": "Status `planned`; holds no column."
+          },
+          "unstarted": {
+            "type": "integer",
+            "description": "In the `to-do` column."
+          },
+          "started": {
+            "type": "integer",
+            "description": "In a column that is neither `to-do` nor final."
+          },
+          "completed": {
+            "type": "integer",
+            "description": "In a column flagged `isFinal`."
+          },
+          "archived": {
+            "type": "integer",
+            "description": "Status `archived`; holds no column."
+          },
+          "unassigned": {
+            "type": "integer",
+            "description": "No assignee. Cuts across the five groups above."
+          },
+          "overdue": {
+            "type": "integer",
+            "description": "Past its due date and not finished, where finished means a final column or the archived status. Cuts across the five groups above."
+          }
+        },
+        "required": [
+          "total",
+          "backlog",
+          "unstarted",
+          "started",
+          "completed",
+          "archived",
+          "unassigned",
+          "overdue"
+        ]
+      },
+      "ProjectAnalyticsBreakdown": {
+        "type": "object",
+        "properties": {
+          "groupBy": {
+            "type": "string",
+            "enum": [
+              "assignee",
+              "status",
+              "priority",
+              "label"
+            ]
+          },
+          "buckets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Null is the unset bucket: no assignee, no label."
+                },
+                "label": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "color",
+                "count"
+              ]
+            }
+          }
+        },
+        "required": [
+          "groupBy",
+          "buckets"
+        ]
+      },
       "TaskRelation": {
         "type": "object",
         "properties": {
@@ -12981,6 +13079,130 @@
           },
           "404": {
             "description": "Telegram integration not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics/project/{projectId}/summary": {
+      "get": {
+        "operationId": "getProjectAnalyticsSummary",
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "Get a project's headline counts",
+        "description": "Five counts that partition the project — backlog, unstarted, started, completed and archived, which sum to the total — plus unassigned and overdue, which cut across them. Unstarted is the `to-do` column, started is any other non-final column, and completed is any column flagged `isFinal`. Overdue excludes finished work, meaning a final column or the archived status.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The project's headline counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAnalyticsSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown project, or its workspace could not be determined",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "No workspace access, or missing task:read permission",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics/project/{projectId}/breakdown": {
+      "get": {
+        "operationId": "getProjectAnalyticsBreakdown",
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "Get a project's task counts grouped by one property",
+        "description": "Counts grouped by assignee, status, priority or label. A null key is the unset bucket: unassigned, or unlabelled. Grouping by label counts a task once per label it carries, so those buckets sum to more than the project's task count; every other grouping partitions it.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "projectId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "assignee",
+                "status",
+                "priority",
+                "label"
+              ]
+            },
+            "required": true,
+            "name": "groupBy",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Counts for the requested grouping",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAnalyticsBreakdown"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown project, an unknown grouping, or a workspace that could not be determined",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "No workspace access, or missing task:read permission",
             "content": {
               "text/plain": {
                 "schema": {
