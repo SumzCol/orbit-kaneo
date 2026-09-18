@@ -65,27 +65,43 @@ describe("BreakdownChart", () => {
     expect(barOf(rows[1] as HTMLElement)?.style.width).toMatch(/^33\.3/);
   });
 
-  it("gives each bar its own colour, and a stored one wins", () => {
+  it("names a priority the way the rest of the app names it", () => {
     render(
       <BreakdownChart
         buckets={[
-          { key: "a", label: "A", color: null, count: 3 },
-          { key: "b", label: "B", color: null, count: 2 },
-          // Labels store a palette name rather than a colour, so passing it
-          // straight to CSS would render the wrong shade.
-          { key: "c", label: "C", color: "purple", count: 1 },
+          { key: "no-priority", label: "no-priority", color: null, count: 3 },
+          { key: "urgent", label: "urgent", color: null, count: 1 },
         ]}
-        groupBy="label"
+        groupBy="priority"
         isLoading={false}
       />,
     );
 
-    const colours = screen
-      .getAllByRole("listitem")
-      .map((row) => barOf(row)?.style.backgroundColor);
+    // The endpoint returns the stored key, which is what the board renders
+    // through an i18n key rather than showing raw.
+    expect(screen.getByText("tasks:priority.no-priority")).toBeInTheDocument();
+    expect(screen.queryByText("no-priority")).not.toBeInTheDocument();
+  });
 
-    expect(new Set(colours).size).toBe(3);
-    expect(colours[2]).toBe("var(--color-violet-500)");
+  it("names the two statuses that have no column", () => {
+    render(
+      <BreakdownChart
+        buckets={[
+          { key: "to-do", label: "To Do", color: null, count: 3 },
+          // No column is seeded for these, so the endpoint falls back to the
+          // raw status string and the client has to name them.
+          { key: "planned", label: "planned", color: null, count: 1 },
+          { key: "archived", label: "archived", color: null, count: 1 },
+        ]}
+        groupBy="status"
+        isLoading={false}
+      />,
+    );
+
+    expect(screen.getByText("To Do")).toBeInTheDocument();
+    expect(screen.getByText("tasks:status.planned")).toBeInTheDocument();
+    expect(screen.getByText("tasks:status.archived")).toBeInTheDocument();
+    expect(screen.queryByText("planned")).not.toBeInTheDocument();
   });
 
   it("shows an empty state rather than an empty chart", () => {

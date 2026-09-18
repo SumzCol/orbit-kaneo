@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BreakdownGroupBy } from "@/fetchers/analytics/get-project-breakdown";
 import { getInitials } from "@/lib/get-initials";
-import { bucketColor } from "./bucket-colors";
+import { assignBucketColors } from "./bucket-colors";
 
 export type BreakdownBucket = {
   key: string | null;
@@ -21,15 +21,31 @@ const SUMS_PAST_TOTAL: BreakdownGroupBy[] = ["label"];
 // A bar that rounds to nothing reads as absent rather than small.
 const MIN_VISIBLE_PERCENT = 1.5;
 
+// `planned` and `archived` are the two statuses no column is seeded for, so
+// the endpoint has no column name to return and falls back to the raw string.
+// The app already names them.
+const COLUMNLESS_STATUS = new Set(["planned", "archived"]);
+
 function bucketLabel(
   bucket: BreakdownBucket,
   groupBy: BreakdownGroupBy,
   t: (key: string) => string,
 ) {
-  if (bucket.key !== null && bucket.label) return bucket.label;
-  return groupBy === "label"
-    ? t("analytics:breakdown.unlabelled")
-    : t("analytics:breakdown.unassigned");
+  if (bucket.key === null) {
+    return groupBy === "label"
+      ? t("analytics:breakdown.unlabelled")
+      : t("analytics:breakdown.unassigned");
+  }
+
+  // Priority is stored as the key itself, so without this the chart shows
+  // `no-priority` where every other screen shows "No priority".
+  if (groupBy === "priority") return t(`tasks:priority.${bucket.key}`);
+
+  if (groupBy === "status" && COLUMNLESS_STATUS.has(bucket.key)) {
+    return t(`tasks:status.${bucket.key}`);
+  }
+
+  return bucket.label || bucket.key;
 }
 
 export function BreakdownChart({
@@ -64,13 +80,14 @@ export function BreakdownChart({
   // Scaled to the largest bucket rather than the project total, so a long tail
   // of small groups stays readable instead of collapsing to invisible slivers.
   const largest = Math.max(...buckets.map((bucket) => bucket.count), 1);
+  const colors = assignBucketColors(buckets, groupBy);
 
   return (
     <div className="flex flex-col gap-3">
       {/* Rows rather than columns: the names here are people and labels, and a
           column narrow enough to fit many of them is too narrow to hold one. */}
       <ul className="flex flex-col gap-2.5">
-        {buckets.map((bucket) => {
+        {buckets.map((bucket, index) => {
           const label = bucketLabel(bucket, groupBy, t);
           const percent = Math.max(
             (bucket.count / largest) * 100,
@@ -102,7 +119,7 @@ export function BreakdownChart({
                   className="h-full rounded-sm"
                   style={{
                     width: `${percent}%`,
-                    backgroundColor: bucketColor(bucket, groupBy),
+                    backgroundColor: colors[index],
                   }}
                 />
               </div>
