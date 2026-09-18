@@ -13,6 +13,13 @@ type GroupBy = z.infer<typeof breakdownGroupBy>;
 
 const count = sql<number>`count(*)::int`;
 
+// The column a task actually sits in, falling back to its status for the two
+// that have none. The summary classifies from the joined column, so grouping
+// by the stored status instead would let the two disagree wherever the pair
+// got out of step: a task whose status says `done` while it sits in `to-do` is
+// counted as unstarted there, and would have been coloured completed here.
+const effectiveStatus = sql<string>`coalesce(${columnTable.slug}, ${taskTable.status})`;
+
 // Grouped by label a task is counted once per label it carries, so the buckets
 // sum to more than the project's task count. Every other grouping partitions.
 // The caller has to say so on the axis; nothing here can.
@@ -59,20 +66,20 @@ async function byAssignee(projectId: string) {
 async function byStatus(projectId: string) {
   return db
     .select({
-      key: taskTable.status,
-      // Grouped by status alone. Two tasks can share a status while pointing
-      // at different columns — the summary is built to survive that — and
-      // grouping by the column's name and colour as well split one status
-      // into rows that all came back under the same key.
-      label: sql<string>`coalesce(min(${columnTable.name}), ${taskTable.status})`,
+      key: effectiveStatus,
+      // One row per key, and the display fields aggregated: two tasks can
+      // share a status while pointing at different columns, and grouping by
+      // the column's name and colour as well split one status into rows that
+      // all came back under the same key.
+      label: sql<string>`coalesce(min(${columnTable.name}), ${effectiveStatus})`,
       color: sql<string | null>`min(${columnTable.color})`,
       count,
     })
     .from(taskTable)
     .leftJoin(columnTable, eq(columnTable.id, taskTable.columnId))
     .where(eq(taskTable.projectId, projectId))
-    .groupBy(taskTable.status)
-    .orderBy(desc(count), taskTable.status);
+    .groupBy(effectiveStatus)
+    .orderBy(desc(count), effectiveStatus);
 }
 
 async function byPriority(projectId: string) {

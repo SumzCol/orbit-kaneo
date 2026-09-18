@@ -327,6 +327,33 @@ describe("API integration: project analytics", () => {
     ).toBe("To Do");
   });
 
+  it("buckets a status by the column the task is actually in", async () => {
+    const { project } = await signedInProject();
+
+    const todo = await db.query.columnTable.findFirst({
+      where: (table, { and: andOp, eq: eqOp }) =>
+        andOp(eqOp(table.projectId, project.id), eqOp(table.slug, "to-do")),
+    });
+    const task = await seedTask(project.id, "done");
+    // Status and column disagreeing is the state the summary is built to
+    // survive. The summary classifies from the joined column and counts this
+    // as unstarted; keying the bucket off the stored status would have the
+    // chart colour it completed and contradict the bar above it.
+    await db
+      .update(schema.taskTable)
+      .set({ columnId: todo?.id })
+      .where(eq(schema.taskTable.id, task.id));
+
+    const summary = (await (await fetchSummary(project.id)).json()) as Summary;
+    const breakdown = (await (
+      await fetchBreakdown(project.id, "status")
+    ).json()) as Breakdown;
+
+    expect(summary.unstarted).toBe(1);
+    expect(summary.completed).toBe(0);
+    expect(breakdown.buckets.map((bucket) => bucket.key)).toEqual(["to-do"]);
+  });
+
   it("puts unassigned work in the null bucket", async () => {
     const { member, project } = await signedInProject();
 
