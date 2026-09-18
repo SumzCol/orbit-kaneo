@@ -248,9 +248,16 @@ describe("API integration: project analytics", () => {
       .where(eq(schema.taskTable.id, task.id));
 
     const summary = (await (await fetchSummary(project.id)).json()) as Summary;
+    const breakdown = (await (
+      await fetchBreakdown(project.id, "status")
+    ).json()) as Breakdown;
 
     expect(summary.archived).toBe(1);
     expect(summary.completed).toBe(0);
+    // The summary gives the virtual statuses precedence over any column a row
+    // points at, so the breakdown has to as well or the chart files this task
+    // under `done` while the bar above counts it archived.
+    expect(breakdown.buckets.map((bucket) => bucket.key)).toEqual(["archived"]);
     expect(
       summary.backlog +
         summary.unstarted +

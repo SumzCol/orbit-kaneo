@@ -13,12 +13,20 @@ type GroupBy = z.infer<typeof breakdownGroupBy>;
 
 const count = sql<number>`count(*)::int`;
 
-// The column a task actually sits in, falling back to its status for the two
-// that have none. The summary classifies from the joined column, so grouping
-// by the stored status instead would let the two disagree wherever the pair
-// got out of step: a task whose status says `done` while it sits in `to-do` is
-// counted as unstarted there, and would have been coloured completed here.
-const effectiveStatus = sql<string>`coalesce(${columnTable.slug}, ${taskTable.status})`;
+// The summary's classification, mirrored: `planned` and `archived` first,
+// whatever column a row happens to point at, then the column a task actually
+// sits in, then its status when it has no column.
+//
+// Both halves matter. Keying off the stored status alone let the two disagree
+// when a task's status said `done` while it sat in `to-do` — unstarted in the
+// summary, completed here. Keying off the column alone disagreed the other
+// way, filing an archived task under `done` while the summary counted it as
+// archived.
+const effectiveStatus = sql<string>`
+  case
+    when ${taskTable.status} in ('planned', 'archived') then ${taskTable.status}
+    else coalesce(${columnTable.slug}, ${taskTable.status})
+  end`;
 
 // Grouped by label a task is counted once per label it carries, so the buckets
 // sum to more than the project's task count. Every other grouping partitions.
