@@ -11,6 +11,11 @@ function useGetProjectSummary(projectId: string) {
     // page current; this covers reopening one whose cached answer went stale
     // while nothing was listening.
     refetchOnMount: true,
+    // Overdue is measured against the server's clock, so it changes at
+    // midnight with no task activity to invalidate anything. Without this a
+    // page left open overnight keeps yesterday's count and its "on track"
+    // badge. Paused while the tab is in the background.
+    refetchInterval: 5 * 60 * 1000,
   });
 }
 

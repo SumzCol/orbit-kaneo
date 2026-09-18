@@ -4,6 +4,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BreakdownGroupBy } from "@/fetchers/analytics/get-project-breakdown";
 import { getInitials } from "@/lib/get-initials";
+import {
+  getPriorityLabel,
+  getStatusDisplayLabel,
+  getStatusLabel,
+} from "@/lib/i18n/domain";
 import { assignBucketColors } from "./bucket-colors";
 import {
   type StatusColumn,
@@ -28,7 +33,7 @@ const MIN_VISIBLE_PERCENT = 1.5;
 
 // `planned` and `archived` are the two statuses no column is seeded for, so
 // the endpoint has no column name to return and falls back to the raw string.
-// The app already names them.
+// Passing that string on as a column name would defeat the helper below.
 const COLUMNLESS_STATUS = new Set(["planned", "archived"]);
 
 function bucketLabel(
@@ -44,10 +49,16 @@ function bucketLabel(
 
   // Priority is stored as the key itself, so without this the chart shows
   // `no-priority` where every other screen shows "No priority".
-  if (groupBy === "priority") return t(`tasks:priority.${bucket.key}`);
+  if (groupBy === "priority") return getPriorityLabel(bucket.key);
 
-  if (groupBy === "status" && COLUMNLESS_STATUS.has(bucket.key)) {
-    return t(`tasks:status.${bucket.key}`);
+  if (groupBy === "status") {
+    // The endpoint returns the stored column name, which is English on a
+    // project nobody has renamed. `getStatusDisplayLabel` is how the rest of
+    // the app resolves that: a name still matching its seed is translated, a
+    // renamed one is left exactly as its author wrote it.
+    return COLUMNLESS_STATUS.has(bucket.key)
+      ? getStatusLabel(bucket.key)
+      : getStatusDisplayLabel(bucket.key, bucket.label || undefined);
   }
 
   return bucket.label || bucket.key;

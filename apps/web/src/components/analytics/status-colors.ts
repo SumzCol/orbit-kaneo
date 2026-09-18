@@ -86,8 +86,15 @@ function sibling(state: TaskState, index: number) {
 export function statusColorMap(columns: StatusColumn[]): Map<string, string> {
   const byState = new Map<TaskState, StatusColumn[]>();
 
+  // `isFinal` is editable on every column, Blocked included. A project that
+  // marks it final means it as a terminal state, and the summary counts those
+  // tasks as completed; colouring them red anyway would put the chart at odds
+  // with the bar. Red is only reserved while Blocked is still work in flight.
+  const blocked = columns.find((column) => column.slug === BLOCKED_SLUG);
+  const blockedIsExceptional = blocked ? !blocked.isFinal : true;
+
   for (const column of columns) {
-    if (column.slug === BLOCKED_SLUG) continue;
+    if (blockedIsExceptional && column.slug === BLOCKED_SLUG) continue;
     const state = stateOfStatus(column.slug, columns);
     const bucket = byState.get(state) ?? [];
     bucket.push(column);
@@ -103,7 +110,9 @@ export function statusColorMap(columns: StatusColumn[]): Map<string, string> {
     });
   }
 
-  colors.set(BLOCKED_SLUG, "var(--state-blocked)");
+  if (blockedIsExceptional) {
+    colors.set(BLOCKED_SLUG, "var(--state-blocked)");
+  }
   // Neither is a column, so neither appears above. Both are real statuses a
   // task can hold, and the summary counts them as their own states.
   colors.set("planned", STATE_COLOR.backlog);

@@ -69,6 +69,20 @@ describe("statusColorMap", () => {
     );
   });
 
+  it("gives up the red when Blocked is marked final", () => {
+    const finalBlocked = columns.map((column) =>
+      column.slug === "blocked" ? { ...column, isFinal: true } : column,
+    );
+    const colors = statusColorMap(finalBlocked);
+
+    // The summary counts a final column as completed. Keeping the exceptional
+    // colour would have the chart calling it unfinished while the bar beside
+    // it calls it done.
+    expect(stateOfStatus("blocked", finalBlocked)).toBe("completed");
+    expect(colors.get("blocked")).not.toBe("var(--state-blocked)");
+    expect(colors.get("blocked")).toContain("--state-completed");
+  });
+
   it("covers the two statuses that have no column", () => {
     const colors = statusColorMap(columns);
 

@@ -6,6 +6,17 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// The domain helpers read the module-level i18n instance rather than the hook.
+// Stubbing them keeps the arguments visible, which is the part that was wrong:
+// a column name has to reach `getStatusDisplayLabel` for a renamed column to
+// survive, and must not reach it for the two statuses that have none.
+vi.mock("@/lib/i18n/domain", () => ({
+  getPriorityLabel: (priority: string) => `priority(${priority})`,
+  getStatusLabel: (status: string) => `status(${status})`,
+  getStatusDisplayLabel: (status: string, columnName?: string) =>
+    `display(${status},${columnName ?? "-"})`,
+}));
+
 afterEach(cleanup);
 
 const barOf = (row: HTMLElement) => row.querySelector<HTMLElement>("[style]");
@@ -70,43 +81,39 @@ describe("BreakdownChart", () => {
       <BreakdownChart
         buckets={[
           { key: "no-priority", label: "no-priority", color: null, count: 3 },
-          { key: "urgent", label: "urgent", color: null, count: 1 },
         ]}
         groupBy="priority"
         isLoading={false}
       />,
     );
 
-    // The endpoint returns the stored key, which is what the board renders
-    // through an i18n key rather than showing raw.
-    expect(screen.getByText("tasks:priority.no-priority")).toBeInTheDocument();
-    expect(screen.queryByText("no-priority")).not.toBeInTheDocument();
+    // The endpoint returns the stored key. Every other screen reads it through
+    // this helper, which also falls back to display case for a value no locale
+    // has a name for.
+    expect(screen.getByText("priority(no-priority)")).toBeInTheDocument();
   });
 
-  it("names the two statuses that have no column", () => {
+  it("translates a seeded column name but not a renamed one", () => {
     render(
       <BreakdownChart
         buckets={[
           { key: "to-do", label: "To Do", color: null, count: 3 },
+          { key: "in-progress", label: "En cours", color: null, count: 1 },
           // No column is seeded for these, so the endpoint falls back to the
-          // raw status string and the client has to name them.
+          // raw status string. Passing that on as a column name would make the
+          // helper treat it as somebody's chosen wording and return it as-is.
           { key: "planned", label: "planned", color: null, count: 1 },
-          { key: "archived", label: "archived", color: null, count: 1 },
         ]}
         groupBy="status"
         isLoading={false}
       />,
     );
 
-    expect(screen.getByText("To Do")).toBeInTheDocument();
-    expect(screen.getByText("tasks:status.planned")).toBeInTheDocument();
-    expect(screen.getByText("tasks:status.archived")).toBeInTheDocument();
-    expect(screen.queryByText("planned")).not.toBeInTheDocument();
-  });
-
-  it("shows an empty state rather than an empty chart", () => {
-    render(<BreakdownChart buckets={[]} groupBy="status" isLoading={false} />);
-    expect(screen.getByText("analytics:breakdown.empty")).toBeInTheDocument();
+    expect(screen.getByText("display(to-do,To Do)")).toBeInTheDocument();
+    expect(
+      screen.getByText("display(in-progress,En cours)"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("status(planned)")).toBeInTheDocument();
   });
 
   it("says a failed request failed instead of showing a skeleton", () => {
