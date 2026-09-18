@@ -4,11 +4,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BreakdownGroupBy } from "@/fetchers/analytics/get-project-breakdown";
 import { getInitials } from "@/lib/get-initials";
-import {
-  getPriorityLabel,
-  getStatusDisplayLabel,
-  getStatusLabel,
-} from "@/lib/i18n/domain";
+import { getPriorityLabel, getStatusDisplayLabel } from "@/lib/i18n/domain";
 import { assignBucketColors } from "./bucket-colors";
 import {
   type StatusColumn,
@@ -31,15 +27,11 @@ const SUMS_PAST_TOTAL: BreakdownGroupBy[] = ["label"];
 // A bar that rounds to nothing reads as absent rather than small.
 const MIN_VISIBLE_PERCENT = 1.5;
 
-// `planned` and `archived` are the two statuses no column is seeded for, so
-// the endpoint has no column name to return and falls back to the raw string.
-// Passing that string on as a column name would defeat the helper below.
-const COLUMNLESS_STATUS = new Set(["planned", "archived"]);
-
 function bucketLabel(
   bucket: BreakdownBucket,
   groupBy: BreakdownGroupBy,
   t: (key: string) => string,
+  columns: StatusColumn[],
 ) {
   if (bucket.key === null) {
     return groupBy === "label"
@@ -52,13 +44,16 @@ function bucketLabel(
   if (groupBy === "priority") return getPriorityLabel(bucket.key);
 
   if (groupBy === "status") {
-    // The endpoint returns the stored column name, which is English on a
-    // project nobody has renamed. `getStatusDisplayLabel` is how the rest of
-    // the app resolves that: a name still matching its seed is translated, a
-    // renamed one is left exactly as its author wrote it.
-    return COLUMNLESS_STATUS.has(bucket.key)
-      ? getStatusLabel(bucket.key)
-      : getStatusDisplayLabel(bucket.key, bucket.label || undefined);
+    // The name comes from the loaded columns rather than the bucket, because
+    // the endpoint has to fall back to the raw status when it has no column to
+    // read — for `planned` and `archived`, which have none, and for a status
+    // whose column has gone. Passing that fallback on as a column name would
+    // have `getStatusDisplayLabel` treat it as somebody's chosen wording and
+    // render `to-do` where every other screen says "To Do".
+    const columnName = columns.find(
+      (column) => column.slug === bucket.key,
+    )?.name;
+    return getStatusDisplayLabel(bucket.key, columnName);
   }
 
   return bucket.label || bucket.key;
@@ -134,7 +129,7 @@ export function BreakdownChart({
           column narrow enough to fit many of them is too narrow to hold one. */}
       <ul className="flex flex-col gap-2.5">
         {ordered.map((bucket, index) => {
-          const label = bucketLabel(bucket, groupBy, t);
+          const label = bucketLabel(bucket, groupBy, t, columns ?? []);
           const percent = Math.max(
             (bucket.count / largest) * 100,
             MIN_VISIBLE_PERCENT,

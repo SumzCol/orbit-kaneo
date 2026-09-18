@@ -92,6 +92,15 @@ describe("statusColorMap", () => {
     expect(colors.get("planned")).not.toBe(colors.get("archived"));
   });
 
+  it("colours a status the column list cannot explain", () => {
+    // A status whose column has gone still comes back from the endpoint. With
+    // no entry it fell through to an arbitrary palette slot; `stateOfStatus`
+    // calls it started, which is where the summary counts it.
+    const colors = statusColorMap(columns, ["ghost"]);
+
+    expect(colors.get("ghost")).toBe("var(--state-started)");
+  });
+
   it("orders siblings by column position, not by the order given", () => {
     const shuffled = [
       { slug: "in-review", position: 2, isFinal: false },

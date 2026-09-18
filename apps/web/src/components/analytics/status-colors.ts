@@ -2,6 +2,8 @@ export type StatusColumn = {
   slug: string;
   position: number;
   isFinal: boolean;
+  /** Present on the API's columns; the colour rules do not read it. */
+  name?: string;
 };
 
 export type TaskState =
@@ -83,7 +85,10 @@ function sibling(state: TaskState, index: number) {
  * Statuses in the same state share its colour; within a state they are ordered
  * by column position so the one earliest in the workflow keeps full weight.
  */
-export function statusColorMap(columns: StatusColumn[]): Map<string, string> {
+export function statusColorMap(
+  columns: StatusColumn[],
+  statuses: string[] = [],
+): Map<string, string> {
   const byState = new Map<TaskState, StatusColumn[]>();
 
   // `isFinal` is editable on every column, Blocked included. A project that
@@ -117,6 +122,16 @@ export function statusColorMap(columns: StatusColumn[]): Map<string, string> {
   // task can hold, and the summary counts them as their own states.
   colors.set("planned", STATE_COLOR.backlog);
   colors.set("archived", STATE_COLOR.archived);
+
+  // A status the column list does not explain — one whose column was removed,
+  // say — still has to be drawn. `stateOfStatus` calls it started, which is
+  // where the summary counts it, so take the colour from there rather than
+  // leaving it to a palette slot that means nothing.
+  for (const status of statuses) {
+    if (!colors.has(status)) {
+      colors.set(status, STATE_COLOR[stateOfStatus(status, columns)]);
+    }
+  }
 
   return colors;
 }

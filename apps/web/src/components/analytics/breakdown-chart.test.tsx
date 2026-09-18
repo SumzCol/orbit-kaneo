@@ -13,8 +13,10 @@ vi.mock("react-i18next", () => ({
 vi.mock("@/lib/i18n/domain", () => ({
   getPriorityLabel: (priority: string) => `priority(${priority})`,
   getStatusLabel: (status: string) => `status(${status})`,
+  // Mirrors the real branch: with no column name it defers to
+  // `getStatusLabel`, which is what makes a translated name possible at all.
   getStatusDisplayLabel: (status: string, columnName?: string) =>
-    `display(${status},${columnName ?? "-"})`,
+    columnName ? `display(${status},${columnName})` : `status(${status})`,
 }));
 
 afterEach(cleanup);
@@ -107,8 +109,14 @@ describe("BreakdownChart", () => {
         groupBy="status"
         isLoading={false}
         columns={[
-          { slug: "to-do", position: 0, isFinal: false },
-          { slug: "in-progress", position: 1, isFinal: false },
+          { slug: "to-do", position: 0, isFinal: false, name: "To Do" },
+          // Renamed in project settings: the helper must pass it through.
+          {
+            slug: "in-progress",
+            position: 1,
+            isFinal: false,
+            name: "En cours",
+          },
         ]}
       />,
     );
@@ -118,6 +126,25 @@ describe("BreakdownChart", () => {
       screen.getByText("display(in-progress,En cours)"),
     ).toBeInTheDocument();
     expect(screen.getByText("status(planned)")).toBeInTheDocument();
+  });
+
+  it("names a status whose column has gone from the app's own vocabulary", () => {
+    render(
+      <BreakdownChart
+        buckets={[
+          // The endpoint falls back to the raw status when it has no column
+          // name to read. Passing that on would render `to-do` where every
+          // other screen says "To Do".
+          { key: "to-do", label: "to-do", color: null, count: 2 },
+        ]}
+        groupBy="status"
+        isLoading={false}
+        columns={[{ slug: "done", position: 0, isFinal: true, name: "Done" }]}
+      />,
+    );
+
+    expect(screen.getByText("status(to-do)")).toBeInTheDocument();
+    expect(screen.queryByText("display(to-do,to-do)")).not.toBeInTheDocument();
   });
 
   it("waits for the columns before drawing a status breakdown", () => {
@@ -140,7 +167,9 @@ describe("BreakdownChart", () => {
         buckets={[{ key: "to-do", label: "To Do", color: null, count: 3 }]}
         groupBy="status"
         isLoading={false}
-        columns={[{ slug: "to-do", position: 0, isFinal: false }]}
+        columns={[
+          { slug: "to-do", position: 0, isFinal: false, name: "To Do" },
+        ]}
       />,
     );
 
