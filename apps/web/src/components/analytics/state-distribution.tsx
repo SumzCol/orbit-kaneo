@@ -2,30 +2,21 @@ import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
+import { STATE_COLOR } from "./status-colors";
 import type { ProjectSummary } from "./types";
 
 // The five states partition the project and sum to the total, which is the
 // only reason a single bar can represent all of them honestly. Drop one and
 // the bar stops filling while every segment still claims a share.
 //
-// These are groups rather than columns, so no stored colour describes them and
-// the board has no vocabulary to borrow — it distinguishes its columns by icon.
-// Semantic tokens rather than raw palette values, so the ramp carries meaning
-// (work in flight is informational, finished work is a success) and both
-// themes resolve it: a literal picked against the dark background would be
-// wrong on the light one.
+// One ramp, shared with the status chart below through `STATE_COLOR`, so the
+// two cannot drift into describing the same work differently.
 const STATES = [
-  { key: "backlog", color: "var(--color-muted-foreground)" },
-  {
-    key: "unstarted",
-    color: "color-mix(in srgb, var(--color-info) 45%, transparent)",
-  },
-  { key: "started", color: "var(--color-info)" },
-  { key: "completed", color: "var(--color-success)" },
-  {
-    key: "archived",
-    color: "color-mix(in srgb, var(--color-muted-foreground) 45%, transparent)",
-  },
+  { key: "backlog", color: STATE_COLOR.backlog },
+  { key: "unstarted", color: STATE_COLOR.unstarted },
+  { key: "started", color: STATE_COLOR.started },
+  { key: "completed", color: STATE_COLOR.completed },
+  { key: "archived", color: STATE_COLOR.archived },
 ] as const;
 
 export function StateDistribution({

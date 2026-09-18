@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { BreakdownGroupBy } from "@/fetchers/analytics/get-project-breakdown";
 import useGetProjectBreakdown from "@/hooks/queries/analytics/use-get-project-breakdown";
 import useGetProjectSummary from "@/hooks/queries/analytics/use-get-project-summary";
+import { useGetColumns } from "@/hooks/queries/column/use-get-columns";
 
 export const Route = createFileRoute(
   "/_layout/_authenticated/dashboard/workspace/$workspaceId/project/$projectId/analytics",
@@ -34,6 +35,10 @@ function ProjectAnalytics() {
     useGetProjectSummary(projectId);
   const { data: breakdown, isPending: breakdownPending } =
     useGetProjectBreakdown(projectId, groupBy);
+  // Which state each status belongs to, so the chart can colour a status the
+  // same as the bar above colours its state. `isFinal` and `position` are not
+  // in the breakdown response and this is already cached for the board.
+  const { data: columns } = useGetColumns(projectId);
 
   return (
     <ProjectLayout
@@ -74,6 +79,7 @@ function ProjectAnalytics() {
               buckets={breakdown?.buckets}
               groupBy={groupBy}
               isLoading={breakdownPending}
+              columns={columns ?? []}
             />
           </Card>
         </div>

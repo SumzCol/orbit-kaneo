@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { BreakdownGroupBy } from "@/fetchers/analytics/get-project-breakdown";
 import { getInitials } from "@/lib/get-initials";
 import { assignBucketColors } from "./bucket-colors";
+import { type StatusColumn, statusColorMap } from "./status-colors";
 
 export type BreakdownBucket = {
   key: string | null;
@@ -52,10 +53,12 @@ export function BreakdownChart({
   buckets,
   groupBy,
   isLoading,
+  columns = [],
 }: {
   buckets: BreakdownBucket[] | undefined;
   groupBy: BreakdownGroupBy;
   isLoading: boolean;
+  columns?: StatusColumn[];
 }) {
   const { t } = useTranslation();
 
@@ -80,7 +83,7 @@ export function BreakdownChart({
   // Scaled to the largest bucket rather than the project total, so a long tail
   // of small groups stays readable instead of collapsing to invisible slivers.
   const largest = Math.max(...buckets.map((bucket) => bucket.count), 1);
-  const colors = assignBucketColors(buckets, groupBy);
+  const colors = assignBucketColors(buckets, groupBy, statusColorMap(columns));
 
   return (
     <div className="flex flex-col gap-3">

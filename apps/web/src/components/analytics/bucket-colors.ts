@@ -62,10 +62,19 @@ function meaningfulColor(
 export function assignBucketColors(
   buckets: { key: string | null; color: string | null }[],
   groupBy: BreakdownGroupBy,
+  statusColors?: Map<string, string>,
 ): string[] {
   const taken = new Set<string>();
   const assigned: (string | null)[] = buckets.map((bucket) => {
-    const meaningful = meaningfulColor(bucket, groupBy);
+    // A status inherits the colour of the state it belongs to, so the chart
+    // and the distribution bar above it say the same thing. That mapping
+    // outranks a stored column colour, which is chosen for a board column
+    // rather than for a chart.
+    const byState =
+      groupBy === "status" && bucket.key
+        ? statusColors?.get(bucket.key)
+        : undefined;
+    const meaningful = byState ?? meaningfulColor(bucket, groupBy);
     if (meaningful) taken.add(meaningful);
     return meaningful;
   });

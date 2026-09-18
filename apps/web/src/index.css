@@ -148,6 +148,17 @@ input:-webkit-autofill:active {
   --success-foreground: var(--color-emerald-700);
   --warning: var(--color-amber-500);
   --warning-foreground: var(--color-amber-700);
+  /* The task lifecycle, as one ramp: grey to steel to blue to green, with red
+     held back for the one state that asks for action. Statuses inherit the
+     colour of the state they belong to, so a reader infers the chart instead
+     of memorising its legend. Dimmer means further from the work in hand,
+     which on a light ground means lighter and on a dark one means darker. */
+  --state-backlog: var(--color-zinc-500);
+  --state-unstarted: var(--color-slate-400);
+  --state-started: var(--color-blue-500);
+  --state-completed: var(--color-emerald-500);
+  --state-archived: var(--color-zinc-300);
+  --state-blocked: var(--color-red-500);
   --chart-1: var(--color-orange-600);
   --chart-2: var(--color-teal-600);
   --chart-3: var(--color-cyan-900);
@@ -200,6 +211,12 @@ input:-webkit-autofill:active {
   --success-foreground: var(--color-emerald-400);
   --warning: var(--color-amber-500);
   --warning-foreground: var(--color-amber-400);
+  --state-backlog: var(--color-zinc-500);
+  --state-unstarted: var(--color-slate-400);
+  --state-started: var(--color-blue-500);
+  --state-completed: var(--color-emerald-500);
+  --state-archived: var(--color-zinc-700);
+  --state-blocked: var(--color-red-500);
   --chart-1: var(--color-blue-700);
   --chart-2: var(--color-emerald-500);
   --chart-3: var(--color-amber-500);
