@@ -2331,5 +2331,35 @@
 		"branding": {
 			"poweredBy": "Овозможено од"
 		}
+	},
+	"analytics": {
+		"title": "Аналитика",
+		"summary": {
+			"byStateTitle": "Работа по состојба",
+			"acrossStatesTitle": "Низ сите состојби",
+			"acrossStatesHint": "Пресметано од сè погоре",
+			"addsUpTo_one": "Вкупно {{count}} задача",
+			"addsUpTo_other": "Вкупно {{count}} задачи",
+			"backlog": "Беклог",
+			"unstarted": "Незапочнати",
+			"started": "Започнати",
+			"completed": "Завршени",
+			"archived": "Архивирани",
+			"unassigned": "Недоделени",
+			"overdue": "Задоцнети"
+		},
+		"breakdown": {
+			"title": "Задачи по својство",
+			"groupBy": {
+				"assignee": "Задолжен",
+				"status": "Состојба",
+				"priority": "Приоритет",
+				"label": "Ознака"
+			},
+			"unassigned": "Недоделена",
+			"unlabelled": "Без ознака",
+			"labelNote": "Задачата се брои по еднаш за секоја ознака, па збирот го надминува вкупниот број во проектот.",
+			"empty": "Сè уште нема задачи за приказ."
+		}
 	}
 }

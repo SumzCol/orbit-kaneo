@@ -2331,5 +2331,35 @@
 		"branding": {
 			"poweredBy": "Bereitgestellt von"
 		}
+	},
+	"analytics": {
+		"title": "Auswertung",
+		"summary": {
+			"byStateTitle": "Arbeit nach Status",
+			"acrossStatesTitle": "Über alle Status hinweg",
+			"acrossStatesHint": "Aus allen oben genannten gezählt",
+			"addsUpTo_one": "{{count}} Aufgabe insgesamt",
+			"addsUpTo_other": "{{count}} Aufgaben insgesamt",
+			"backlog": "Backlog",
+			"unstarted": "Nicht begonnen",
+			"started": "Begonnen",
+			"completed": "Abgeschlossen",
+			"archived": "Archiviert",
+			"unassigned": "Nicht zugewiesen",
+			"overdue": "Überfällig"
+		},
+		"breakdown": {
+			"title": "Aufgaben nach Merkmal",
+			"groupBy": {
+				"assignee": "Zuständig",
+				"status": "Status",
+				"priority": "Priorität",
+				"label": "Label"
+			},
+			"unassigned": "Nicht zugewiesen",
+			"unlabelled": "Ohne Label",
+			"labelNote": "Eine Aufgabe zählt einmal pro Label, daher liegt die Summe über dem Projektbestand.",
+			"empty": "Noch keine Aufgaben zum Anzeigen."
+		}
 	}
 }

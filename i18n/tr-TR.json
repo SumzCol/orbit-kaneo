@@ -2331,5 +2331,35 @@
 		"branding": {
 			"poweredBy": "Tarafından desteklenmektedir"
 		}
+	},
+	"analytics": {
+		"title": "Analiz",
+		"summary": {
+			"byStateTitle": "Duruma göre iş",
+			"acrossStatesTitle": "Tüm durumlarda",
+			"acrossStatesHint": "Yukarıdakilerin tamamından sayılır",
+			"addsUpTo_one": "Toplam {{count}} görev",
+			"addsUpTo_other": "Toplam {{count}} görev",
+			"backlog": "Backlog",
+			"unstarted": "Başlamamış",
+			"started": "Başlamış",
+			"completed": "Tamamlanmış",
+			"archived": "Arşivlenmiş",
+			"unassigned": "Atanmamış",
+			"overdue": "Gecikmiş"
+		},
+		"breakdown": {
+			"title": "Özelliğe göre görevler",
+			"groupBy": {
+				"assignee": "Atanan kişi",
+				"status": "Durum",
+				"priority": "Öncelik",
+				"label": "Etiket"
+			},
+			"unassigned": "Atanmamış",
+			"unlabelled": "Etiketsiz",
+			"labelNote": "Bir görev taşıdığı her etiket için bir kez sayılır, bu yüzden toplam projedekinden fazladır.",
+			"empty": "Henüz gösterilecek görev yok."
+		}
 	}
 }

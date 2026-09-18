@@ -9605,6 +9605,130 @@
 				"copyUrl",
 				"branding"
 			]
+		},
+		"analytics": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"title": {
+					"type": "string"
+				},
+				"summary": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"byStateTitle": {
+							"type": "string"
+						},
+						"acrossStatesTitle": {
+							"type": "string"
+						},
+						"acrossStatesHint": {
+							"type": "string"
+						},
+						"addsUpTo_one": {
+							"type": "string"
+						},
+						"addsUpTo_zero": {
+							"type": "string"
+						},
+						"addsUpTo_two": {
+							"type": "string"
+						},
+						"addsUpTo_few": {
+							"type": "string"
+						},
+						"addsUpTo_many": {
+							"type": "string"
+						},
+						"addsUpTo_other": {
+							"type": "string"
+						},
+						"backlog": {
+							"type": "string"
+						},
+						"unstarted": {
+							"type": "string"
+						},
+						"started": {
+							"type": "string"
+						},
+						"completed": {
+							"type": "string"
+						},
+						"archived": {
+							"type": "string"
+						},
+						"unassigned": {
+							"type": "string"
+						},
+						"overdue": {
+							"type": "string"
+						}
+					},
+					"required": [
+						"byStateTitle",
+						"acrossStatesTitle",
+						"acrossStatesHint",
+						"backlog",
+						"unstarted",
+						"started",
+						"completed",
+						"archived",
+						"unassigned",
+						"overdue"
+					]
+				},
+				"breakdown": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"title": {
+							"type": "string"
+						},
+						"groupBy": {
+							"type": "object",
+							"additionalProperties": false,
+							"properties": {
+								"assignee": {
+									"type": "string"
+								},
+								"status": {
+									"type": "string"
+								},
+								"priority": {
+									"type": "string"
+								},
+								"label": {
+									"type": "string"
+								}
+							},
+							"required": ["assignee", "status", "priority", "label"]
+						},
+						"unassigned": {
+							"type": "string"
+						},
+						"unlabelled": {
+							"type": "string"
+						},
+						"labelNote": {
+							"type": "string"
+						},
+						"empty": {
+							"type": "string"
+						}
+					},
+					"required": [
+						"title",
+						"groupBy",
+						"unassigned",
+						"unlabelled",
+						"labelNote",
+						"empty"
+					]
+				}
+			},
+			"required": ["title", "summary", "breakdown"]
 		}
 	},
 	"required": [
@@ -9618,6 +9742,7 @@
 		"invitations",
 		"workspace",
 		"team",
-		"publicProject"
+		"publicProject",
+		"analytics"
 	]
 }

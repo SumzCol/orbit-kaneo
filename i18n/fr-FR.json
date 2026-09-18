@@ -2340,5 +2340,36 @@
 		"branding": {
 			"poweredBy": "Propulsé par"
 		}
+	},
+	"analytics": {
+		"title": "Analyse",
+		"summary": {
+			"byStateTitle": "Travail par état",
+			"acrossStatesTitle": "Tous états confondus",
+			"acrossStatesHint": "Calculé sur l’ensemble ci-dessus",
+			"addsUpTo_one": "{{count}} tâche au total",
+			"addsUpTo_many": "{{count}} tâches au total",
+			"addsUpTo_other": "{{count}} tâches au total",
+			"backlog": "Backlog",
+			"unstarted": "Non commencées",
+			"started": "Commencées",
+			"completed": "Terminées",
+			"archived": "Archivées",
+			"unassigned": "Non attribuées",
+			"overdue": "En retard"
+		},
+		"breakdown": {
+			"title": "Tâches par propriété",
+			"groupBy": {
+				"assignee": "Responsable",
+				"status": "État",
+				"priority": "Priorité",
+				"label": "Étiquette"
+			},
+			"unassigned": "Non attribuée",
+			"unlabelled": "Sans étiquette",
+			"labelNote": "Une tâche est comptée une fois par étiquette, le total dépasse donc celui du projet.",
+			"empty": "Aucune tâche à afficher pour l’instant."
+		}
 	}
 }

@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
   CalendarDays,
   CalendarRange,
+  ChartColumn,
   SquareKanban,
   SquircleDashed,
 } from "lucide-react";
@@ -32,7 +33,7 @@ type ProjectLayoutProps = {
   headerActions?: ReactNode;
   children: ReactNode;
   showViewSwitcher?: boolean;
-  activeView?: "backlog" | "board" | "calendar" | "gantt";
+  activeView?: "backlog" | "board" | "calendar" | "gantt" | "analytics";
 };
 
 export default function ProjectLayout({
@@ -60,7 +61,9 @@ export default function ProjectLayout({
         ? "calendar"
         : location.pathname.includes("/gantt")
           ? "gantt"
-          : "board");
+          : location.pathname.includes("/analytics")
+            ? "analytics"
+            : "board");
 
   const handleNavigateToBacklog = () => {
     navigate({
@@ -90,6 +93,13 @@ export default function ProjectLayout({
     });
   };
 
+  const handleNavigateToAnalytics = () => {
+    navigate({
+      to: "/dashboard/workspace/$workspaceId/project/$projectId/analytics",
+      params: { workspaceId, projectId },
+    });
+  };
+
   const handleProjectSwitch = (nextProjectId: string) => {
     navigate({
       to:
@@ -99,7 +109,9 @@ export default function ProjectLayout({
             ? "/dashboard/workspace/$workspaceId/project/$projectId/calendar"
             : resolvedView === "gantt"
               ? "/dashboard/workspace/$workspaceId/project/$projectId/gantt"
-              : "/dashboard/workspace/$workspaceId/project/$projectId/board",
+              : resolvedView === "analytics"
+                ? "/dashboard/workspace/$workspaceId/project/$projectId/analytics"
+                : "/dashboard/workspace/$workspaceId/project/$projectId/board",
       params: {
         workspaceId,
         projectId: nextProjectId,
@@ -154,6 +166,7 @@ export default function ProjectLayout({
                 onSelectBoard={handleNavigateToBoard}
                 onSelectCalendar={handleNavigateToCalendar}
                 onSelectGantt={handleNavigateToGantt}
+                onSelectAnalytics={handleNavigateToAnalytics}
                 onSelectProject={handleProjectSwitch}
                 onAddProject={() => setIsCreateProjectModalOpen(true)}
               />
@@ -208,6 +221,18 @@ export default function ProjectLayout({
                 >
                   <CalendarDays className="size-3.5" />
                   Gantt
+                </Button>
+                <Button
+                  variant={resolvedView === "analytics" ? "secondary" : "ghost"}
+                  size="xs"
+                  onClick={handleNavigateToAnalytics}
+                  className={cn(
+                    "h-6 gap-1.5 rounded-md px-2 text-xs",
+                    resolvedView !== "analytics" && "text-muted-foreground",
+                  )}
+                >
+                  <ChartColumn className="size-3.5" />
+                  {t("analytics:title")}
                 </Button>
               </div>
             )}

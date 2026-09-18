@@ -2331,5 +2331,35 @@
 		"branding": {
 			"poweredBy": "Υποστηρίζεται από"
 		}
+	},
+	"analytics": {
+		"title": "Αναλυτικά",
+		"summary": {
+			"byStateTitle": "Εργασία ανά κατάσταση",
+			"acrossStatesTitle": "Σε όλες τις καταστάσεις",
+			"acrossStatesHint": "Υπολογίζεται από όλα τα παραπάνω",
+			"addsUpTo_one": "{{count}} εργασία συνολικά",
+			"addsUpTo_other": "{{count}} εργασίες συνολικά",
+			"backlog": "Backlog",
+			"unstarted": "Δεν ξεκίνησαν",
+			"started": "Ξεκίνησαν",
+			"completed": "Ολοκληρώθηκαν",
+			"archived": "Αρχειοθετημένες",
+			"unassigned": "Χωρίς ανάθεση",
+			"overdue": "Εκπρόθεσμες"
+		},
+		"breakdown": {
+			"title": "Εργασίες ανά ιδιότητα",
+			"groupBy": {
+				"assignee": "Υπεύθυνος",
+				"status": "Κατάσταση",
+				"priority": "Προτεραιότητα",
+				"label": "Ετικέτα"
+			},
+			"unassigned": "Χωρίς ανάθεση",
+			"unlabelled": "Χωρίς ετικέτα",
+			"labelNote": "Κάθε εργασία μετριέται μία φορά ανά ετικέτα, οπότε το άθροισμα ξεπερνά το σύνολο του έργου.",
+			"empty": "Δεν υπάρχουν ακόμη εργασίες για προβολή."
+		}
 	}
 }

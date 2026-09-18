@@ -2331,5 +2331,35 @@
 		"branding": {
 			"poweredBy": "Mogelijk gemaakt door"
 		}
+	},
+	"analytics": {
+		"title": "Analyse",
+		"summary": {
+			"byStateTitle": "Werk per status",
+			"acrossStatesTitle": "Over alle statussen",
+			"acrossStatesHint": "Geteld over alles hierboven",
+			"addsUpTo_one": "{{count}} taak in totaal",
+			"addsUpTo_other": "{{count}} taken in totaal",
+			"backlog": "Backlog",
+			"unstarted": "Niet gestart",
+			"started": "Gestart",
+			"completed": "Afgerond",
+			"archived": "Gearchiveerd",
+			"unassigned": "Niet toegewezen",
+			"overdue": "Te laat"
+		},
+		"breakdown": {
+			"title": "Taken per eigenschap",
+			"groupBy": {
+				"assignee": "Toegewezen aan",
+				"status": "Status",
+				"priority": "Prioriteit",
+				"label": "Label"
+			},
+			"unassigned": "Niet toegewezen",
+			"unlabelled": "Geen label",
+			"labelNote": "Een taak telt één keer per label, dus de som ligt hoger dan het projecttotaal.",
+			"empty": "Nog geen taken om te tonen."
+		}
 	}
 }

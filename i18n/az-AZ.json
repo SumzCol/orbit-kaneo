@@ -2331,5 +2331,35 @@
 		"branding": {
 			"poweredBy": "Təmin edən"
 		}
+	},
+	"analytics": {
+		"title": "Analitika",
+		"summary": {
+			"byStateTitle": "Vəziyyətə görə iş",
+			"acrossStatesTitle": "Bütün vəziyyətlər üzrə",
+			"acrossStatesHint": "Yuxarıdakıların hamısından hesablanır",
+			"addsUpTo_one": "Ümumilikdə {{count}} tapşırıq",
+			"addsUpTo_other": "Ümumilikdə {{count}} tapşırıq",
+			"backlog": "Backlog",
+			"unstarted": "Başlanmayıb",
+			"started": "Başlanıb",
+			"completed": "Tamamlanıb",
+			"archived": "Arxivlənib",
+			"unassigned": "Təyin edilməyib",
+			"overdue": "Gecikmiş"
+		},
+		"breakdown": {
+			"title": "Xassəyə görə tapşırıqlar",
+			"groupBy": {
+				"assignee": "Təyin olunan",
+				"status": "Vəziyyət",
+				"priority": "Prioritet",
+				"label": "Etiket"
+			},
+			"unassigned": "Təyin edilməyib",
+			"unlabelled": "Etiketsiz",
+			"labelNote": "Tapşırıq daşıdığı hər etiket üçün bir dəfə sayılır, ona görə cəm layihədəkindən çoxdur.",
+			"empty": "Hələ göstəriləcək tapşırıq yoxdur."
+		}
 	}
 }

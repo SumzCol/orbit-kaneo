@@ -2322,5 +2322,35 @@
 		"branding": {
 			"poweredBy": "제공"
 		}
+	},
+	"analytics": {
+		"title": "분석",
+		"summary": {
+			"byStateTitle": "상태별 작업",
+			"acrossStatesTitle": "모든 상태 통틀어",
+			"acrossStatesHint": "위 항목 전체에서 집계",
+			"addsUpTo_one": "전체 {{count}}개 작업",
+			"addsUpTo_other": "전체 {{count}}개 작업",
+			"backlog": "백로그",
+			"unstarted": "시작 전",
+			"started": "시작됨",
+			"completed": "완료됨",
+			"archived": "보관됨",
+			"unassigned": "담당자 없음",
+			"overdue": "기한 초과"
+		},
+		"breakdown": {
+			"title": "속성별 작업",
+			"groupBy": {
+				"assignee": "담당자",
+				"status": "상태",
+				"priority": "우선순위",
+				"label": "라벨"
+			},
+			"unassigned": "담당자 없음",
+			"unlabelled": "라벨 없음",
+			"labelNote": "작업은 지닌 라벨마다 한 번씩 세므로 합계가 프로젝트 작업 수보다 많습니다.",
+			"empty": "아직 표시할 작업이 없습니다."
+		}
 	}
 }

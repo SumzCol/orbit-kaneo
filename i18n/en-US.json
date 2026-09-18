@@ -2331,5 +2331,35 @@
 		"branding": {
 			"poweredBy": "Powered by"
 		}
+	},
+	"analytics": {
+		"title": "Analytics",
+		"summary": {
+			"byStateTitle": "Work by state",
+			"acrossStatesTitle": "Across every state",
+			"acrossStatesHint": "Counted from all of the above",
+			"addsUpTo_one": "{{count}} task in total",
+			"addsUpTo_other": "{{count}} tasks in total",
+			"backlog": "Backlog",
+			"unstarted": "Unstarted",
+			"started": "Started",
+			"completed": "Completed",
+			"archived": "Archived",
+			"unassigned": "Unassigned",
+			"overdue": "Overdue"
+		},
+		"breakdown": {
+			"title": "Tasks by property",
+			"groupBy": {
+				"assignee": "Assignee",
+				"status": "Status",
+				"priority": "Priority",
+				"label": "Label"
+			},
+			"unassigned": "Unassigned",
+			"unlabelled": "No label",
+			"labelNote": "A task is counted once per label it carries, so these add up to more than the project holds.",
+			"empty": "No tasks to chart yet."
+		}
 	}
 }

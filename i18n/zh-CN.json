@@ -2322,5 +2322,35 @@
 		"branding": {
 			"poweredBy": "由以下技术提供支持"
 		}
+	},
+	"analytics": {
+		"title": "分析",
+		"summary": {
+			"byStateTitle": "按状态统计",
+			"acrossStatesTitle": "跨所有状态",
+			"acrossStatesHint": "基于以上全部统计",
+			"addsUpTo_one": "共 {{count}} 个任务",
+			"addsUpTo_other": "共 {{count}} 个任务",
+			"backlog": "待办池",
+			"unstarted": "未开始",
+			"started": "已开始",
+			"completed": "已完成",
+			"archived": "已归档",
+			"unassigned": "未分配",
+			"overdue": "已逾期"
+		},
+		"breakdown": {
+			"title": "按属性统计任务",
+			"groupBy": {
+				"assignee": "负责人",
+				"status": "状态",
+				"priority": "优先级",
+				"label": "标签"
+			},
+			"unassigned": "未分配",
+			"unlabelled": "无标签",
+			"labelNote": "每个任务会按其携带的每个标签各计一次，因此总和会超过项目任务数。",
+			"empty": "暂无可展示的任务。"
+		}
 	}
 }

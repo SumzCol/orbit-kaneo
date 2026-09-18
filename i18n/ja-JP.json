@@ -2322,5 +2322,35 @@
 		"branding": {
 			"poweredBy": "Powered by"
 		}
+	},
+	"analytics": {
+		"title": "分析",
+		"summary": {
+			"byStateTitle": "状態ごとの作業",
+			"acrossStatesTitle": "すべての状態を横断",
+			"acrossStatesHint": "上記すべてから集計",
+			"addsUpTo_one": "合計 {{count}} 件のタスク",
+			"addsUpTo_other": "合計 {{count}} 件のタスク",
+			"backlog": "バックログ",
+			"unstarted": "未着手",
+			"started": "着手済み",
+			"completed": "完了",
+			"archived": "アーカイブ済み",
+			"unassigned": "未割り当て",
+			"overdue": "期限超過"
+		},
+		"breakdown": {
+			"title": "属性ごとのタスク",
+			"groupBy": {
+				"assignee": "担当者",
+				"status": "状態",
+				"priority": "優先度",
+				"label": "ラベル"
+			},
+			"unassigned": "未割り当て",
+			"unlabelled": "ラベルなし",
+			"labelNote": "タスクは持っているラベルごとに 1 回数えるため、合計はプロジェクトの件数を上回ります。",
+			"empty": "表示できるタスクはまだありません。"
+		}
 	}
 }

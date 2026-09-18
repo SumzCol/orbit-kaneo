@@ -2340,5 +2340,36 @@
 		"branding": {
 			"poweredBy": "Offerto da"
 		}
+	},
+	"analytics": {
+		"title": "Analisi",
+		"summary": {
+			"byStateTitle": "Lavoro per stato",
+			"acrossStatesTitle": "Su tutti gli stati",
+			"acrossStatesHint": "Conteggiato su tutto quanto sopra",
+			"addsUpTo_one": "{{count}} attività in totale",
+			"addsUpTo_many": "{{count}} attività in totale",
+			"addsUpTo_other": "{{count}} attività in totale",
+			"backlog": "Backlog",
+			"unstarted": "Non iniziate",
+			"started": "Iniziate",
+			"completed": "Completate",
+			"archived": "Archiviate",
+			"unassigned": "Non assegnate",
+			"overdue": "In ritardo"
+		},
+		"breakdown": {
+			"title": "Attività per proprietà",
+			"groupBy": {
+				"assignee": "Assegnatario",
+				"status": "Stato",
+				"priority": "Priorità",
+				"label": "Etichetta"
+			},
+			"unassigned": "Non assegnata",
+			"unlabelled": "Senza etichetta",
+			"labelNote": "Ogni attività è contata una volta per etichetta, quindi la somma supera il totale del progetto.",
+			"empty": "Ancora nessuna attività da mostrare."
+		}
 	}
 }
