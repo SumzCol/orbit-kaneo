@@ -47,7 +47,9 @@ function ProjectAnalytics() {
   // Which state each status belongs to, so the chart can colour a status the
   // same as the bar above colours its state. `isFinal` and `position` are not
   // in the breakdown response and this is already cached for the board.
-  const { data: columns } = useGetColumns(projectId);
+  const { data: columns } = useGetColumns(projectId, {
+    refetchOnMount: true,
+  });
 
   return (
     <ProjectLayout

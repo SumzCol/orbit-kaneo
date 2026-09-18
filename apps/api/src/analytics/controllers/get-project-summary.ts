@@ -19,6 +19,12 @@ import { columnTable, taskTable } from "../../database/schema";
 // calendar day"; for a time supplied through the API it is not, and the task
 // badges are what a reader compares this count against.
 //
+// Both sides of that comparison are naive UTC. `due_date` is stored without a
+// zone, so comparing it against `now()` would have Postgres read those digits
+// in whatever the session timezone happens to be; taking `now()` into UTC
+// instead keeps the arithmetic in the same space the column is written in,
+// whatever the server is configured to.
+//
 // The coalesce is load-bearing. Backlog and archived tasks hold no column, so
 // the left join leaves isFinal NULL; without it `not (NULL = true)` is NULL,
 // the row fails the filter, and every overdue backlog task disappears from the
@@ -56,7 +62,7 @@ async function getProjectSummary(projectId: string) {
       ),
       unassigned: countWhere(sql`${taskTable.userId} is null`),
       overdue: countWhere(
-        sql`${taskTable.dueDate} <= now() - interval '1 day'
+        sql`${taskTable.dueDate} <= (now() at time zone 'utc') - interval '1 day'
             and not ${isFinished}`,
       ),
     })
