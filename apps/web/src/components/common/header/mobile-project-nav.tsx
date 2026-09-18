@@ -65,7 +65,10 @@ export default function MobileProjectNav({
             <p className="px-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               View
             </p>
-            <div className="grid grid-cols-4 gap-1">
+            {/* Five options since Analytics joined the four. A four-column
+                grid left it alone on a second row, where a nowrap label beside
+                an icon overflows a quarter-width cell. */}
+            <div className="grid grid-cols-3 gap-1 sm:grid-cols-5">
               <button
                 type="button"
                 onClick={onSelectBacklog}
