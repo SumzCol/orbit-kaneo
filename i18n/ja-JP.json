@@ -2322,5 +2322,41 @@
 		"branding": {
 			"poweredBy": "Powered by"
 		}
+	},
+	"analytics": {
+		"title": "分析",
+		"headline": {
+			"totalTasks": "タスク総数",
+			"complete": "完了",
+			"onTrack": "順調",
+			"ofCount": "アクティブ {{total}} 件中 {{count}} 件",
+			"ofTotal": "/ {{total}}"
+		},
+		"summary": {
+			"byStateTitle": "状態ごとの作業",
+			"addsUpTo_one": "合計 {{count}} 件のタスク",
+			"addsUpTo_other": "合計 {{count}} 件のタスク",
+			"backlog": "バックログ",
+			"unstarted": "未着手",
+			"started": "着手済み",
+			"completed": "完了",
+			"archived": "アーカイブ済み",
+			"unassigned": "未割り当て",
+			"overdue": "期限超過"
+		},
+		"breakdown": {
+			"title": "属性ごとのタスク",
+			"groupBy": {
+				"assignee": "担当者",
+				"status": "状態",
+				"priority": "優先度",
+				"label": "ラベル"
+			},
+			"unassigned": "未割り当て",
+			"unlabelled": "ラベルなし",
+			"labelNote": "タスクは持っているラベルごとに 1 回数えるため、合計がプロジェクトの件数を上回ることがあります。",
+			"empty": "表示できるタスクはまだありません。",
+			"loadError": "この内訳を読み込めませんでした。"
+		}
 	}
 }

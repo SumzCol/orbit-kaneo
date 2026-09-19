@@ -62,3 +62,17 @@ describe("isTaskCompleted", () => {
     );
   });
 });
+
+describe("isTaskCompleted with archived", () => {
+  it("treats archived as finished even when columns are loaded", () => {
+    // No column carries the `archived` slug, so the lookup used to return
+    // false and the same task showed an overdue badge on surfaces that had
+    // columns and none on surfaces that did not.
+    expect(
+      isTaskCompleted("archived", [
+        { slug: "to-do", isFinal: false },
+        { slug: "done", isFinal: true },
+      ]),
+    ).toBe(true);
+  });
+});

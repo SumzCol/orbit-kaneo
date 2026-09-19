@@ -2331,5 +2331,41 @@
 		"branding": {
 			"poweredBy": "Powered by"
 		}
+	},
+	"analytics": {
+		"title": "Analytics",
+		"headline": {
+			"totalTasks": "Total tasks",
+			"complete": "Complete",
+			"onTrack": "On track",
+			"ofCount": "{{count}} of {{total}} active",
+			"ofTotal": "of {{total}}"
+		},
+		"summary": {
+			"byStateTitle": "Work by state",
+			"addsUpTo_one": "{{count}} task in total",
+			"addsUpTo_other": "{{count}} tasks in total",
+			"backlog": "Backlog",
+			"unstarted": "Unstarted",
+			"started": "Started",
+			"completed": "Completed",
+			"archived": "Archived",
+			"unassigned": "Unassigned",
+			"overdue": "Overdue"
+		},
+		"breakdown": {
+			"title": "Tasks by property",
+			"groupBy": {
+				"assignee": "Assignee",
+				"status": "Status",
+				"priority": "Priority",
+				"label": "Label"
+			},
+			"unassigned": "Unassigned",
+			"unlabelled": "No label",
+			"labelNote": "A task is counted once for each label it carries, so these can add up to more than the project holds.",
+			"empty": "No tasks to chart yet.",
+			"loadError": "Could not load this breakdown."
+		}
 	}
 }

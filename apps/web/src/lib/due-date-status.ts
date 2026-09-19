@@ -13,10 +13,16 @@ export function isTaskCompleted(
   status: string,
   columns?: CompletionColumn[],
 ): boolean {
+  // Archived work is finished whether or not columns are loaded. No column
+  // carries this slug, so the lookup below returns false for it, and the same
+  // archived task showed an overdue badge on a surface that had columns and
+  // none on a surface that did not.
+  if (status === "archived") return true;
+
   if (columns?.length) {
     return columns.find((column) => column.slug === status)?.isFinal ?? false;
   }
-  return status === "done" || status === "archived";
+  return status === "done";
 }
 
 export function getDueDateStatus(

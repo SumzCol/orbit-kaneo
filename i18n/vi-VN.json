@@ -2322,5 +2322,41 @@
 		"branding": {
 			"poweredBy": "Được vận hành bởi"
 		}
+	},
+	"analytics": {
+		"title": "Phân tích",
+		"headline": {
+			"totalTasks": "Tổng công việc",
+			"complete": "Hoàn thành",
+			"onTrack": "Đúng tiến độ",
+			"ofCount": "{{count}} trên {{total}} đang hoạt động",
+			"ofTotal": "trên {{total}}"
+		},
+		"summary": {
+			"byStateTitle": "Công việc theo trạng thái",
+			"addsUpTo_one": "Tổng {{count}} công việc",
+			"addsUpTo_other": "Tổng {{count}} công việc",
+			"backlog": "Backlog",
+			"unstarted": "Chưa bắt đầu",
+			"started": "Đã bắt đầu",
+			"completed": "Đã hoàn thành",
+			"archived": "Đã lưu trữ",
+			"unassigned": "Chưa giao",
+			"overdue": "Quá hạn"
+		},
+		"breakdown": {
+			"title": "Công việc theo thuộc tính",
+			"groupBy": {
+				"assignee": "Người phụ trách",
+				"status": "Trạng thái",
+				"priority": "Độ ưu tiên",
+				"label": "Nhãn"
+			},
+			"unassigned": "Chưa giao",
+			"unlabelled": "Không có nhãn",
+			"labelNote": "Mỗi công việc được đếm một lần cho từng nhãn nó mang, nên tổng có thể vượt quá số công việc của dự án.",
+			"empty": "Chưa có công việc nào để hiển thị.",
+			"loadError": "Không thể tải phân tích này."
+		}
 	}
 }

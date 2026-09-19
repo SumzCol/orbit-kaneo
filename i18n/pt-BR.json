@@ -2340,5 +2340,42 @@
 		"branding": {
 			"poweredBy": "Desenvolvido por"
 		}
+	},
+	"analytics": {
+		"title": "Análises",
+		"headline": {
+			"totalTasks": "Tarefas no total",
+			"complete": "Concluído",
+			"onTrack": "No prazo",
+			"ofCount": "{{count}} de {{total}} ativas",
+			"ofTotal": "de {{total}}"
+		},
+		"summary": {
+			"byStateTitle": "Trabalho por estado",
+			"addsUpTo_one": "{{count}} tarefa no total",
+			"addsUpTo_many": "{{count}} tarefas no total",
+			"addsUpTo_other": "{{count}} tarefas no total",
+			"backlog": "Backlog",
+			"unstarted": "Não iniciadas",
+			"started": "Iniciadas",
+			"completed": "Concluídas",
+			"archived": "Arquivadas",
+			"unassigned": "Sem responsável",
+			"overdue": "Atrasadas"
+		},
+		"breakdown": {
+			"title": "Tarefas por propriedade",
+			"groupBy": {
+				"assignee": "Responsável",
+				"status": "Estado",
+				"priority": "Prioridade",
+				"label": "Etiqueta"
+			},
+			"unassigned": "Sem responsável",
+			"unlabelled": "Sem etiqueta",
+			"labelNote": "Cada tarefa é contada uma vez para cada etiqueta que carrega, então a soma pode passar do total do projeto.",
+			"empty": "Ainda não há tarefas para exibir.",
+			"loadError": "Não foi possível carregar este detalhamento."
+		}
 	}
 }

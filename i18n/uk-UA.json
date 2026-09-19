@@ -2349,5 +2349,43 @@
 		"branding": {
 			"poweredBy": "Працює на"
 		}
+	},
+	"analytics": {
+		"title": "Аналітика",
+		"headline": {
+			"totalTasks": "Усього задач",
+			"complete": "Завершено",
+			"onTrack": "За графіком",
+			"ofCount": "{{count}} з {{total}} активних",
+			"ofTotal": "з {{total}}"
+		},
+		"summary": {
+			"byStateTitle": "Робота за станом",
+			"addsUpTo_one": "{{count}} задача загалом",
+			"addsUpTo_few": "{{count}} задачі загалом",
+			"addsUpTo_many": "{{count}} задач загалом",
+			"addsUpTo_other": "{{count}} задач загалом",
+			"backlog": "Беклог",
+			"unstarted": "Не розпочаті",
+			"started": "Розпочаті",
+			"completed": "Завершені",
+			"archived": "В архіві",
+			"unassigned": "Без виконавця",
+			"overdue": "Протерміновані"
+		},
+		"breakdown": {
+			"title": "Задачі за властивістю",
+			"groupBy": {
+				"assignee": "Виконавець",
+				"status": "Стан",
+				"priority": "Пріоритет",
+				"label": "Мітка"
+			},
+			"unassigned": "Без виконавця",
+			"unlabelled": "Без мітки",
+			"labelNote": "Задача рахується один раз на кожну мітку, тому сума може перевищити кількість задач проєкту.",
+			"empty": "Поки немає задач для показу.",
+			"loadError": "Не вдалося завантажити цей розподіл."
+		}
 	}
 }

@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   CalendarRange,
+  ChartColumn,
   Check,
   Menu,
   Plus,
@@ -20,11 +21,12 @@ import { cn } from "@/lib/cn";
 type MobileProjectNavProps = {
   workspaceId: string;
   projectId: string;
-  activeView: "backlog" | "board" | "calendar" | "gantt";
+  activeView: "backlog" | "board" | "calendar" | "gantt" | "analytics";
   onSelectBoard: () => void;
   onSelectBacklog: () => void;
   onSelectCalendar: () => void;
   onSelectGantt: () => void;
+  onSelectAnalytics: () => void;
   onSelectProject: (projectId: string) => void;
   onAddProject: () => void;
 };
@@ -37,6 +39,7 @@ export default function MobileProjectNav({
   onSelectBacklog,
   onSelectCalendar,
   onSelectGantt,
+  onSelectAnalytics,
   onSelectProject,
   onAddProject,
 }: MobileProjectNavProps) {
@@ -62,7 +65,12 @@ export default function MobileProjectNav({
             <p className="px-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               View
             </p>
-            <div className="grid grid-cols-4 gap-1">
+            {/* Five options since Analytics joined the four. The popover is a
+                fixed w-72, so columns do not get wider with the screen: four
+                gave about 65px a cell and five would give 51, too narrow for
+                an icon beside a translated label. Three gives 88 and wraps to
+                a second row of two. */}
+            <div className="grid grid-cols-3 gap-1">
               <button
                 type="button"
                 onClick={onSelectBacklog}
@@ -113,6 +121,19 @@ export default function MobileProjectNav({
               >
                 <CalendarDays className="size-3.5" />
                 Gantt
+              </button>
+              <button
+                type="button"
+                onClick={onSelectAnalytics}
+                className={cn(
+                  "flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-md border px-2 py-1.5 text-xs font-medium transition-colors",
+                  activeView === "analytics"
+                    ? "border-border bg-secondary text-foreground"
+                    : "border-transparent text-muted-foreground hover:bg-accent",
+                )}
+              >
+                <ChartColumn className="size-3.5" />
+                {t("analytics:title")}
               </button>
             </div>
           </div>

@@ -2349,5 +2349,43 @@
 			"board": "Tablica",
 			"list": "Lista"
 		}
+	},
+	"analytics": {
+		"title": "Analityka",
+		"headline": {
+			"totalTasks": "Zadania łącznie",
+			"complete": "Ukończone",
+			"onTrack": "Zgodnie z planem",
+			"ofCount": "{{count}} z {{total}} aktywnych",
+			"ofTotal": "z {{total}}"
+		},
+		"summary": {
+			"byStateTitle": "Praca według stanu",
+			"addsUpTo_one": "{{count}} zadanie łącznie",
+			"addsUpTo_few": "{{count}} zadania łącznie",
+			"addsUpTo_many": "{{count}} zadań łącznie",
+			"addsUpTo_other": "{{count}} zadań łącznie",
+			"backlog": "Backlog",
+			"unstarted": "Nierozpoczęte",
+			"started": "Rozpoczęte",
+			"completed": "Ukończone",
+			"archived": "Zarchiwizowane",
+			"unassigned": "Nieprzypisane",
+			"overdue": "Po terminie"
+		},
+		"breakdown": {
+			"title": "Zadania według właściwości",
+			"groupBy": {
+				"assignee": "Przypisany",
+				"status": "Stan",
+				"priority": "Priorytet",
+				"label": "Etykieta"
+			},
+			"unassigned": "Nieprzypisane",
+			"unlabelled": "Bez etykiety",
+			"labelNote": "Zadanie liczy się raz na każdą etykietę, którą nosi, więc suma może przekroczyć liczbę zadań w projekcie.",
+			"empty": "Nie ma jeszcze zadań do pokazania.",
+			"loadError": "Nie udało się wczytać tego zestawienia."
+		}
 	}
 }

@@ -2405,5 +2405,43 @@
 		"branding": {
 			"poweredBy": "Работает на"
 		}
+	},
+	"analytics": {
+		"title": "Аналитика",
+		"headline": {
+			"totalTasks": "Всего задач",
+			"complete": "Завершено",
+			"onTrack": "В графике",
+			"ofCount": "{{count}} из {{total}} активных",
+			"ofTotal": "из {{total}}"
+		},
+		"summary": {
+			"byStateTitle": "Работа по состоянию",
+			"addsUpTo_one": "{{count}} задача всего",
+			"addsUpTo_few": "{{count}} задачи всего",
+			"addsUpTo_many": "{{count}} задач всего",
+			"addsUpTo_other": "{{count}} задач всего",
+			"backlog": "Бэклог",
+			"unstarted": "Не начатые",
+			"started": "Начатые",
+			"completed": "Завершённые",
+			"archived": "В архиве",
+			"unassigned": "Без исполнителя",
+			"overdue": "Просроченные"
+		},
+		"breakdown": {
+			"title": "Задачи по свойству",
+			"groupBy": {
+				"assignee": "Исполнитель",
+				"status": "Состояние",
+				"priority": "Приоритет",
+				"label": "Метка"
+			},
+			"unassigned": "Без исполнителя",
+			"unlabelled": "Без метки",
+			"labelNote": "Задача считается один раз на каждую метку, поэтому сумма может превысить число задач проекта.",
+			"empty": "Пока нет задач для отображения.",
+			"loadError": "Не удалось загрузить эту разбивку."
+		}
 	}
 }

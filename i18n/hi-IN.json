@@ -2331,5 +2331,41 @@
 		"branding": {
 			"poweredBy": "द्वारा संचालित"
 		}
+	},
+	"analytics": {
+		"title": "विश्लेषण",
+		"headline": {
+			"totalTasks": "कुल कार्य",
+			"complete": "पूर्ण",
+			"onTrack": "समय पर",
+			"ofCount": "{{total}} सक्रिय में से {{count}}",
+			"ofTotal": "{{total}} में से"
+		},
+		"summary": {
+			"byStateTitle": "स्थिति के अनुसार कार्य",
+			"addsUpTo_one": "कुल {{count}} कार्य",
+			"addsUpTo_other": "कुल {{count}} कार्य",
+			"backlog": "बैकलॉग",
+			"unstarted": "शुरू नहीं हुए",
+			"started": "शुरू हो चुके",
+			"completed": "पूर्ण",
+			"archived": "संग्रहित",
+			"unassigned": "अनासाइन",
+			"overdue": "अतिदेय"
+		},
+		"breakdown": {
+			"title": "गुण के अनुसार कार्य",
+			"groupBy": {
+				"assignee": "असाइनी",
+				"status": "स्थिति",
+				"priority": "प्राथमिकता",
+				"label": "लेबल"
+			},
+			"unassigned": "अनासाइन",
+			"unlabelled": "कोई लेबल नहीं",
+			"labelNote": "हर कार्य अपने प्रत्येक लेबल के लिए एक बार गिना जाता है, इसलिए योग परियोजना के कुल से अधिक हो सकता है।",
+			"empty": "दिखाने के लिए अभी कोई कार्य नहीं है।",
+			"loadError": "यह विश्लेषण लोड नहीं हो सका।"
+		}
 	}
 }

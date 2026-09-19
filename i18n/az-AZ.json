@@ -2331,5 +2331,41 @@
 		"branding": {
 			"poweredBy": "Təmin edən"
 		}
+	},
+	"analytics": {
+		"title": "Analitika",
+		"headline": {
+			"totalTasks": "Ümumi tapşırıq",
+			"complete": "Tamamlanıb",
+			"onTrack": "Qrafik üzrə",
+			"ofCount": "{{total}} aktivdən {{count}}",
+			"ofTotal": "/ {{total}}"
+		},
+		"summary": {
+			"byStateTitle": "Vəziyyətə görə iş",
+			"addsUpTo_one": "Ümumilikdə {{count}} tapşırıq",
+			"addsUpTo_other": "Ümumilikdə {{count}} tapşırıq",
+			"backlog": "Backlog",
+			"unstarted": "Başlanmayıb",
+			"started": "Başlanıb",
+			"completed": "Tamamlanıb",
+			"archived": "Arxivlənib",
+			"unassigned": "Təyin edilməyib",
+			"overdue": "Gecikmiş"
+		},
+		"breakdown": {
+			"title": "Xassəyə görə tapşırıqlar",
+			"groupBy": {
+				"assignee": "Təyin olunan",
+				"status": "Vəziyyət",
+				"priority": "Prioritet",
+				"label": "Etiket"
+			},
+			"unassigned": "Təyin edilməyib",
+			"unlabelled": "Etiketsiz",
+			"labelNote": "Tapşırıq daşıdığı hər etiket üçün bir dəfə sayılır, ona görə cəm layihədəkindən çox ola bilər.",
+			"empty": "Hələ göstəriləcək tapşırıq yoxdur.",
+			"loadError": "Bu bölgü yüklənə bilmədi."
+		}
 	}
 }

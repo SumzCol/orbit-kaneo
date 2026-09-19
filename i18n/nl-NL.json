@@ -2331,5 +2331,41 @@
 		"branding": {
 			"poweredBy": "Mogelijk gemaakt door"
 		}
+	},
+	"analytics": {
+		"title": "Analyse",
+		"headline": {
+			"totalTasks": "Taken totaal",
+			"complete": "Afgerond",
+			"onTrack": "Op schema",
+			"ofCount": "{{count}} van {{total}} actieve",
+			"ofTotal": "van {{total}}"
+		},
+		"summary": {
+			"byStateTitle": "Werk per status",
+			"addsUpTo_one": "{{count}} taak in totaal",
+			"addsUpTo_other": "{{count}} taken in totaal",
+			"backlog": "Backlog",
+			"unstarted": "Niet gestart",
+			"started": "Gestart",
+			"completed": "Afgerond",
+			"archived": "Gearchiveerd",
+			"unassigned": "Niet toegewezen",
+			"overdue": "Te laat"
+		},
+		"breakdown": {
+			"title": "Taken per eigenschap",
+			"groupBy": {
+				"assignee": "Toegewezen aan",
+				"status": "Status",
+				"priority": "Prioriteit",
+				"label": "Label"
+			},
+			"unassigned": "Niet toegewezen",
+			"unlabelled": "Geen label",
+			"labelNote": "Een taak telt één keer per label dat ze draagt, dus de som kan hoger liggen dan het projecttotaal.",
+			"empty": "Nog geen taken om te tonen.",
+			"loadError": "Deze uitsplitsing kon niet worden geladen."
+		}
 	}
 }

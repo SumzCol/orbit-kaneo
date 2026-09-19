@@ -14,6 +14,7 @@ import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import activity from "./activity";
+import analytics from "./analytics";
 import { auth } from "./auth";
 import { organizationRoutes } from "./auth-openapi";
 import billing from "./billing";
@@ -609,6 +610,7 @@ export function createApp() {
     "/telegram-integration",
     telegramIntegration,
   );
+  const analyticsApi = api.route("/analytics", analytics);
   const taskRelationApi = api.route("/task-relation", taskRelation);
   const externalLinkApi = api.route("/external-link", externalLink);
   const workflowRuleApi = api.route("/workflow-rule", workflowRule);
@@ -772,6 +774,7 @@ export function createApp() {
     notificationPreferencesApi,
     projectApi,
     publicProjectApi,
+    analyticsApi,
     searchApi,
     mattermostIntegrationApi,
     slackIntegrationApi,
@@ -892,6 +895,7 @@ const {
   notificationApi,
   notificationPreferencesApi,
   projectApi,
+  analyticsApi,
   publicProjectApi,
   searchApi,
   slackIntegrationApi,
@@ -936,6 +940,7 @@ export type AppType =
   | typeof mattermostIntegrationApi
   | typeof slackIntegrationApi
   | typeof telegramIntegrationApi
+  | typeof analyticsApi
   | typeof taskRelationApi
   | typeof externalLinkApi
   | typeof workflowRuleApi

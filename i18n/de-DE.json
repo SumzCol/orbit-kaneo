@@ -2331,5 +2331,41 @@
 		"branding": {
 			"poweredBy": "Bereitgestellt von"
 		}
+	},
+	"analytics": {
+		"title": "Auswertung",
+		"headline": {
+			"totalTasks": "Aufgaben gesamt",
+			"complete": "Abgeschlossen",
+			"onTrack": "Im Plan",
+			"ofCount": "{{count}} von {{total}} aktiven",
+			"ofTotal": "von {{total}}"
+		},
+		"summary": {
+			"byStateTitle": "Arbeit nach Status",
+			"addsUpTo_one": "{{count}} Aufgabe insgesamt",
+			"addsUpTo_other": "{{count}} Aufgaben insgesamt",
+			"backlog": "Backlog",
+			"unstarted": "Nicht begonnen",
+			"started": "Begonnen",
+			"completed": "Abgeschlossen",
+			"archived": "Archiviert",
+			"unassigned": "Nicht zugewiesen",
+			"overdue": "Überfällig"
+		},
+		"breakdown": {
+			"title": "Aufgaben nach Merkmal",
+			"groupBy": {
+				"assignee": "Zuständig",
+				"status": "Status",
+				"priority": "Priorität",
+				"label": "Label"
+			},
+			"unassigned": "Nicht zugewiesen",
+			"unlabelled": "Ohne Label",
+			"labelNote": "Eine Aufgabe zählt einmal pro Label, das sie trägt, daher kann die Summe über dem Projektbestand liegen.",
+			"empty": "Noch keine Aufgaben zum Anzeigen.",
+			"loadError": "Diese Aufschlüsselung konnte nicht geladen werden."
+		}
 	}
 }

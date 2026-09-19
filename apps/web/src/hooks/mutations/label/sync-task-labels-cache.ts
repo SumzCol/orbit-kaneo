@@ -51,11 +51,35 @@ export function syncTaskLabelsInTasksCache(
     {
       queryKey: ["tasks"],
     },
-    (existingProject) =>
-      existingProject
-        ? updateTaskLabelsInProject(existingProject, taskId, updater)
-        : existingProject,
+    (existing) => {
+      // `setQueriesData` matches by prefix, and not everything cached under
+      // ["tasks"] is a project: the analytics queries live beneath a project's
+      // task key so that the invalidation every task mutation already performs
+      // reaches them too. Checking the shape rather than the key keeps this
+      // correct for whatever else is nested there later — the alternative is
+      // that the next such key throws here on the first label change.
+      if (
+        !Array.isArray((existing as { columns?: unknown } | undefined)?.columns)
+      ) {
+        return existing;
+      }
+      return updateTaskLabelsInProject(
+        existing as ProjectWithTasks,
+        taskId,
+        updater,
+      );
+    },
   );
+
+  // Writing through the task cache leaves the analytics counts untouched, and
+  // the label mutations invalidate only their own `["labels", ...]` keys. The
+  // project id is not in scope here, so this reaches every cached analytics
+  // query rather than one project's: there are at most a couple, and a label
+  // moving between tasks changes the label breakdown either way.
+  queryClient.invalidateQueries({
+    predicate: (query) =>
+      query.queryKey[0] === "tasks" && query.queryKey[2] === "analytics",
+  });
 }
 
 export function addLabelToTaskInTasksCache(

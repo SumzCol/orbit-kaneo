@@ -2322,5 +2322,41 @@
 		"branding": {
 			"poweredBy": "Didukung oleh"
 		}
+	},
+	"analytics": {
+		"title": "Analitik",
+		"headline": {
+			"totalTasks": "Total tugas",
+			"complete": "Selesai",
+			"onTrack": "Sesuai rencana",
+			"ofCount": "{{count}} dari {{total}} aktif",
+			"ofTotal": "dari {{total}}"
+		},
+		"summary": {
+			"byStateTitle": "Pekerjaan menurut status",
+			"addsUpTo_one": "{{count}} tugas seluruhnya",
+			"addsUpTo_other": "{{count}} tugas seluruhnya",
+			"backlog": "Backlog",
+			"unstarted": "Belum dimulai",
+			"started": "Sudah dimulai",
+			"completed": "Selesai",
+			"archived": "Diarsipkan",
+			"unassigned": "Belum ditugaskan",
+			"overdue": "Terlambat"
+		},
+		"breakdown": {
+			"title": "Tugas menurut properti",
+			"groupBy": {
+				"assignee": "Penerima tugas",
+				"status": "Status",
+				"priority": "Prioritas",
+				"label": "Label"
+			},
+			"unassigned": "Belum ditugaskan",
+			"unlabelled": "Tanpa label",
+			"labelNote": "Satu tugas dihitung sekali untuk tiap label yang dibawanya, sehingga jumlahnya bisa melebihi total proyek.",
+			"empty": "Belum ada tugas untuk ditampilkan.",
+			"loadError": "Rincian ini tidak dapat dimuat."
+		}
 	}
 }

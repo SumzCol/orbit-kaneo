@@ -2340,5 +2340,42 @@
 		"branding": {
 			"poweredBy": "Propulsé par"
 		}
+	},
+	"analytics": {
+		"title": "Analyse",
+		"headline": {
+			"totalTasks": "Tâches au total",
+			"complete": "Terminé",
+			"onTrack": "Dans les temps",
+			"ofCount": "{{count}} sur {{total}} actives",
+			"ofTotal": "sur {{total}}"
+		},
+		"summary": {
+			"byStateTitle": "Travail par état",
+			"addsUpTo_one": "{{count}} tâche au total",
+			"addsUpTo_many": "{{count}} tâches au total",
+			"addsUpTo_other": "{{count}} tâches au total",
+			"backlog": "Backlog",
+			"unstarted": "Non commencées",
+			"started": "Commencées",
+			"completed": "Terminées",
+			"archived": "Archivées",
+			"unassigned": "Non attribuées",
+			"overdue": "En retard"
+		},
+		"breakdown": {
+			"title": "Tâches par propriété",
+			"groupBy": {
+				"assignee": "Responsable",
+				"status": "État",
+				"priority": "Priorité",
+				"label": "Étiquette"
+			},
+			"unassigned": "Non attribuée",
+			"unlabelled": "Sans étiquette",
+			"labelNote": "Une tâche est comptée une fois par étiquette qu’elle porte, le total peut donc dépasser celui du projet.",
+			"empty": "Aucune tâche à afficher pour l’instant.",
+			"loadError": "Impossible de charger cette répartition."
+		}
 	}
 }
