@@ -15,12 +15,20 @@ const NEUTRAL = "var(--color-muted-foreground)";
 // different colours on two screens. Medium and high share a hue there, so they
 // share one here too — faithful to the board, and the reason those two bars
 // look alike.
+// The `-foreground` variants, because those are the ones the board uses:
+// `priorityColorsTaskCard` reads `text-info-foreground`,
+// `text-warning-foreground/85`, `text-warning-foreground` and
+// `text-destructive-foreground`. The base tokens are a different shade — amber
+// 500 against the board's 700 on light and 400 on dark — so taking them made
+// the same priority two colours on two screens, which is the thing this map
+// exists to prevent.
 const PRIORITY_COLORS: Record<string, string> = {
   "no-priority": NEUTRAL,
-  low: "var(--color-info)",
-  medium: "color-mix(in srgb, var(--color-warning) 85%, transparent)",
-  high: "var(--color-warning)",
-  urgent: "var(--color-destructive)",
+  low: "var(--color-info-foreground)",
+  medium:
+    "color-mix(in srgb, var(--color-warning-foreground) 85%, transparent)",
+  high: "var(--color-warning-foreground)",
+  urgent: "var(--color-destructive-foreground)",
 };
 
 // Position in the sorted list is not an identity: buckets are ordered by

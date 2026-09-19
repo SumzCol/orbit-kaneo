@@ -9,16 +9,18 @@ const bucket = (key: string | null, color: string | null = null) => ({
 describe("assignBucketColors", () => {
   it("colours priority the way the board does", () => {
     // The board reads priority through `priorityColorsTaskCard` and
-    // `getPriorityIcon`. A chart with its own opinion would paint the same
-    // task two colours on two screens.
+    // `getPriorityIcon`, both of which use the `-foreground` variants. Taking
+    // the base tokens instead is a different shade — amber 500 against the
+    // board's 700 on light and 400 on dark — and paints the same task two
+    // colours on two screens.
     const [low, high, urgent, none] = assignBucketColors(
       [bucket("low"), bucket("high"), bucket("urgent"), bucket("no-priority")],
       "priority",
     );
 
-    expect(low).toBe("var(--color-info)");
-    expect(high).toBe("var(--color-warning)");
-    expect(urgent).toBe("var(--color-destructive)");
+    expect(low).toBe("var(--color-info-foreground)");
+    expect(high).toBe("var(--color-warning-foreground)");
+    expect(urgent).toBe("var(--color-destructive-foreground)");
     // Absence of a priority is not the most severe one. Left to the palette
     // this landed on crimson and outranked urgent on screen.
     expect(none).toBe("var(--color-muted-foreground)");
