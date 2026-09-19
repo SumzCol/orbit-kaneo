@@ -1,6 +1,6 @@
 import { and, count, eq, isNull, min, sql } from "drizzle-orm";
 import db from "../../database";
-import { projectTable, taskTable } from "../../database/schema";
+import { columnTable, projectTable, taskTable } from "../../database/schema";
 
 type ProjectStatistics = {
   completionPercentage: number;
@@ -30,13 +30,29 @@ async function getProjectStatistics(
     .select({
       projectId: taskTable.projectId,
       totalTasks: count(),
+      // Completion is the column's `isFinal` flag rather than a hardcoded
+      // `done` slug. The flag is per project and the slug is not: a project
+      // can mark a second column final, or build its own workflow whose
+      // terminal column was never called Done, and the slug rule counts
+      // neither. It equally counts a `done` column that someone has since
+      // marked non-final. The analytics view reads the same flag, so the two
+      // cannot answer "how complete is this project?" differently.
       completedTasks: count(
-        sql`case when ${taskTable.status} in ('done', 'archived') then 1 end`,
+        sql`case when ${taskTable.status} <> 'archived' and ${columnTable.isFinal} then 1 end`,
+      ),
+      // Archived work is neither finished nor outstanding, so it leaves the
+      // denominator too. Counting it would stop a project that archives most
+      // of its tasks from ever reading as complete.
+      activeTasks: count(
+        sql`case when ${taskTable.status} <> 'archived' then 1 end`,
       ),
       dueDate: min(taskTable.dueDate),
     })
     .from(taskTable)
     .innerJoin(projectTable, eq(taskTable.projectId, projectTable.id))
+    // One column per task at most, so this cannot multiply the rows the
+    // counts above are taken over.
+    .leftJoin(columnTable, eq(columnTable.id, taskTable.columnId))
     .where(
       includeArchived
         ? eq(projectTable.workspaceId, workspaceId)
@@ -50,11 +66,12 @@ async function getProjectStatistics(
   for (const row of rows) {
     const totalTasks = Number(row.totalTasks);
     const completedTasks = Number(row.completedTasks);
+    const activeTasks = Number(row.activeTasks);
 
     statisticsByProject.set(row.projectId, {
       totalTasks,
       completionPercentage:
-        totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+        activeTasks > 0 ? Math.round((completedTasks / activeTasks) * 100) : 0,
       dueDate: row.dueDate ?? null,
     });
   }
