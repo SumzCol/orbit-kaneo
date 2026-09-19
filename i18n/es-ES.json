@@ -1728,8 +1728,8 @@
 		"title": "Tareas",
 		"status": {
 			"label": "Estado",
-			"to-do": "To Do",
-			"in-progress": "En progreso",
+			"to-do": "Por hacer",
+			"in-progress": "En curso",
 			"in-review": "En revisión",
 			"done": "Hecho",
 			"archived": "Archivado",
