@@ -68,13 +68,19 @@ export default function TaskMovePopover({
     ? task.status
     : selectedStatus || fallbackStatus;
 
-  const selectedStatusLabel = useMemo(() => {
+  // Not memoised. `getStatusDisplayLabel` reads the i18n instance rather than
+  // taking a translator, so nothing in its arguments tells a dependency list
+  // that the answer changes with the active language — a memo here kept the
+  // previous language when somebody switched locale with the popover open.
+  // It is a find over a handful of columns and a lookup; recomputing it per
+  // render costs less than getting that wrong.
+  const selectedStatusLabel = (() => {
     if (!effectiveStatus || destinationColumns.length === 0) return null;
     const column = destinationColumns.find((c) => c.id === effectiveStatus);
     // `id` is the status slug on these columns — `column.id === task.status`
-    // above — which is why the fallback below reads it as one.
+    // above — which is why the fallback reads it as one.
     return getStatusDisplayLabel(effectiveStatus, column?.name) || null;
-  }, [destinationColumns, effectiveStatus]);
+  })();
 
   useEffect(() => {
     if (!open) {
