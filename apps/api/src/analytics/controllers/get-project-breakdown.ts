@@ -22,6 +22,8 @@ const count = sql<number>`count(*)::int`;
 // summary, completed here. Keying off the column alone disagreed the other
 // way, filing an archived task under `done` while the summary counted it as
 // archived.
+const VIRTUAL = sql`${taskTable.status} in ('planned', 'archived')`;
+
 const effectiveStatus = sql<string>`
   case
     when ${taskTable.status} in ('planned', 'archived') then ${taskTable.status}
@@ -79,8 +81,18 @@ async function byStatus(projectId: string) {
       // share a status while pointing at different columns, and grouping by
       // the column's name and colour as well split one status into rows that
       // all came back under the same key.
-      label: sql<string>`coalesce(min(${columnTable.name}), ${effectiveStatus})`,
-      color: sql<string | null>`min(${columnTable.color})`,
+      // The key gives the virtual statuses precedence, and so must the
+      // presentation that travels with it. A row whose status says `archived`
+      // while it points at the Done column would otherwise come back as
+      // `{ key: "archived", label: "Done", color: <Done's> }`, and a consumer
+      // reading those fields would draw a virtual bucket as a final column.
+      label: sql<string>`coalesce(
+        min(case when ${VIRTUAL} then null else ${columnTable.name} end),
+        ${effectiveStatus}
+      )`,
+      color: sql<
+        string | null
+      >`min(case when ${VIRTUAL} then null else ${columnTable.color} end)`,
       count,
     })
     .from(taskTable)

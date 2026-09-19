@@ -258,6 +258,12 @@ describe("API integration: project analytics", () => {
     // points at, so the breakdown has to as well or the chart files this task
     // under `done` while the bar above counts it archived.
     expect(breakdown.buckets.map((bucket) => bucket.key)).toEqual(["archived"]);
+    // The presentation has to follow the key. Taking the joined column's name
+    // and colour would hand a consumer `{ key: "archived", label: "Done" }`.
+    expect(breakdown.buckets[0]).toMatchObject({
+      label: "archived",
+      color: null,
+    });
     expect(
       summary.backlog +
         summary.unstarted +
