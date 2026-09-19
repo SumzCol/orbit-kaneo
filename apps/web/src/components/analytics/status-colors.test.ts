@@ -57,21 +57,21 @@ describe("statusColorMap", () => {
   });
 
   it("keeps several siblings in one state distinguishable", () => {
-    // A workflow can put more than two custom columns in the started state.
-    // Subtracting a fixed weight and flooring it gave every sibling past the
-    // fourth the same value, drawing them identically.
+    // A workflow can put many custom columns in the started state. A fixed
+    // ladder of weights repeated once the group outgrew it — the seventh
+    // sibling taking the third's colour — so the weights are spread across
+    // however many there are.
+    const slugs = ["a", "b", "c", "d", "e", "f", "g", "h"];
     const many = [
       { slug: "to-do", position: 0, isFinal: false },
-      ...["a", "b", "c", "d", "e", "f"].map((slug, index) => ({
+      ...slugs.map((slug, index) => ({
         slug,
         position: index + 1,
         isFinal: false,
       })),
     ];
     const colors = statusColorMap(many);
-    const started = ["a", "b", "c", "d", "e", "f"].map((slug) =>
-      colors.get(slug),
-    );
+    const started = slugs.map((slug) => colors.get(slug));
 
     expect(new Set(started).size).toBe(started.length);
   });

@@ -68,22 +68,32 @@ export function stateOfStatus(
 // transparent rather than toward a literal keeps that working on both grounds:
 // over a dark card it reads darker, over a light one lighter, and in each case
 // as the same colour carrying less weight.
-const SIBLING_WEIGHTS = [82, 64, 46, 30] as const;
+// The range the faded siblings are spread across. Below the floor a bar stops
+// reading as its state's colour at all.
+const FADE_FROM = 82;
+const FADE_TO = 30;
 
-function sibling(state: TaskState, index: number) {
+function sibling(state: TaskState, index: number, groupSize: number) {
   const base = STATE_COLOR[state];
   if (index === 0) return base;
   const alt = STATE_COLOR_ALT[state];
   if (index === 1 && alt) return alt;
-  // A third status in one stage is possible with custom columns and has no
-  // token of its own. Fading the alt keeps the hue and the direction.
-  //
-  // A ladder rather than a clamped subtraction: subtracting a fixed step and
-  // flooring it gave every sibling past the fourth the same value, so a
-  // workflow with several custom columns in one state drew them identically.
+
+  // Weights are spread across however many siblings the state has, rather
+  // than taken from a fixed ladder. A ladder of n values either repeats once
+  // a workflow puts more than n columns in one state — the seventh taking the
+  // third's colour — or keeps subtracting until the bars are invisible.
+  // Spreading means the spacing narrows as a state gains columns, which is
+  // the honest trade against drawing two of them identically.
   const from = alt ?? base;
-  const strength = SIBLING_WEIGHTS[(index - 2) % SIBLING_WEIGHTS.length];
-  return `color-mix(in srgb, ${from} ${strength}%, transparent)`;
+  const offset = alt ? 2 : 1;
+  const faded = index - offset;
+  const total = groupSize - offset;
+  const strength =
+    total <= 1
+      ? FADE_FROM
+      : FADE_FROM - (faded * (FADE_FROM - FADE_TO)) / (total - 1);
+  return `color-mix(in srgb, ${from} ${Math.round(strength * 10) / 10}%, transparent)`;
 }
 
 /**
@@ -134,7 +144,7 @@ export function statusColorMap(
   const colors = new Map<string, string>();
   for (const [state, group] of byState) {
     group.forEach((slug, index) => {
-      colors.set(slug, sibling(state, index));
+      colors.set(slug, sibling(state, index, group.length));
     });
   }
 
