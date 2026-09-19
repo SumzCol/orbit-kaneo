@@ -22,7 +22,7 @@ import {
 } from "@/hooks/use-task-filters";
 import { getColumnIcon } from "@/lib/column";
 import { getInitials } from "@/lib/get-initials";
-import { getPriorityLabel } from "@/lib/i18n/domain";
+import { getPriorityLabel, getStatusDisplayLabel } from "@/lib/i18n/domain";
 import { resolveLabelColor } from "@/lib/label-color";
 import { getPriorityIcon } from "@/lib/priority";
 import type { SortConfig } from "@/lib/sort-tasks";
@@ -343,7 +343,9 @@ export default function BoardToolbar({
                           <span className="inline-flex h-4 w-4 items-center justify-center">
                             {getStatusIcon(column.id)}
                           </span>
-                          <span className="truncate">{column.name}</span>
+                          <span className="truncate">
+                            {getStatusDisplayLabel(column.slug, column.name)}
+                          </span>
                         </button>
                       ))}
                     </div>

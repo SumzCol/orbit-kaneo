@@ -1,4 +1,5 @@
 import { getColumnIcon } from "@/lib/column";
+import { getStatusDisplayLabel } from "@/lib/i18n/domain";
 import type { ProjectWithTasks } from "@/types/project";
 import type Task from "@/types/task";
 import { PublicTaskCard } from "./task-card";
@@ -29,7 +30,7 @@ export function PublicKanbanView({
                     <div className="flex items-center gap-2">
                       {getColumnIcon(column.id, column.isFinal, column.icon)}
                       <h3 className="font-medium text-foreground">
-                        {column.name}
+                        {getStatusDisplayLabel(column.slug, column.name)}
                       </h3>
                       <span className="text-sm text-muted-foreground">
                         {column.tasks.length}
