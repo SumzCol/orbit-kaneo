@@ -2357,7 +2357,7 @@
 			"addsUpTo_other": "{{count}} tareas en total",
 			"backlog": "Pendientes",
 			"unstarted": "Sin empezar",
-			"started": "En curso",
+			"started": "Iniciadas",
 			"completed": "Completadas",
 			"archived": "Archivadas",
 			"unassigned": "Sin asignar",
