@@ -18,6 +18,8 @@ type ProjectListEntry = typeof schema.projectTable.$inferSelect & {
   tasks?: unknown;
 };
 
+const NON_COLUMN_STATUSES = new Set(["planned", "archived"]);
+
 // `update-task` resolves a task's column from its status, and the startup
 // migration backfills the same way, so a task carries the column whose slug
 // matches it. Seeding without one would leave `isFinal` null and make every
@@ -31,6 +33,14 @@ async function seedTasks(
       where: (table, { and: andOp, eq: eqOp }) =>
         andOp(eqOp(table.projectId, projectId), eqOp(table.slug, task.status)),
     });
+    // Only `planned` and `archived` legitimately have none. Letting anything
+    // else through would make a mistyped status look like unfinished work
+    // rather than a broken fixture, now that completion reads the column.
+    if (!column && !NON_COLUMN_STATUSES.has(task.status)) {
+      throw new Error(
+        `seedTasks: no column with slug "${task.status}" in this project`,
+      );
+    }
     await db.insert(schema.taskTable).values({
       projectId,
       title: task.title,
@@ -167,6 +177,34 @@ describe("API integration: project list payload", () => {
     expect(payload[0].statistics).toMatchObject({
       totalTasks: 3,
       completionPercentage: 100,
+    });
+  });
+
+  it("reports nothing complete when every task is archived", async () => {
+    const member = await createWorkspaceMember();
+    const { project } = await createProjectFixture({
+      workspaceId: member.workspace.id,
+    });
+
+    await seedTasks(project.id, [
+      { title: "Filed", status: "archived", number: 1 },
+      { title: "Filed too", status: "archived", number: 2 },
+    ]);
+
+    mockAuthenticatedSession(member.user);
+    const { app } = createApp();
+    const response = await app.request(
+      `/api/project?workspaceId=${member.workspace.id}`,
+    );
+    const payload = (await response.json()) as ProjectListEntry[];
+
+    // Nothing is in play, so there is no fraction to report and the guard
+    // against dividing by zero decides it. The analytics view answers the
+    // same way, which is the point of this change; `totalTasks` still counts
+    // the archived rows, so the project does not read as untouched.
+    expect(payload[0].statistics).toMatchObject({
+      totalTasks: 2,
+      completionPercentage: 0,
     });
   });
 
