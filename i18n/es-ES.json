@@ -122,7 +122,7 @@
 				"successUpdated": "Tarea actualizada satisfactoriamente",
 				"createError": "Error al crear la tarea",
 				"priority": "Prioridad",
-				"statusFallback": "En progreso",
+				"statusFallback": "En curso",
 				"startDate": "Fecha de inicio",
 				"dueDate": "Fecha de vencimiento",
 				"clearStartDate": "Borrar fecha de inicio",
@@ -1643,8 +1643,8 @@
 		"title": "Tareas",
 		"status": {
 			"label": "Estado",
-			"to-do": "To Do",
-			"in-progress": "En progreso",
+			"to-do": "Por hacer",
+			"in-progress": "En curso",
 			"in-review": "En revisión",
 			"done": "Hecho",
 			"archived": "Archivado",
@@ -2115,7 +2115,7 @@
 			"projectStatus": {
 				"notStarted": "Sin comenzar",
 				"complete": "Completado",
-				"inProgress": "En progreso"
+				"inProgress": "En curso"
 			},
 			"noDueDate": "Sin fecha de vencimiento",
 			"reorderHandle": "Reordenar proyecto",
@@ -2138,7 +2138,7 @@
 			"suggestionHighPriority": "Alta prioridad",
 			"suggestionBug": "Bugs",
 			"suggestionFeature": "Features",
-			"suggestionInProgress": "En progreso",
+			"suggestionInProgress": "En curso",
 			"suggestionCompleted": "Completadas",
 			"resultsFound_many": "{{count}} resultados"
 		},
