@@ -66,7 +66,9 @@ function ProjectAnalytics() {
       activeView="analytics"
     >
       <PageTitle title={t("analytics:title")} />
-      <div className="overflow-y-auto p-4">
+      {/* `h-full` against the layout's `min-h-0` parent: without a height of
+          its own this box grows with its content and never scrolls. */}
+      <div className="h-full overflow-y-auto p-4">
         {/* Capped rather than full-bleed. The board and backlog fill the width
             because their content does; a handful of counts does not, and
             stretched across a wide screen the padding becomes the subject. */}

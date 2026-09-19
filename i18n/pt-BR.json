@@ -2373,7 +2373,7 @@
 			},
 			"unassigned": "Sem responsável",
 			"unlabelled": "Sem etiqueta",
-			"labelNote": "Cada tarefa é contada uma vez por etiqueta, então a soma passa do total do projeto.",
+			"labelNote": "Cada tarefa é contada uma vez para cada etiqueta que carrega, então a soma pode passar do total do projeto.",
 			"empty": "Ainda não há tarefas para exibir.",
 			"loadError": "Não foi possível carregar este detalhamento."
 		}

@@ -2363,7 +2363,7 @@
 			},
 			"unassigned": "Nicht zugewiesen",
 			"unlabelled": "Ohne Label",
-			"labelNote": "Eine Aufgabe zählt einmal pro Label, daher liegt die Summe über dem Projektbestand.",
+			"labelNote": "Eine Aufgabe zählt einmal pro Label, das sie trägt, daher kann die Summe über dem Projektbestand liegen.",
 			"empty": "Noch keine Aufgaben zum Anzeigen.",
 			"loadError": "Diese Aufschlüsselung konnte nicht geladen werden."
 		}

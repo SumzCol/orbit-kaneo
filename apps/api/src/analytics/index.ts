@@ -41,7 +41,7 @@ const getProjectBreakdownRoute = createRoute({
   tags: ["Analytics"],
   summary: "Get a project's task counts grouped by one property",
   description:
-    "Counts grouped by assignee, status, priority or label. Status buckets are keyed by the column a task actually sits in, falling back to its status for `planned` and `archived`, which have no column — the same reading the summary classifies from, so the two cannot disagree. A null key is the unset bucket: unassigned, or unlabelled. Grouping by label counts a task once per label it carries, so those buckets sum to more than the project's task count; every other grouping partitions it.",
+    "Counts grouped by assignee, status, priority or label. Status buckets are keyed by the column a task actually sits in, falling back to its status for `planned` and `archived`, which have no column — the same reading the summary classifies from, so the two cannot disagree. A null key is the unset bucket: unassigned, or unlabelled. Grouping by label counts a task once for each label it carries, so those buckets can sum to more than the project's task count; with at most one label per task they match it. Every other grouping partitions the project.",
   middleware: [
     workspaceAccess.fromProject("projectId"),
     requireWorkspacePermission({ task: ["read"] }),

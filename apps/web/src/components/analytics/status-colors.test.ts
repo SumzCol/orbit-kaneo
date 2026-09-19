@@ -56,6 +56,26 @@ describe("statusColorMap", () => {
     expect(colors.get("in-review")).toBe("var(--state-started-alt)");
   });
 
+  it("keeps several siblings in one state distinguishable", () => {
+    // A workflow can put more than two custom columns in the started state.
+    // Subtracting a fixed weight and flooring it gave every sibling past the
+    // fourth the same value, drawing them identically.
+    const many = [
+      { slug: "to-do", position: 0, isFinal: false },
+      ...["a", "b", "c", "d", "e", "f"].map((slug, index) => ({
+        slug,
+        position: index + 1,
+        isFinal: false,
+      })),
+    ];
+    const colors = statusColorMap(many);
+    const started = ["a", "b", "c", "d", "e", "f"].map((slug) =>
+      colors.get(slug),
+    );
+
+    expect(new Set(started).size).toBe(started.length);
+  });
+
   it("reserves red for the one status that asks for action", () => {
     const colors = statusColorMap(columns);
 

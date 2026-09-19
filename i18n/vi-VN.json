@@ -2354,7 +2354,7 @@
 			},
 			"unassigned": "Chưa giao",
 			"unlabelled": "Không có nhãn",
-			"labelNote": "Mỗi công việc được đếm một lần cho từng nhãn nó mang, nên tổng vượt quá số công việc của dự án.",
+			"labelNote": "Mỗi công việc được đếm một lần cho từng nhãn nó mang, nên tổng có thể vượt quá số công việc của dự án.",
 			"empty": "Chưa có công việc nào để hiển thị.",
 			"loadError": "Không thể tải phân tích này."
 		}

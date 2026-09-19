@@ -68,6 +68,8 @@ export function stateOfStatus(
 // transparent rather than toward a literal keeps that working on both grounds:
 // over a dark card it reads darker, over a light one lighter, and in each case
 // as the same colour carrying less weight.
+const SIBLING_WEIGHTS = [82, 64, 46, 30] as const;
+
 function sibling(state: TaskState, index: number) {
   const base = STATE_COLOR[state];
   if (index === 0) return base;
@@ -75,8 +77,12 @@ function sibling(state: TaskState, index: number) {
   if (index === 1 && alt) return alt;
   // A third status in one stage is possible with custom columns and has no
   // token of its own. Fading the alt keeps the hue and the direction.
+  //
+  // A ladder rather than a clamped subtraction: subtracting a fixed step and
+  // flooring it gave every sibling past the fourth the same value, so a
+  // workflow with several custom columns in one state drew them identically.
   const from = alt ?? base;
-  const strength = Math.max(100 - (index - 1) * 25, 45);
+  const strength = SIBLING_WEIGHTS[(index - 2) % SIBLING_WEIGHTS.length];
   return `color-mix(in srgb, ${from} ${strength}%, transparent)`;
 }
 

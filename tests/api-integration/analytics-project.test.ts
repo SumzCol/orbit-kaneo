@@ -379,6 +379,25 @@ describe("API integration: project analytics", () => {
     ).toBe(1);
   });
 
+  it("groups by priority, which nothing else covers", async () => {
+    const { project } = await signedInProject();
+
+    await seedTask(project.id, "to-do", { priority: "urgent" });
+    await seedTask(project.id, "to-do", { priority: "urgent" });
+    await seedTask(project.id, "in-progress", { priority: "no-priority" });
+
+    const breakdown = (await (
+      await fetchBreakdown(project.id, "priority")
+    ).json()) as Breakdown;
+
+    // Ordered by count, and the stored key is returned for the client to
+    // translate — every other grouping has a test and this branch had none.
+    expect(breakdown.buckets).toEqual([
+      expect.objectContaining({ key: "urgent", count: 2 }),
+      expect.objectContaining({ key: "no-priority", count: 1 }),
+    ]);
+  });
+
   it("counts a task once per label, so label buckets outrun the total", async () => {
     const { member, project } = await signedInProject();
     const task = await seedTask(project.id, "to-do");

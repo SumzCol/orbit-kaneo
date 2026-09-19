@@ -2363,7 +2363,7 @@
 			},
 			"unassigned": "Niet toegewezen",
 			"unlabelled": "Geen label",
-			"labelNote": "Een taak telt één keer per label, dus de som ligt hoger dan het projecttotaal.",
+			"labelNote": "Een taak telt één keer per label dat ze draagt, dus de som kan hoger liggen dan het projecttotaal.",
 			"empty": "Nog geen taken om te tonen.",
 			"loadError": "Deze uitsplitsing kon niet worden geladen."
 		}

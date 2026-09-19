@@ -2373,7 +2373,7 @@
 			},
 			"unassigned": "Non assegnata",
 			"unlabelled": "Senza etichetta",
-			"labelNote": "Ogni attività è contata una volta per etichetta, quindi la somma supera il totale del progetto.",
+			"labelNote": "Ogni attività è contata una volta per ciascuna etichetta che porta, quindi la somma può superare il totale del progetto.",
 			"empty": "Ancora nessuna attività da mostrare.",
 			"loadError": "Impossibile caricare questa suddivisione."
 		}

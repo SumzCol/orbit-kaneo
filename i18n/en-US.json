@@ -2363,7 +2363,7 @@
 			},
 			"unassigned": "Unassigned",
 			"unlabelled": "No label",
-			"labelNote": "A task is counted once per label it carries, so these add up to more than the project holds.",
+			"labelNote": "A task is counted once for each label it carries, so these can add up to more than the project holds.",
 			"empty": "No tasks to chart yet.",
 			"loadError": "Could not load this breakdown."
 		}

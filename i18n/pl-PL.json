@@ -2383,7 +2383,7 @@
 			},
 			"unassigned": "Nieprzypisane",
 			"unlabelled": "Bez etykiety",
-			"labelNote": "Zadanie liczy się raz na każdą etykietę, więc suma przekracza liczbę zadań w projekcie.",
+			"labelNote": "Zadanie liczy się raz na każdą etykietę, którą nosi, więc suma może przekroczyć liczbę zadań w projekcie.",
 			"empty": "Nie ma jeszcze zadań do pokazania.",
 			"loadError": "Nie udało się wczytać tego zestawienia."
 		}

@@ -2354,7 +2354,7 @@
 			},
 			"unassigned": "Belum ditugaskan",
 			"unlabelled": "Tanpa label",
-			"labelNote": "Satu tugas dihitung sekali per label yang dibawanya, sehingga jumlahnya melebihi total proyek.",
+			"labelNote": "Satu tugas dihitung sekali untuk tiap label yang dibawanya, sehingga jumlahnya bisa melebihi total proyek.",
 			"empty": "Belum ada tugas untuk ditampilkan.",
 			"loadError": "Rincian ini tidak dapat dimuat."
 		}

@@ -2363,7 +2363,7 @@
 			},
 			"unassigned": "Təyin edilməyib",
 			"unlabelled": "Etiketsiz",
-			"labelNote": "Tapşırıq daşıdığı hər etiket üçün bir dəfə sayılır, ona görə cəm layihədəkindən çoxdur.",
+			"labelNote": "Tapşırıq daşıdığı hər etiket üçün bir dəfə sayılır, ona görə cəm layihədəkindən çox ola bilər.",
 			"empty": "Hələ göstəriləcək tapşırıq yoxdur.",
 			"loadError": "Bu bölgü yüklənə bilmədi."
 		}
