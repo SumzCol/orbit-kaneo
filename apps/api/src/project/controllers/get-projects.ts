@@ -30,10 +30,13 @@ async function getProjectStatistics(
     .select({
       projectId: taskTable.projectId,
       totalTasks: count(),
-      // Completion is the column's `isFinal` flag, which is per project and
-      // survives a renamed column, rather than a hardcoded `done` slug. The
-      // analytics view reads the same flag, so the two cannot answer "how
-      // complete is this project?" differently.
+      // Completion is the column's `isFinal` flag rather than a hardcoded
+      // `done` slug. The flag is per project and the slug is not: a project
+      // can mark a second column final, or build its own workflow whose
+      // terminal column was never called Done, and the slug rule counts
+      // neither. It equally counts a `done` column that someone has since
+      // marked non-final. The analytics view reads the same flag, so the two
+      // cannot answer "how complete is this project?" differently.
       completedTasks: count(
         sql`case when ${taskTable.status} <> 'archived' and ${columnTable.isFinal} then 1 end`,
       ),

@@ -119,14 +119,18 @@ describe("API integration: project list payload", () => {
     expect(new Date(payload[0].statistics.dueDate as string)).toEqual(earliest);
   });
 
-  it("counts a renamed final column, and a final To Do", async () => {
+  it("counts every final column, not only the seeded one", async () => {
     const member = await createWorkspaceMember();
     const { project, columns } = await createProjectFixture({
       workspaceId: member.workspace.id,
     });
 
-    // The old rule matched the slug `done`. A project that renames that
-    // column, or marks another one final, is what the flag is for.
+    // The old rule matched the slug `done` and nothing else. Marking a second
+    // column final is what the flag is for, and the slug rule cannot see it.
+    //
+    // Renaming Done is incidental here and deliberately kept: `update-column`
+    // writes `name` and never `slug`, so a rename alone changes no count. It
+    // is in the fixture to make that explicit rather than to be the subject.
     await db
       .update(schema.columnTable)
       .set({ name: "Shipped" })
