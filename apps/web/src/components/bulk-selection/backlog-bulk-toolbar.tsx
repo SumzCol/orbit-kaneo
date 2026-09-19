@@ -50,7 +50,7 @@ import { useGetActiveWorkspaceUsers } from "@/hooks/queries/workspace-users/use-
 import { useWorkspacePermission } from "@/hooks/use-workspace-permission";
 import { getColumnIcon } from "@/lib/column";
 import { getInitials } from "@/lib/get-initials";
-import { getPriorityLabel } from "@/lib/i18n/domain";
+import { getPriorityLabel, getStatusDisplayLabel } from "@/lib/i18n/domain";
 import { resolveLabelColor } from "@/lib/label-color";
 import { getPriorityIcon } from "@/lib/priority";
 import { toast } from "@/lib/toast";
@@ -403,7 +403,9 @@ function BacklogBulkToolbar() {
                       onClick={() => handleMoveToBoard(col.id)}
                     >
                       {getColumnIcon(col.id, col.isFinal, col.icon)}
-                      <span className="ml-2">{col.name}</span>
+                      <span className="ml-2">
+                        {getStatusDisplayLabel(col.slug, col.name)}
+                      </span>
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>

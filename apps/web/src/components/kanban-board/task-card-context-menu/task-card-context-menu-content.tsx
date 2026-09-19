@@ -25,7 +25,7 @@ import { useWorkspacePermission } from "@/hooks/use-workspace-permission";
 import { getColumnIcon } from "@/lib/column";
 import { generateLink } from "@/lib/generate-link";
 import { getInitials } from "@/lib/get-initials";
-import { getPriorityLabel } from "@/lib/i18n/domain";
+import { getPriorityLabel, getStatusDisplayLabel } from "@/lib/i18n/domain";
 import { getPriorityIcon } from "@/lib/priority";
 import { toast } from "@/lib/toast";
 import useProjectStore from "@/store/project";
@@ -53,13 +53,18 @@ export default function TaskCardContextMenuContent({
   const columns =
     project?.columns && project.columns.length > 0
       ? project.columns.map((col) => ({
+          // `slug` carries the id on this branch and the slug on the other,
+          // because it is what the status change is keyed on. `statusKey` is
+          // always the real slug, which is what names the column.
           slug: col.id,
+          statusKey: col.slug,
           name: col.name,
           icon: col.icon,
           isFinal: col.isFinal,
         }))
       : columnsData.map((col) => ({
           slug: col.slug,
+          statusKey: col.slug,
           name: col.name,
           icon: col.icon,
           isFinal: col.isFinal,
@@ -188,7 +193,7 @@ export default function TaskCardContextMenuContent({
                 className="[&_svg]:text-muted-foreground"
               >
                 {getColumnIcon(col.slug, col.isFinal, col.icon)}
-                <span>{col.name}</span>
+                <span>{getStatusDisplayLabel(col.statusKey, col.name)}</span>
               </ContextMenuCheckboxItem>
             ))}
           </ContextMenuSubContent>

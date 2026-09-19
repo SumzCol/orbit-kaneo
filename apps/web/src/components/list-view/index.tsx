@@ -34,6 +34,7 @@ import {
   readExpandedRows,
   writeExpandedRows,
 } from "@/lib/expanded-rows-storage";
+import { getStatusDisplayLabel } from "@/lib/i18n/domain";
 import { buildSubtaskChildren, flattenSubtaskRows } from "@/lib/subtask-tree";
 import { toast } from "@/lib/toast";
 import useBulkSelectionStore from "@/store/bulk-selection";
@@ -407,7 +408,9 @@ function ListView({ project, disableDragDrop = false }: ListViewProps) {
             <div className="flex items-center gap-2 h-4">
               {getColumnIcon(column.id, column.isFinal, column.icon)}
               <div className="flex items-center gap-1">
-                <span className="mt-1 mr-1">{column.name}</span>
+                <span className="mt-1 mr-1">
+                  {getStatusDisplayLabel(column.slug, column.name)}
+                </span>
                 <span className="text-xs text-muted-foreground mt-0.5">
                   {column.tasks.length}
                 </span>
