@@ -20,7 +20,7 @@ import { useMoveTask } from "@/hooks/mutations/task/use-move-task";
 import useGetProjects from "@/hooks/queries/project/use-get-projects";
 import { useGetTasks } from "@/hooks/queries/task/use-get-tasks";
 import { cn } from "@/lib/cn";
-import { getStatusLabel } from "@/lib/i18n/domain";
+import { getStatusDisplayLabel } from "@/lib/i18n/domain";
 import type Task from "@/types/task";
 
 type TaskMovePopoverProps = {
@@ -71,7 +71,9 @@ export default function TaskMovePopover({
   const selectedStatusLabel = useMemo(() => {
     if (!effectiveStatus || destinationColumns.length === 0) return null;
     const column = destinationColumns.find((c) => c.id === effectiveStatus);
-    return column?.name || getStatusLabel(effectiveStatus) || null;
+    // `id` is the status slug on these columns — `column.id === task.status`
+    // above — which is why the fallback below reads it as one.
+    return getStatusDisplayLabel(effectiveStatus, column?.name) || null;
   }, [destinationColumns, effectiveStatus]);
 
   useEffect(() => {
@@ -203,7 +205,7 @@ export default function TaskMovePopover({
                   <SelectContent>
                     {destinationColumns.map((column) => (
                       <SelectItem key={column.id} value={column.id}>
-                        {column.name || getStatusLabel(column.id)}
+                        {getStatusDisplayLabel(column.id, column.name)}
                       </SelectItem>
                     ))}
                   </SelectContent>
