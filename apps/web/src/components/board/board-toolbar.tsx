@@ -170,7 +170,8 @@ export default function BoardToolbar({
 
   const getStatusDisplayName = (statusId: string) => {
     const column = project?.columns?.find((col) => col.id === statusId);
-    return column?.name || statusId;
+    // Feeds the filter chip that names the selected status.
+    return column ? getStatusDisplayLabel(column.slug, column.name) : statusId;
   };
   const getStatusIcon = (statusId: string) => {
     const column = project?.columns?.find((col) => col.id === statusId);

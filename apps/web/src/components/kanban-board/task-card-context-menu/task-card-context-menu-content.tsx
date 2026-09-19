@@ -53,13 +53,18 @@ export default function TaskCardContextMenuContent({
   const columns =
     project?.columns && project.columns.length > 0
       ? project.columns.map((col) => ({
+          // `slug` carries the id on this branch and the slug on the other,
+          // because it is what the status change is keyed on. `statusKey` is
+          // always the real slug, which is what names the column.
           slug: col.id,
+          statusKey: col.slug,
           name: col.name,
           icon: col.icon,
           isFinal: col.isFinal,
         }))
       : columnsData.map((col) => ({
           slug: col.slug,
+          statusKey: col.slug,
           name: col.name,
           icon: col.icon,
           isFinal: col.isFinal,
@@ -188,7 +193,7 @@ export default function TaskCardContextMenuContent({
                 className="[&_svg]:text-muted-foreground"
               >
                 {getColumnIcon(col.slug, col.isFinal, col.icon)}
-                <span>{getStatusDisplayLabel(col.slug, col.name)}</span>
+                <span>{getStatusDisplayLabel(col.statusKey, col.name)}</span>
               </ContextMenuCheckboxItem>
             ))}
           </ContextMenuSubContent>
