@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import db, { schema } from "../../apps/api/src/database";
 import { createApp } from "../../apps/api/src/index";
@@ -17,15 +18,24 @@ type ProjectListEntry = typeof schema.projectTable.$inferSelect & {
   tasks?: unknown;
 };
 
+// `update-task` resolves a task's column from its status, and the startup
+// migration backfills the same way, so a task carries the column whose slug
+// matches it. Seeding without one would leave `isFinal` null and make every
+// task look unfinished.
 async function seedTasks(
   projectId: string,
   tasks: { title: string; status: string; dueDate?: Date; number: number }[],
 ) {
   for (const task of tasks) {
+    const column = await db.query.columnTable.findFirst({
+      where: (table, { and: andOp, eq: eqOp }) =>
+        andOp(eqOp(table.projectId, projectId), eqOp(table.slug, task.status)),
+    });
     await db.insert(schema.taskTable).values({
       projectId,
       title: task.title,
       status: task.status,
+      columnId: column?.id ?? null,
       dueDate: task.dueDate ?? null,
       number: task.number,
     });
@@ -89,12 +99,75 @@ describe("API integration: project list payload", () => {
     );
     const payload = (await response.json()) as ProjectListEntry[];
 
-    // done + archived count as completed: 2 of 4 => 50%
+    // Completion is the column's `isFinal` flag, and archived work leaves
+    // both sides of the fraction: Done alone, over the three tasks still in
+    // play. Counting `done` and `archived` against all four gave 50%.
     expect(payload[0].statistics).toMatchObject({
       totalTasks: 4,
-      completionPercentage: 50,
+      completionPercentage: 33,
     });
     expect(new Date(payload[0].statistics.dueDate as string)).toEqual(earliest);
+  });
+
+  it("counts a renamed final column, and a final To Do", async () => {
+    const member = await createWorkspaceMember();
+    const { project, columns } = await createProjectFixture({
+      workspaceId: member.workspace.id,
+    });
+
+    // The old rule matched the slug `done`. A project that renames that
+    // column, or marks another one final, is what the flag is for.
+    await db
+      .update(schema.columnTable)
+      .set({ name: "Shipped" })
+      .where(eq(schema.columnTable.id, columns.done.id));
+    await db
+      .update(schema.columnTable)
+      .set({ isFinal: true })
+      .where(eq(schema.columnTable.id, columns.inReview.id));
+
+    await seedTasks(project.id, [
+      { title: "Shipped one", status: "done", number: 1 },
+      { title: "Reviewed", status: "in-review", number: 2 },
+      { title: "Open", status: "to-do", number: 3 },
+      { title: "Doing", status: "in-progress", number: 4 },
+    ]);
+
+    mockAuthenticatedSession(member.user);
+    const { app } = createApp();
+    const response = await app.request(
+      `/api/project?workspaceId=${member.workspace.id}`,
+    );
+    const payload = (await response.json()) as ProjectListEntry[];
+
+    expect(payload[0].statistics).toMatchObject({ completionPercentage: 50 });
+  });
+
+  it("reads complete when every task still in play is done", async () => {
+    const member = await createWorkspaceMember();
+    const { project } = await createProjectFixture({
+      workspaceId: member.workspace.id,
+    });
+
+    await seedTasks(project.id, [
+      { title: "Closed", status: "done", number: 1 },
+      { title: "Filed", status: "archived", number: 2 },
+      { title: "Filed too", status: "archived", number: 3 },
+    ]);
+
+    mockAuthenticatedSession(member.user);
+    const { app } = createApp();
+    const response = await app.request(
+      `/api/project?workspaceId=${member.workspace.id}`,
+    );
+    const payload = (await response.json()) as ProjectListEntry[];
+
+    // Leaving archived work in the denominator capped this at 33% and a
+    // project that files most of its tasks could never read as finished.
+    expect(payload[0].statistics).toMatchObject({
+      totalTasks: 3,
+      completionPercentage: 100,
+    });
   });
 
   it("reports zeroed statistics for a project with no tasks", async () => {

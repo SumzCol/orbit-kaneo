@@ -30,7 +30,10 @@ export const projectSchema = z
 
 export const projectStatisticsSchema = z
   .object({
-    completionPercentage: z.number(),
+    completionPercentage: z.number().openapi({
+      description:
+        "Share of the project's unarchived tasks that sit in a column flagged `isFinal`, as a whole percentage. Archived work counts neither as finished nor towards the total, so a project that archives most of its tasks can still read as complete.",
+    }),
     totalTasks: z.number(),
     dueDate: nullableResponseTimestamp.openapi({
       description: "The soonest due date among the project's open tasks.",
