@@ -614,7 +614,17 @@
 			"copy": "Kopiëren",
 			"copiedToast": "Gekopieerd",
 			"toastUpdated": "Zichtbaarheid bijgewerkt",
-			"toastUpdateError": "Bijwerken zichtbaarheid mislukt"
+			"toastUpdateError": "Bijwerken zichtbaarheid mislukt",
+			"memberAddedToast": "Member added",
+			"memberAddErrorToast": "Failed to add the member",
+			"memberRemove": "Remove",
+			"memberRemovedToast": "Member removed",
+			"memberRemoveErrorToast": "Failed to remove the member",
+			"membersAdd": "Add",
+			"membersAddPlaceholder": "Select a workspace member",
+			"membersEmpty": "No members yet",
+			"membersSectionSubtitle": "Only these people can open this project. Workspace administrators always can.",
+			"membersSectionTitle": "Project members"
 		},
 		"projectWorkflow": {
 			"pageTitle": "Workflow-instellingen",

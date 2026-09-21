@@ -879,7 +879,17 @@
 			"copy": "कॉपी करें",
 			"copiedToast": "कॉपी किया",
 			"toastUpdated": "दृश्यता अपडेट की गई",
-			"toastUpdateError": "दृश्यता अपडेट करने में विफल"
+			"toastUpdateError": "दृश्यता अपडेट करने में विफल",
+			"memberAddedToast": "Member added",
+			"memberAddErrorToast": "Failed to add the member",
+			"memberRemove": "Remove",
+			"memberRemovedToast": "Member removed",
+			"memberRemoveErrorToast": "Failed to remove the member",
+			"membersAdd": "Add",
+			"membersAddPlaceholder": "Select a workspace member",
+			"membersEmpty": "No members yet",
+			"membersSectionSubtitle": "Only these people can open this project. Workspace administrators always can.",
+			"membersSectionTitle": "Project members"
 		},
 		"projectWorkflow": {
 			"pageTitle": "वर्कफ़्लो सेटिंग",

@@ -717,7 +717,17 @@
 			"copy": "Salin",
 			"copiedToast": "Disalin",
 			"toastUpdated": "Visibilitas diperbarui",
-			"toastUpdateError": "Gagal memperbarui visibilitas"
+			"toastUpdateError": "Gagal memperbarui visibilitas",
+			"memberAddedToast": "Member added",
+			"memberAddErrorToast": "Failed to add the member",
+			"memberRemove": "Remove",
+			"memberRemovedToast": "Member removed",
+			"memberRemoveErrorToast": "Failed to remove the member",
+			"membersAdd": "Add",
+			"membersAddPlaceholder": "Select a workspace member",
+			"membersEmpty": "No members yet",
+			"membersSectionSubtitle": "Only these people can open this project. Workspace administrators always can.",
+			"membersSectionTitle": "Project members"
 		},
 		"projectWorkflow": {
 			"pageTitle": "Pengaturan Alur Kerja",

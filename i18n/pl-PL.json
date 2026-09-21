@@ -1404,7 +1404,17 @@
 			"subtitle": "Określ, kto może wyświetlać projekt i uzyskać do niego dostęp.",
 			"title": "Widoczność",
 			"toastUpdated": "Widoczność zaktualizowano",
-			"toastUpdateError": "Nie udało się zaktualizować widoczności"
+			"toastUpdateError": "Nie udało się zaktualizować widoczności",
+			"memberAddedToast": "Member added",
+			"memberAddErrorToast": "Failed to add the member",
+			"memberRemove": "Remove",
+			"memberRemovedToast": "Member removed",
+			"memberRemoveErrorToast": "Failed to remove the member",
+			"membersAdd": "Add",
+			"membersAddPlaceholder": "Select a workspace member",
+			"membersEmpty": "No members yet",
+			"membersSectionSubtitle": "Only these people can open this project. Workspace administrators always can.",
+			"membersSectionTitle": "Project members"
 		},
 		"projectWorkflow": {
 			"automationDescription": "Mapuj zdarzenia integracji na kolumny. Gdy wystąpi zdarzenie, powiązane zadanie zostanie przeniesione do wybranej kolumny.",

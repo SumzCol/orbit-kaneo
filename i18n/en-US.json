@@ -959,7 +959,17 @@
 			"copy": "Copy",
 			"copiedToast": "Copied",
 			"toastUpdated": "Visibility updated",
-			"toastUpdateError": "Failed to update visibility"
+			"toastUpdateError": "Failed to update visibility",
+			"membersSectionTitle": "Project members",
+			"membersSectionSubtitle": "Only these people can open this project. Workspace administrators always can.",
+			"membersEmpty": "No members yet",
+			"membersAdd": "Add",
+			"membersAddPlaceholder": "Select a workspace member",
+			"memberAddedToast": "Member added",
+			"memberAddErrorToast": "Failed to add the member",
+			"memberRemovedToast": "Member removed",
+			"memberRemoveErrorToast": "Failed to remove the member",
+			"memberRemove": "Remove"
 		},
 		"projectWorkflow": {
 			"pageTitle": "Workflow Settings",

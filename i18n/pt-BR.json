@@ -880,7 +880,17 @@
 			"copy": "Copiar",
 			"copiedToast": "Copiado",
 			"toastUpdated": "Visibilidade atualizada",
-			"toastUpdateError": "Falha ao atualizar visibilidade"
+			"toastUpdateError": "Falha ao atualizar visibilidade",
+			"memberAddedToast": "Member added",
+			"memberAddErrorToast": "Failed to add the member",
+			"memberRemove": "Remove",
+			"memberRemovedToast": "Member removed",
+			"memberRemoveErrorToast": "Failed to remove the member",
+			"membersAdd": "Add",
+			"membersAddPlaceholder": "Select a workspace member",
+			"membersEmpty": "No members yet",
+			"membersSectionSubtitle": "Only these people can open this project. Workspace administrators always can.",
+			"membersSectionTitle": "Project members"
 		},
 		"projectWorkflow": {
 			"pageTitle": "Configurações de fluxo de trabalho",

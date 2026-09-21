@@ -614,7 +614,17 @@
 			"copy": "Copiar",
 			"copiedToast": "URL copiada",
 			"toastUpdated": "Visibilidad actualizada",
-			"toastUpdateError": "Error al actualizar espacio la visibilidad del proyecto"
+			"toastUpdateError": "Error al actualizar espacio la visibilidad del proyecto",
+			"membersSectionTitle": "Miembros del proyecto",
+			"membersSectionSubtitle": "Solo estas personas pueden abrir este proyecto. Los administradores del espacio siempre pueden.",
+			"membersEmpty": "Aún no hay miembros",
+			"membersAdd": "Añadir",
+			"membersAddPlaceholder": "Selecciona un miembro del espacio",
+			"memberAddedToast": "Miembro añadido",
+			"memberAddErrorToast": "No se pudo añadir el miembro",
+			"memberRemovedToast": "Miembro eliminado",
+			"memberRemoveErrorToast": "No se pudo eliminar el miembro",
+			"memberRemove": "Eliminar"
 		},
 		"projectWorkflow": {
 			"pageTitle": "Ajustes del Flujo de trabajo",

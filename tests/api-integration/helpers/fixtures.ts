@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import db, { schema } from "../../../apps/api/src/database";
 import { DEFAULT_PROJECT_COLUMNS } from "../../../apps/api/src/project/controllers/create-project";
 
@@ -52,11 +53,15 @@ export async function createProjectFixture({
   name = "Integration Project",
   icon = "Folder",
   slug = `project-${randomUUID()}`,
+  members,
 }: {
   workspaceId: string;
   name?: string;
   icon?: string;
   slug?: string;
+  // Defaults to every current member of the workspace. Pass an explicit list
+  // (`[]` included) to test who can and cannot reach the project.
+  members?: string[];
 }) {
   const [project] = await db
     .insert(schema.projectTable)
@@ -67,6 +72,24 @@ export async function createProjectFixture({
       slug,
     })
     .returning();
+
+  // A project is only readable by its members, and real creation adds the
+  // creator. Mirror that here by seeding everyone who is already in the
+  // workspace, which is also what the upgrade backfill does, so tests about
+  // other subjects keep reading the project they just made.
+  const workspaceMembers = await db
+    .select({ userId: schema.workspaceUserTable.userId })
+    .from(schema.workspaceUserTable)
+    .where(eq(schema.workspaceUserTable.workspaceId, workspaceId));
+
+  const memberIds = members ?? workspaceMembers.map((row) => row.userId);
+
+  if (memberIds.length > 0) {
+    await db
+      .insert(schema.projectMemberTable)
+      .values(memberIds.map((userId) => ({ projectId: project.id, userId })))
+      .onConflictDoNothing();
+  }
 
   const insertedColumns: (typeof schema.columnTable.$inferSelect)[] = [];
 

@@ -717,7 +717,17 @@
 			"copy": "Копировать",
 			"copiedToast": "Скопировано",
 			"toastUpdated": "Видимость обновлена",
-			"toastUpdateError": "Не удалось обновить видимость"
+			"toastUpdateError": "Не удалось обновить видимость",
+			"memberAddedToast": "Member added",
+			"memberAddErrorToast": "Failed to add the member",
+			"memberRemove": "Remove",
+			"memberRemovedToast": "Member removed",
+			"memberRemoveErrorToast": "Failed to remove the member",
+			"membersAdd": "Add",
+			"membersAddPlaceholder": "Select a workspace member",
+			"membersEmpty": "No members yet",
+			"membersSectionSubtitle": "Only these people can open this project. Workspace administrators always can.",
+			"membersSectionTitle": "Project members"
 		},
 		"projectWorkflow": {
 			"pageTitle": "Настройки рабочего процесса",

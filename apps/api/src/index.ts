@@ -65,6 +65,7 @@ import { migrateNotificationPreferencesSchema } from "./utils/migrate-notificati
 import { migrateSessionColumn } from "./utils/migrate-session-column";
 import { migrateWorkspaceUserEmail } from "./utils/migrate-workspace-user-email";
 import { normalizeApiServerUrl } from "./utils/openapi-spec";
+import { canAccessProject } from "./utils/project-access";
 import { seedDefaultWorkspaceRoles } from "./utils/seed-default-workspace-roles";
 import { validateWorkspaceAccess } from "./utils/validate-workspace-access";
 import workflowRule from "./workflow-rule";
@@ -709,6 +710,17 @@ export function createApp() {
         }
 
         await validateWorkspaceAccess(userId, project.workspaceId);
+
+        // A project's realtime stream is as restricted as its board.
+        // `canAccessProject` resolves workspace permissions from the context,
+        // so the workspace has to be on it first.
+        c.set("workspaceId", project.workspaceId);
+
+        if (!(await canAccessProject(c, projectId))) {
+          throw new HTTPException(403, {
+            message: "You don't have access to this project",
+          });
+        }
       }
 
       const windowId = c.req.query("windowId");

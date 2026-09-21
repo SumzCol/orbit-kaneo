@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { state } = vi.hoisted(() => ({
-  state: { lookedUpIds: [] as string[] },
+  state: { lookedUpIds: [] as string[], projectAccess: true },
 }));
 
 const WORKSPACE_BY_TASK: Record<string, string> = {
@@ -57,6 +57,13 @@ vi.mock("../../../apps/api/src/utils/validate-workspace-access", async () => {
   };
 });
 
+// This file is about which source the middleware takes the id from. Whether
+// the caller is on the project is a separate rule with its own integration
+// coverage, so it is stubbed here and only its allow/deny effect is asserted.
+vi.mock("../../../apps/api/src/utils/project-access", () => ({
+  canAccessProject: async () => state.projectAccess,
+}));
+
 const { workspaceAccess } = await import(
   "../../../apps/api/src/utils/workspace-access-middleware"
 );
@@ -86,6 +93,7 @@ function post(query: string, body: Record<string, unknown>) {
 describe("workspaceAccess lookup sources", () => {
   beforeEach(() => {
     state.lookedUpIds.length = 0;
+    state.projectAccess = true;
   });
 
   it("authorizes against the body id the handler will act on", async () => {
@@ -100,6 +108,14 @@ describe("workspaceAccess lookup sources", () => {
 
     expect(res.status).toBe(403);
     expect(state.lookedUpIds).toEqual(["task-in-other-workspace"]);
+  });
+
+  it("refuses a task whose project the caller is not on", async () => {
+    state.projectAccess = false;
+
+    const res = await post("", { taskId: "task-in-my-workspace" });
+
+    expect(res.status).toBe(403);
   });
 
   it("does not let a query id override the body id the handler acts on", async () => {

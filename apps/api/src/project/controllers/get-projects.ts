@@ -1,6 +1,7 @@
 import { and, count, eq, isNull, min, sql } from "drizzle-orm";
 import db from "../../database";
 import { columnTable, projectTable, taskTable } from "../../database/schema";
+import { visibleProjectCondition } from "../../utils/project-access";
 
 type ProjectStatistics = {
   completionPercentage: number;
@@ -79,14 +80,26 @@ async function getProjectStatistics(
   return statisticsByProject;
 }
 
-async function getProjects(workspaceId: string, includeArchived = false) {
+type GetProjectsOptions = {
+  includeArchived?: boolean;
+  // The caller, and whether they reach projects they are not a member of. The
+  // statistics query is scoped by workspace only, which is safe: its rows are
+  // keyed by project id and only projects that survive the visibility filter
+  // are ever read out of the map.
+  userId: string;
+  seesAllProjects: boolean;
+};
+
+async function getProjects(
+  workspaceId: string,
+  { includeArchived = false, userId, seesAllProjects }: GetProjectsOptions,
+) {
   const projects = await db.query.projectTable.findMany({
-    where: includeArchived
-      ? eq(projectTable.workspaceId, workspaceId)
-      : and(
-          eq(projectTable.workspaceId, workspaceId),
-          isNull(projectTable.archivedAt),
-        ),
+    where: and(
+      eq(projectTable.workspaceId, workspaceId),
+      includeArchived ? undefined : isNull(projectTable.archivedAt),
+      visibleProjectCondition(userId, seesAllProjects),
+    ),
     // `id` is the deterministic tie-breaker: without it, rows sharing both a
     // position and a createdAt come back in an unspecified order.
     orderBy: (project, { asc }) => [

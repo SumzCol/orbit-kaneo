@@ -878,7 +878,17 @@
 			"copy": "コピー",
 			"copiedToast": "コピーしました",
 			"toastUpdated": "公開設定を更新しました",
-			"toastUpdateError": "公開設定の更新に失敗しました"
+			"toastUpdateError": "公開設定の更新に失敗しました",
+			"memberAddedToast": "Member added",
+			"memberAddErrorToast": "Failed to add the member",
+			"memberRemove": "Remove",
+			"memberRemovedToast": "Member removed",
+			"memberRemoveErrorToast": "Failed to remove the member",
+			"membersAdd": "Add",
+			"membersAddPlaceholder": "Select a workspace member",
+			"membersEmpty": "No members yet",
+			"membersSectionSubtitle": "Only these people can open this project. Workspace administrators always can.",
+			"membersSectionTitle": "Project members"
 		},
 		"projectWorkflow": {
 			"pageTitle": "ワークフロー設定",
