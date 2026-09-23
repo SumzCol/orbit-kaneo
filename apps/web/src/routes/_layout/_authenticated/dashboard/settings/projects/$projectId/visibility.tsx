@@ -3,6 +3,7 @@ import { createFileRoute, useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PageTitle from "@/components/page-title";
+import useAuth from "@/components/providers/auth-provider/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const { projectId } = useParams({ strict: false });
   const { data: workspace } = useActiveWorkspace();
   const { data: project } = useGetProject({
@@ -107,6 +109,21 @@ function RouteComponent() {
       }
     },
     [project, removeProjectMember, t],
+  );
+
+  // Mirrors what the API refuses, so the button explains itself instead of
+  // turning into a toast.
+  const removalBlockedReason = useCallback(
+    (userId: string) => {
+      if (userId === user?.id) {
+        return t("settings:projectVisibility.memberRemoveSelfHint");
+      }
+      if (projectMembers.length <= 1) {
+        return t("settings:projectVisibility.memberRemoveLastHint");
+      }
+      return null;
+    },
+    [user?.id, projectMembers.length, t],
   );
 
   const handleToggle = useCallback(async () => {
@@ -231,9 +248,16 @@ function RouteComponent() {
           </div>
 
           <div className="space-y-4 border border-border rounded-md p-4 bg-sidebar">
+            {!canShare && (
+              <p className="text-xs text-muted-foreground">
+                {t("settings:projectVisibility.membersManageHint")}
+              </p>
+            )}
+
             <div className="flex items-center gap-2">
               <Select
                 value={memberToAdd}
+                disabled={!canShare}
                 onValueChange={(value) => {
                   if (typeof value === "string") setMemberToAdd(value);
                 }}
@@ -257,7 +281,7 @@ function RouteComponent() {
               </Select>
               <Button
                 size="sm"
-                disabled={!memberToAdd}
+                disabled={!canShare || !memberToAdd}
                 onClick={() => void handleAddMember()}
               >
                 {t("settings:projectVisibility.membersAdd")}
@@ -290,6 +314,17 @@ function RouteComponent() {
                     <Button
                       size="sm"
                       variant="ghost"
+                      // The visible label is the same on every row, so the
+                      // accessible name has to carry which member it removes.
+                      aria-label={t(
+                        "settings:projectVisibility.memberRemoveLabel",
+                        { name: member.name },
+                      )}
+                      title={removalBlockedReason(member.userId) ?? undefined}
+                      disabled={
+                        !canShare ||
+                        removalBlockedReason(member.userId) !== null
+                      }
                       onClick={() => void handleRemoveMember(member.userId)}
                     >
                       {t("settings:projectVisibility.memberRemove")}

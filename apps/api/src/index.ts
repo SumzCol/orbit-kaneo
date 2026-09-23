@@ -274,7 +274,7 @@ export function createApp() {
       tags: ["Assets"],
       summary: "Download asset",
       description:
-        "Download an uploaded asset. Readable without signing in only when it belongs to a public project; image types are served inline, everything else as an attachment.",
+        "Download an uploaded asset. Readable without signing in only when it belongs to a public project; otherwise only by the project's own members. Image types are served inline, everything else as an attachment.",
       security: [],
       request: { params: z.object({ id: z.string() }) },
       responses: {
@@ -296,6 +296,7 @@ export function createApp() {
           mimeType: schema.assetTable.mimeType,
           filename: schema.assetTable.filename,
           workspaceId: schema.assetTable.workspaceId,
+          projectId: schema.assetTable.projectId,
           isPublic: schema.projectTable.isPublic,
         })
         .from(schema.assetTable)

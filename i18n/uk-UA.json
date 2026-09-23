@@ -727,7 +727,11 @@
 			"membersAddPlaceholder": "Select a workspace member",
 			"membersEmpty": "No members yet",
 			"membersSectionSubtitle": "Only these people can open this project. Workspace administrators always can.",
-			"membersSectionTitle": "Project members"
+			"membersSectionTitle": "Project members",
+			"memberRemoveLabel": "Remove {{name}}",
+			"memberRemoveSelfHint": "You cannot remove yourself from a project",
+			"memberRemoveLastHint": "A project must keep at least one member",
+			"membersManageHint": "Only people who can share this project may change who is on it."
 		},
 		"projectWorkflow": {
 			"pageTitle": "Налаштування робочого процесу",

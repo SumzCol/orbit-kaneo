@@ -3514,7 +3514,7 @@
           "Assets"
         ],
         "summary": "Download asset",
-        "description": "Download an uploaded asset. Readable without signing in only when it belongs to a public project; image types are served inline, everything else as an attachment.",
+        "description": "Download an uploaded asset. Readable without signing in only when it belongs to a public project; otherwise only by the project's own members. Image types are served inline, everything else as an attachment.",
         "security": [],
         "parameters": [
           {
@@ -6234,7 +6234,7 @@
           "Projects"
         ],
         "summary": "Reorder projects",
-        "description": "Set the sidebar order of a workspace's projects. The given positions express relative order only -- the workspace is renumbered to 0..n-1.",
+        "description": "Set the sidebar order of a workspace's projects. The given positions express relative order only -- the workspace is renumbered to 0..n-1. Only projects the caller can open may be named, and only those are returned.",
         "parameters": [
           {
             "schema": {
@@ -6308,7 +6308,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, missing project:update permission, or a project the caller cannot open",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6493,7 +6493,7 @@
           "Projects"
         ],
         "summary": "Add project member",
-        "description": "Give a workspace member access to this project. Available to the project's existing members and to whoever administers the workspace. Adding someone who is already a member succeeds without changing anything.",
+        "description": "Give a workspace member access to this project. Requires the project:share permission, the same one that governs the project's public link. Adding someone who is already a member succeeds without changing anything.",
         "parameters": [
           {
             "schema": {
@@ -6548,7 +6548,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing project:share permission",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6577,7 +6577,7 @@
           "Projects"
         ],
         "summary": "Remove project member",
-        "description": "Take away a member's access to this project. Available to the project's existing members and to whoever administers the workspace.",
+        "description": "Take away a member's access to this project, closing any board they have open on it. Requires the project:share permission. A project always keeps at least one member, and nobody can remove themselves.",
         "parameters": [
           {
             "schema": {
@@ -6608,7 +6608,7 @@
             }
           },
           "400": {
-            "description": "Project workspace could not be determined",
+            "description": "Project workspace could not be determined, the caller is removing themselves, or this is the project's last member",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6621,7 +6621,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing project:share permission",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7282,7 +7282,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, missing task:update permission, or no access to the source or destination project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9626,7 +9626,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing label:create permission",
+            "description": "No workspace access, missing label:create permission, or no access to the task's project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9902,7 +9902,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing label:update permission",
+            "description": "No workspace access, missing label:update permission, or no access to the task's project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11087,7 +11087,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:create permission",
+            "description": "No workspace access, missing task:create permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11603,7 +11603,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:create permission",
+            "description": "No workspace access, missing task:create permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13552,7 +13552,7 @@
           "Task Relations"
         ],
         "summary": "Get task relations",
-        "description": "Get every relation where the task is the source or the target, each with a summary of both linked tasks. Relations pointing outside the caller's workspace are omitted.",
+        "description": "Get every relation where the task is the source or the target, each with a summary of both linked tasks. Relations pointing outside the caller's workspace, or into a project they cannot open, are omitted.",
         "parameters": [
           {
             "schema": {
@@ -13667,7 +13667,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, missing task:update permission, or no access to the source or target task's project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13732,7 +13732,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, missing task:update permission, or no access to the source task's project",
             "content": {
               "text/plain": {
                 "schema": {

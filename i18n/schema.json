@@ -3777,6 +3777,18 @@
 						},
 						"memberRemove": {
 							"type": "string"
+						},
+						"memberRemoveLabel": {
+							"type": "string"
+						},
+						"memberRemoveSelfHint": {
+							"type": "string"
+						},
+						"memberRemoveLastHint": {
+							"type": "string"
+						},
+						"membersManageHint": {
+							"type": "string"
 						}
 					},
 					"required": [
@@ -3802,7 +3814,11 @@
 						"memberAddErrorToast",
 						"memberRemovedToast",
 						"memberRemoveErrorToast",
-						"memberRemove"
+						"memberRemove",
+						"memberRemoveLabel",
+						"memberRemoveSelfHint",
+						"memberRemoveLastHint",
+						"membersManageHint"
 					]
 				},
 				"projectWorkflow": {

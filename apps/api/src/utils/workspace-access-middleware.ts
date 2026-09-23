@@ -31,8 +31,19 @@ type WorkspaceIdSource =
       idKey: string;
     };
 
+/**
+ * An id the handler will also act on, but that does not decide the request's
+ * workspace: a move destination, a relation target, the task a label is being
+ * attached to. Without these a route could pass its scoping check on one
+ * project and then reach into another.
+ */
+type ProjectAuthorizationSource =
+  | { type: "projectFromBody"; key: string }
+  | { type: "taskFromBody"; key: string };
+
 type WorkspaceAccessMiddlewareConfig = {
   sources: WorkspaceIdSource[];
+  alsoAuthorize?: ProjectAuthorizationSource[];
 };
 
 // Resolving a resource yields the project it belongs to as well as its
@@ -148,6 +159,47 @@ export function workspaceAccessMiddleware(
     // makes can read `workspaceId` from the context.
     for (const projectId of projectIds) {
       if (!(await canAccessProject(c, projectId))) {
+        throw new HTTPException(403, {
+          message: "You don't have access to this project",
+        });
+      }
+    }
+
+    // Deliberately not folded into `projectIds`: these are secondary targets,
+    // and `c.set("projectId", ...)` below must keep meaning "the project this
+    // request is scoped to".
+    for (const source of config.alsoAuthorize ?? []) {
+      const body = await readJsonObjectBody(c);
+      const rawId = body[source.key];
+
+      if (typeof rawId !== "string" || rawId.length === 0) {
+        // Absent or malformed: the route's validator rejects it a moment
+        // later, and there is nothing to authorize in the meantime.
+        continue;
+      }
+
+      const target = await lookupScope(
+        source.type === "projectFromBody" ? "project" : "task",
+        rawId,
+      );
+      const targetProjectId = target?.projectIds[0];
+
+      if (!target || !targetProjectId) {
+        throw new HTTPException(404, {
+          message:
+            source.type === "projectFromBody"
+              ? "Project not found"
+              : "Task not found",
+        });
+      }
+
+      // Same workspace first: visibility is evaluated against the workspace
+      // this request was scoped to, so a project from another workspace must
+      // never be measured against it.
+      if (
+        target.workspaceId !== workspaceId ||
+        !(await canAccessProject(c, targetProjectId))
+      ) {
         throw new HTTPException(403, {
           message: "You don't have access to this project",
         });
@@ -378,8 +430,14 @@ export const workspaceAccess = {
   fromQuery: (key = "workspaceId") =>
     workspaceAccessMiddleware({ sources: [{ type: "query", key }] }),
 
-  fromBody: (key = "workspaceId") =>
-    workspaceAccessMiddleware({ sources: [{ type: "body", key }] }),
+  fromBody: (
+    key = "workspaceId",
+    alsoAuthorize?: ProjectAuthorizationSource[],
+  ) =>
+    workspaceAccessMiddleware({
+      sources: [{ type: "body", key }],
+      alsoAuthorize,
+    }),
 
   fromParam: (key = "workspaceId") =>
     workspaceAccessMiddleware({ sources: [{ type: "param", key }] }),
@@ -389,20 +447,25 @@ export const workspaceAccess = {
       sources: [{ type: "lookup", resource: "project", idKey }],
     }),
 
-  fromTask: (idKey = "id") =>
+  fromTask: (idKey = "id", alsoAuthorize?: ProjectAuthorizationSource[]) =>
     workspaceAccessMiddleware({
       sources: [
         { type: "lookup", resource: "task", idKey },
         { type: "query", key: "workspaceId" },
       ],
+      alsoAuthorize,
     }),
 
-  fromTaskId: (idKey = "taskId") =>
+  fromTaskId: (
+    idKey = "taskId",
+    alsoAuthorize?: ProjectAuthorizationSource[],
+  ) =>
     workspaceAccessMiddleware({
       sources: [
         { type: "lookup", resource: "task", idKey },
         { type: "query", key: "workspaceId" },
       ],
+      alsoAuthorize,
     }),
 
   fromTasks: (idKey = "taskIds") =>
@@ -410,12 +473,13 @@ export const workspaceAccess = {
       sources: [{ type: "lookupMany", resource: "task", idKey }],
     }),
 
-  fromLabel: (idKey = "id") =>
+  fromLabel: (idKey = "id", alsoAuthorize?: ProjectAuthorizationSource[]) =>
     workspaceAccessMiddleware({
       sources: [
         { type: "lookup", resource: "label", idKey },
         { type: "query", key: "workspaceId" },
       ],
+      alsoAuthorize,
     }),
 
   fromTimeEntry: (idKey = "id") =>

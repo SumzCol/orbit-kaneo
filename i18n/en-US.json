@@ -969,7 +969,11 @@
 			"memberAddErrorToast": "Failed to add the member",
 			"memberRemovedToast": "Member removed",
 			"memberRemoveErrorToast": "Failed to remove the member",
-			"memberRemove": "Remove"
+			"memberRemove": "Remove",
+			"memberRemoveLabel": "Remove {{name}}",
+			"memberRemoveSelfHint": "You cannot remove yourself from a project",
+			"memberRemoveLastHint": "A project must keep at least one member",
+			"membersManageHint": "Only people who can share this project may change who is on it."
 		},
 		"projectWorkflow": {
 			"pageTitle": "Workflow Settings",

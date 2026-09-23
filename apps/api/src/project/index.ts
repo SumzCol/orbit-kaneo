@@ -111,7 +111,7 @@ const reorderProjectsRoute = createRoute({
   tags: ["Projects"],
   summary: "Reorder projects",
   description:
-    "Set the sidebar order of a workspace's projects. The given positions express relative order only -- the workspace is renumbered to 0..n-1.",
+    "Set the sidebar order of a workspace's projects. The given positions express relative order only -- the workspace is renumbered to 0..n-1. Only projects the caller can open may be named, and only those are returned.",
   middleware: [
     workspaceAccess.fromQuery(),
     requireWorkspacePermission({ project: ["update"] }),
@@ -129,7 +129,7 @@ const reorderProjectsRoute = createRoute({
     200: jsonResponse("The reordered projects", z.array(projectSchema)),
     400: errorResponse("Invalid body, or workspace ID could not be determined"),
     403: errorResponse(
-      "No workspace access, or missing project:update permission",
+      "No workspace access, missing project:update permission, or a project the caller cannot open",
     ),
   },
 });
@@ -259,8 +259,13 @@ const addProjectMemberRoute = createRoute({
   tags: ["Projects"],
   summary: "Add project member",
   description:
-    "Give a workspace member access to this project. Available to the project's existing members and to whoever administers the workspace. Adding someone who is already a member succeeds without changing anything.",
-  middleware: [workspaceAccess.fromProject()] as const,
+    "Give a workspace member access to this project. Requires the project:share permission, the same one that governs the project's public link. Adding someone who is already a member succeeds without changing anything.",
+  // Reaching a project is not the same as deciding who else reaches it, so
+  // this is gated on a workspace permission rather than on membership alone.
+  middleware: [
+    workspaceAccess.fromProject(),
+    requireWorkspacePermission({ project: ["share"] }),
+  ] as const,
   request: {
     params: projectParam,
     body: {
@@ -271,7 +276,9 @@ const addProjectMemberRoute = createRoute({
   responses: {
     200: jsonResponse("The membership", projectMembershipSchema),
     400: errorResponse("Invalid body, or the user is not a workspace member"),
-    403: errorResponse("No access to the project"),
+    403: errorResponse(
+      "No access to the project, or missing project:share permission",
+    ),
     404: errorResponse("Unknown project"),
   },
 });
@@ -283,13 +290,20 @@ const removeProjectMemberRoute = createRoute({
   tags: ["Projects"],
   summary: "Remove project member",
   description:
-    "Take away a member's access to this project. Available to the project's existing members and to whoever administers the workspace.",
-  middleware: [workspaceAccess.fromProject()] as const,
+    "Take away a member's access to this project, closing any board they have open on it. Requires the project:share permission. A project always keeps at least one member, and nobody can remove themselves.",
+  middleware: [
+    workspaceAccess.fromProject(),
+    requireWorkspacePermission({ project: ["share"] }),
+  ] as const,
   request: { params: projectMemberParam },
   responses: {
     200: jsonResponse("The removed membership", projectMembershipSchema),
-    400: errorResponse("Project workspace could not be determined"),
-    403: errorResponse("No access to the project"),
+    400: errorResponse(
+      "Project workspace could not be determined, the caller is removing themselves, or this is the project's last member",
+    ),
+    403: errorResponse(
+      "No access to the project, or missing project:share permission",
+    ),
     404: errorResponse("The user is not a member of this project"),
   },
 });
@@ -326,7 +340,10 @@ const project = apiRouter<BaseVariables & { workspaceId: string }>()
   .openapi(reorderProjectsRoute, async (c) => {
     const workspaceId = c.get("workspaceId");
     const { projects } = c.req.valid("json");
-    const reordered = await reorderProjectsCtrl(workspaceId, projects);
+    const reordered = await reorderProjectsCtrl(workspaceId, projects, {
+      userId: c.get("userId"),
+      seesAllProjects: await canSeeAllProjects(c),
+    });
     return c.json(reordered, 200);
   })
   .openapi(updateProjectRoute, async (c) => {
@@ -374,7 +391,10 @@ const project = apiRouter<BaseVariables & { workspaceId: string }>()
   })
   .openapi(removeProjectMemberRoute, async (c) => {
     const { id, userId } = c.req.valid("param");
-    return c.json(await removeProjectMemberCtrl(id, userId), 200);
+    return c.json(
+      await removeProjectMemberCtrl(id, userId, c.get("userId")),
+      200,
+    );
   });
 
 export default project;

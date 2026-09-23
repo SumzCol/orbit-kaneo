@@ -184,7 +184,11 @@ const moveTaskRoute = createRoute({
   description:
     "Move a task to another project, optionally into a named column. Both projects must be in the same workspace.",
   middleware: [
-    workspaceAccess.fromTask(),
+    // The destination is authorized alongside the task: reaching a task you
+    // can see must not let you file it into a project you cannot.
+    workspaceAccess.fromTask("id", [
+      { type: "projectFromBody", key: "destinationProjectId" },
+    ]),
     requireWorkspacePermission({ task: ["update"] }),
     requireEntitlement,
   ] as const,
@@ -202,7 +206,7 @@ const moveTaskRoute = createRoute({
     ),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission",
+      "No workspace access, missing task:update permission, or no access to the source or destination project",
     ),
     404: errorResponse("Task or destination project not found"),
   },

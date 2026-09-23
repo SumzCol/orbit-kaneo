@@ -2,12 +2,21 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { state } = vi.hoisted(() => ({
-  state: { lookedUpIds: [] as string[], projectAccess: true },
+  state: {
+    lookedUpIds: [] as string[],
+    projectAccess: true,
+    deniedProjects: [] as string[],
+  },
 }));
 
-const WORKSPACE_BY_TASK: Record<string, string> = {
+// Keyed by resource id: the mocked lookups only ever need the workspace an id
+// resolves to, whether it is a task or a project.
+const WORKSPACE_BY_ID: Record<string, string> = {
   "task-in-my-workspace": "workspace-mine",
   "task-in-other-workspace": "workspace-theirs",
+  "project-visible": "workspace-mine",
+  "project-hidden": "workspace-mine",
+  "project-in-other-workspace": "workspace-theirs",
 };
 
 vi.mock("../../../apps/api/src/database", async () => {
@@ -36,7 +45,7 @@ vi.mock("../../../apps/api/src/database", async () => {
         return [];
       }
       state.lookedUpIds.push(boundId);
-      const workspaceId = WORKSPACE_BY_TASK[boundId];
+      const workspaceId = WORKSPACE_BY_ID[boundId];
       return workspaceId ? [{ workspaceId }] : [];
     },
   };
@@ -61,7 +70,8 @@ vi.mock("../../../apps/api/src/utils/validate-workspace-access", async () => {
 // the caller is on the project is a separate rule with its own integration
 // coverage, so it is stubbed here and only its allow/deny effect is asserted.
 vi.mock("../../../apps/api/src/utils/project-access", () => ({
-  canAccessProject: async () => state.projectAccess,
+  canAccessProject: async (_c: unknown, projectId: string) =>
+    state.projectAccess && !state.deniedProjects.includes(projectId),
 }));
 
 const { workspaceAccess } = await import(
@@ -71,15 +81,26 @@ const { workspaceAccess } = await import(
 // Mirrors POST /api/activity/comment: there is no `taskId` path param, the id
 // travels in the JSON body, and the handler acts on that body value.
 function buildApp() {
-  return new Hono()
-    .use("*", async (c, next) => {
-      c.set("userId", "user-1");
-      return next();
-    })
-    .post("/comment", workspaceAccess.fromTaskId(), async (c) => {
-      const body = (await c.req.json()) as { taskId: string };
-      return c.json({ actedOn: body.taskId });
-    });
+  return (
+    new Hono()
+      .use("*", async (c, next) => {
+        c.set("userId", "user-1");
+        return next();
+      })
+      .post("/comment", workspaceAccess.fromTaskId(), async (c) => {
+        const body = (await c.req.json()) as { taskId: string };
+        return c.json({ actedOn: body.taskId });
+      })
+      // Mirrors PUT /api/task/move/{id}: the task decides the workspace, and the
+      // body names a second project the handler will also write to.
+      .post(
+        "/move",
+        workspaceAccess.fromTaskId("taskId", [
+          { type: "projectFromBody", key: "destinationProjectId" },
+        ]),
+        async (c) => c.json({ ok: true }),
+      )
+  );
 }
 
 function post(query: string, body: Record<string, unknown>) {
@@ -94,6 +115,7 @@ describe("workspaceAccess lookup sources", () => {
   beforeEach(() => {
     state.lookedUpIds.length = 0;
     state.projectAccess = true;
+    state.deniedProjects.length = 0;
   });
 
   it("authorizes against the body id the handler will act on", async () => {
@@ -125,5 +147,59 @@ describe("workspaceAccess lookup sources", () => {
 
     expect(state.lookedUpIds).toEqual(["task-in-other-workspace"]);
     expect(res.status).toBe(403);
+  });
+});
+
+describe("workspaceAccess secondary targets", () => {
+  beforeEach(() => {
+    state.lookedUpIds.length = 0;
+    state.projectAccess = true;
+    state.deniedProjects.length = 0;
+  });
+
+  function move(body: Record<string, unknown>) {
+    return buildApp().request("/move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("allows a destination the caller can open", async () => {
+    const res = await move({
+      taskId: "task-in-my-workspace",
+      destinationProjectId: "project-visible",
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("refuses a destination the caller cannot open", async () => {
+    state.deniedProjects.push("project-hidden");
+
+    const res = await move({
+      taskId: "task-in-my-workspace",
+      destinationProjectId: "project-hidden",
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("refuses a destination in another workspace", async () => {
+    const res = await move({
+      taskId: "task-in-my-workspace",
+      destinationProjectId: "project-in-other-workspace",
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("refuses a destination that does not exist", async () => {
+    const res = await move({
+      taskId: "task-in-my-workspace",
+      destinationProjectId: "project-gone",
+    });
+
+    expect(res.status).toBe(404);
   });
 });

@@ -4,6 +4,8 @@ export type ProjectBroadcastMessage = {
   taskId?: string;
   sourceTaskId?: string;
   targetTaskId?: string;
+  /** Only set on PROJECT_ACCESS_REVOKED: whose connections to close. */
+  userId?: string;
 };
 
 export type BroadcastMessage = {
