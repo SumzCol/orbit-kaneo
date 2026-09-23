@@ -14,6 +14,16 @@ import { RedisBroadcastAdapter } from "./redis-broadcast-adapter";
 
 const INSTANCE_ID = randomUUID();
 
+/**
+ * Control message rather than a client notification: it never reaches a
+ * socket, it closes one. Access is checked once at upgrade time, so without it
+ * a removed member keeps receiving a project's events until they reconnect.
+ */
+const PROJECT_ACCESS_REVOKED = "PROJECT_ACCESS_REVOKED";
+
+// 4403 mirrors the HTTP status the reconnect attempt will get.
+const ACCESS_REVOKED_CLOSE_CODE = 4403;
+
 type ProjectConnection = {
   ws: WSContext;
   userId: string;
@@ -113,6 +123,15 @@ export async function initializeWebSocketAdapter() {
 
   try {
     await nextAdapter.subscribe((msg: BroadcastMessage) => {
+      if (msg.message.type === PROJECT_ACCESS_REVOKED) {
+        if (msg.message.userId) {
+          closeLocalProjectConnectionsForUser(
+            msg.projectId,
+            msg.message.userId,
+          );
+        }
+        return;
+      }
       deliverToLocalConnections(
         msg.projectId,
         msg.message,
@@ -178,6 +197,55 @@ function deliverToLocalConnections(
   if (connections.size === 0) {
     projectConnections.delete(projectId);
   }
+}
+
+function closeLocalProjectConnectionsForUser(
+  projectId: string,
+  userId: string,
+) {
+  const connections = projectConnections.get(projectId);
+  if (!connections) return;
+
+  for (const conn of connections) {
+    if (conn.userId !== userId) continue;
+    try {
+      conn.ws.close(ACCESS_REVOKED_CLOSE_CODE, "Project access revoked");
+    } catch {
+      // Already gone; dropping it reaches the same end state.
+    }
+    connections.delete(conn);
+  }
+
+  if (connections.size === 0) {
+    projectConnections.delete(projectId);
+  }
+}
+
+/**
+ * Drops a user's live connections to a project on every instance, for when
+ * their access to it is taken away.
+ */
+export function revokeProjectAccess(projectId: string, userId: string) {
+  closeLocalProjectConnectionsForUser(projectId, userId);
+
+  if (!adapter) {
+    return;
+  }
+
+  // Published straight through rather than queued: the batching queue's dedup
+  // key does not include the user, so two revocations in the same window would
+  // collapse into one.
+  void adapter
+    .publish({
+      projectId,
+      message: { type: PROJECT_ACCESS_REVOKED, projectId, userId },
+    })
+    .catch((err) => {
+      console.error(
+        `Failed to publish an access revocation for project ${projectId}:`,
+        err,
+      );
+    });
 }
 
 export function addConnection(

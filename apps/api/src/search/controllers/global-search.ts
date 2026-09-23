@@ -8,6 +8,7 @@ import {
   workspaceTable,
   workspaceUserTable,
 } from "../../database/schema";
+import { visibleProjectCondition } from "../../utils/project-access";
 import { escapeLikePattern } from "../like-pattern";
 import { TASK_SHORT_ID_PATTERN } from "../task-short-id";
 
@@ -25,6 +26,10 @@ type SearchParams = {
   workspaceId?: string;
   projectId?: string;
   limit?: number;
+  // Whether the caller reaches projects they are not a member of. Resolved by
+  // the route against the workspace being searched, so search agrees with what
+  // the sidebar shows.
+  seesAllProjects?: boolean;
 };
 
 type SearchResult = {
@@ -109,6 +114,7 @@ async function globalSearch(params: SearchParams): Promise<{
     workspaceId,
     projectId,
     limit = 20,
+    seesAllProjects = false,
   } = params;
 
   let resolvedUserId = userId;
@@ -144,9 +150,16 @@ async function globalSearch(params: SearchParams): Promise<{
   const results: SearchResult[] = [];
   const searchPattern = `%${query.toLowerCase()}%`;
 
-  const workspaceFilter = workspaceId
-    ? eq(projectTable.workspaceId, workspaceId)
-    : inArray(projectTable.workspaceId, accessibleWorkspaceIds);
+  // Every query below reaches its rows through `projectTable`, so folding the
+  // membership rule into the shared workspace filter keeps tasks, projects,
+  // comments and activities of a project the caller cannot open out of all of
+  // them at once.
+  const workspaceFilter = and(
+    workspaceId
+      ? eq(projectTable.workspaceId, workspaceId)
+      : inArray(projectTable.workspaceId, accessibleWorkspaceIds),
+    visibleProjectCondition(resolvedUserId, seesAllProjects),
+  );
 
   // Check if query matches short-id pattern (e.g. "DEP-23"). `generateProjectSlug`
   // normalizes to NFKC before it stores a key, so the query is normalized too,

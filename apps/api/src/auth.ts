@@ -41,6 +41,7 @@ import {
 import { syncWorkspaceSeats } from "./billing/controllers/sync-seats";
 import db, { schema } from "./database";
 import { publishEvent } from "./events";
+import revokeWorkspaceProjectMemberships from "./project/controllers/revoke-workspace-project-memberships";
 import deleteAccountData from "./user/controllers/delete-account-data";
 import { checkRegistrationAllowed } from "./utils/check-registration-allowed";
 import { checkWorkspaceName } from "./utils/check-workspace-name";
@@ -474,6 +475,23 @@ export const auth = betterAuth({
         },
         afterRemoveMember: async ({ member }) => {
           if (member?.organizationId) {
+            // Awaited, unlike the seat sync: this is a revocation, and the
+            // project rows outlive the workspace membership that justified
+            // them.
+            if (member.userId) {
+              try {
+                await revokeWorkspaceProjectMemberships(
+                  member.organizationId,
+                  member.userId,
+                );
+              } catch (error) {
+                console.error(
+                  "Failed to revoke project memberships after member remove:",
+                  error,
+                );
+              }
+            }
+
             void syncWorkspaceSeats(member.organizationId).catch((error) => {
               console.error("Seat sync after member remove failed:", error);
             });

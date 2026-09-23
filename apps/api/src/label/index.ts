@@ -66,7 +66,12 @@ const createLabelRoute = createRoute({
   summary: "Create label",
   description: "Create a new label in a workspace",
   middleware: [
-    workspaceAccess.fromBody(),
+    // A label can be created already attached to a task, so the task's project
+    // is authorized here too; the workspace alone would let a non-member write
+    // into a project they cannot see.
+    workspaceAccess.fromBody("workspaceId", [
+      { type: "taskFromBody", key: "taskId" },
+    ]),
     requireWorkspacePermission({ label: ["create"] }),
   ] as const,
   request: {
@@ -79,7 +84,7 @@ const createLabelRoute = createRoute({
     200: jsonResponse("Label created successfully", labelSchema),
     400: errorResponse("Invalid body, or workspace ID could not be determined"),
     403: errorResponse(
-      "No workspace access, or missing label:create permission",
+      "No workspace access, missing label:create permission, or no access to the task's project",
     ),
     404: errorResponse("Task not found"),
   },
@@ -111,7 +116,9 @@ const attachLabelToTaskRoute = createRoute({
   summary: "Attach label to task",
   description: "Attach an existing label to a task",
   middleware: [
-    workspaceAccess.fromLabel(),
+    // A workspace-level label carries no project of its own, so the task in
+    // the body is what decides which project this attaches to.
+    workspaceAccess.fromLabel("id", [{ type: "taskFromBody", key: "taskId" }]),
     requireWorkspacePermission({ label: ["update"] }),
   ] as const,
   request: {
@@ -127,7 +134,7 @@ const attachLabelToTaskRoute = createRoute({
       "Unknown label, or label and task belong to different workspaces",
     ),
     403: errorResponse(
-      "No workspace access, or missing label:update permission",
+      "No workspace access, missing label:update permission, or no access to the task's project",
     ),
     404: errorResponse("Task not found"),
   },

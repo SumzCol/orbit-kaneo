@@ -14,7 +14,22 @@ In your workspace:
 3. Send invitations to teammates.
 4. Track active and pending members in the members table.
 
-## 2. Assign clear ownership
+## 2. Decide who is on each project
+
+A project is visible only to the people added to it. Everyone else in the workspace stops seeing it in the sidebar, in search, on the board, and over the realtime connection.
+
+Two exceptions keep this workable:
+
+- Whoever administers the workspace sees every project in it.
+- Whoever creates a project is added to it automatically.
+
+Manage the list in **Settings -> Projects -> Visibility**. Changing who is on a project needs the same `project:share` permission as its public link, so workspace administrators and any custom role that carries it. Only people who are already in the workspace can be added, a project always keeps at least one member, and nobody can remove themselves.
+
+Removing someone takes effect immediately: any board they have open on that project disconnects. Removing someone from the workspace removes them from its projects too.
+
+When you upgrade an existing instance, every current workspace member is added to every project in their workspace, so nothing disappears on the day of the upgrade. Prune from there, project by project.
+
+## 3. Assign clear ownership
 
 For each active task:
 
@@ -22,7 +37,7 @@ For each active task:
 - Use due dates for time-sensitive work
 - Set priority to support tradeoff decisions
 
-## 3. Standardize labels
+## 4. Standardize labels
 
 Use labels to create a shared language across the team. Manage them at the workspace level in **Settings -> Workspace -> Labels** (see [Manage workspace labels](/core/functional/manage-workspace-labels)).
 
@@ -32,7 +47,7 @@ Examples:
 - Domain: `api`, `web`, `infra`
 - Risk/impact: `critical`, `customer-impact`
 
-## 4. Use views intentionally
+## 5. Use views intentionally
 
 - **Board** for daily execution
 - **List** for compact review and cleanup
@@ -40,7 +55,7 @@ Examples:
 
 Switch views depending on the meeting or decision you are making.
 
-## 5. Keep communication in the task
+## 6. Keep communication in the task
 
 When scope, ownership, or timing changes, update the task directly so project history remains visible.
 

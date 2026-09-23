@@ -879,7 +879,21 @@
 			"copy": "Kopyala",
 			"copiedToast": "Kopyalandı",
 			"toastUpdated": "Görünürlük yeniləndi",
-			"toastUpdateError": "Görünürlüğü yeniləmək alınmadı"
+			"toastUpdateError": "Görünürlüğü yeniləmək alınmadı",
+			"memberAddedToast": "Member added",
+			"memberAddErrorToast": "Failed to add the member",
+			"memberRemove": "Remove",
+			"memberRemovedToast": "Member removed",
+			"memberRemoveErrorToast": "Failed to remove the member",
+			"membersAdd": "Add",
+			"membersAddPlaceholder": "Select a workspace member",
+			"membersEmpty": "No members yet",
+			"membersSectionSubtitle": "Only these people can open this project. Workspace administrators always can.",
+			"membersSectionTitle": "Project members",
+			"memberRemoveLabel": "Remove {{name}}",
+			"memberRemoveSelfHint": "You cannot remove yourself from a project",
+			"memberRemoveLastHint": "A project must keep at least one member",
+			"membersManageHint": "Only people who can share this project may change who is on it."
 		},
 		"projectWorkflow": {
 			"pageTitle": "İş axını parametrləri",
