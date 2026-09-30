@@ -19,7 +19,7 @@ concurrency:
 jobs:
   publish:
     # npm provenance and trusted publishing require a GitHub-hosted runner.
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     if: ${{ github.event_name == 'push' || startsWith(github.event.release.tag_name, 'mcp-v') }}
     permissions:
       # gh release create needs contents: write; npm publish --provenance needs id-token: write.
