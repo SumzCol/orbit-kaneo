@@ -26,6 +26,14 @@ jobs:
       # org-wide names `api` and `web`, which any other SumzCol repository
       # would push straight into.
       image_prefix: orbit-
+      # build-images publishes only from the ref named here, and verifies the
+      # same ref again in verify-release-source.mjs. Upstream's default is main;
+      # this fork deploys what is on orbit.
+      publish_ref: refs/heads/orbit
+      # There is no release version to stamp or verify here. `nightly` is the
+      # mode that builds the run SHA as-is and rejects a version outright, which
+      # is exactly this build. The default, `released`, would demand a tag.
+      source_mode: nightly
       # `orbit` is what deployments track; the SHA tag is what makes a rollback
       # possible, since `orbit` alone has no history to roll back to.
       tags: |
