@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
+import journal from "../../apps/api/drizzle/meta/_journal.json";
 import { createApp } from "../../apps/api/src/index";
 import revokeWorkspaceProjectMemberships from "../../apps/api/src/project/controllers/revoke-workspace-project-memberships";
 import { mockAuthenticatedSession } from "./helpers/auth";
@@ -39,6 +40,19 @@ async function addWorkspaceMember(workspaceId: string, role: string) {
 
   return user;
 }
+
+// Resolved through the journal rather than by filename: the index shifts
+// whenever this branch is rebased past other migrations, and a hardcoded name
+// turns that into a failing test instead of a merge conflict.
+const backfillPath = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../apps/api/drizzle",
+  `${
+    journal.entries.find((entry) =>
+      entry.tag.endsWith("_backfill_project_members"),
+    )?.tag
+  }.sql`,
+);
 
 describe("a project is visible only to its members", () => {
   it("keeps it out of the project list for a workspace member who is not on it", async () => {
@@ -405,11 +419,7 @@ describe("the upgrade backfill", () => {
     });
 
     // Run the migration's own statement so this test fails if it drifts.
-    const migrationPath = resolve(
-      dirname(fileURLToPath(import.meta.url)),
-      "../../apps/api/drizzle/0047_backfill_project_members.sql",
-    );
-    await db.execute(sql.raw(readFileSync(migrationPath, "utf8")));
+    await db.execute(sql.raw(readFileSync(backfillPath, "utf8")));
 
     const members = await db
       .select({
@@ -435,11 +445,7 @@ describe("the upgrade backfill", () => {
     const { workspace } = await createWorkspaceMember({ role: "owner" });
     await createProjectFixture({ workspaceId: workspace.id });
 
-    const migrationPath = resolve(
-      dirname(fileURLToPath(import.meta.url)),
-      "../../apps/api/drizzle/0047_backfill_project_members.sql",
-    );
-    const statement = readFileSync(migrationPath, "utf8");
+    const statement = readFileSync(backfillPath, "utf8");
 
     await db.execute(sql.raw(statement));
     await db.execute(sql.raw(statement));
