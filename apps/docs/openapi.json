@@ -16934,7 +16934,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, missing task:update permission, or no access to the source task's project",
+            "description": "No workspace access, missing task:update permission, or no access to a linked task's project",
             "content": {
               "text/plain": {
                 "schema": {
