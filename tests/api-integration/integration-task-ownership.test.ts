@@ -321,6 +321,68 @@ describe("integration task ownership", () => {
       }),
     ).toEqual([]);
   });
+  it("a concurrent disable waits for scoped integration writes to commit", async () => {
+    const f = await setup();
+    let release!: () => void;
+    let started!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const ready = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const sync = withIntegrationTask(
+      f.task.id,
+      { ...f.integration, project: f.project },
+      async (tx) => {
+        started();
+        await barrier;
+        await tx
+          .update(schema.taskTable)
+          .set({ title: "Synced before disabling" })
+          .where(eq(schema.taskTable.id, f.task.id));
+      },
+    );
+    await ready;
+    let disabled = false;
+    const disable = db
+      .update(schema.integrationTable)
+      .set({ isActive: false })
+      .where(eq(schema.integrationTable.id, f.integration.id))
+      .then(() => {
+        disabled = true;
+      });
+    try {
+      // Key share would not hold this back: an ordinary UPDATE takes FOR NO
+      // KEY UPDATE, which key share does not conflict with.
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(disabled).toBe(false);
+    } finally {
+      release();
+    }
+    await Promise.all([sync, disable]);
+    expect(
+      await db.query.taskTable.findFirst({
+        where: eq(schema.taskTable.id, f.task.id),
+      }),
+    ).toMatchObject({ title: "Synced before disabling" });
+  });
+  it("an integration disabled before the scope opens writes nothing", async () => {
+    const f = await setup();
+    await db
+      .update(schema.integrationTable)
+      .set({ isActive: false })
+      .where(eq(schema.integrationTable.id, f.integration.id));
+    const apply = vi.fn();
+    expect(
+      await withIntegrationTask(
+        f.task.id,
+        { ...f.integration, project: f.project },
+        apply,
+      ),
+    ).toBeUndefined();
+    expect(apply).not.toHaveBeenCalled();
+  });
   it("a concurrent task move waits for scoped integration writes to commit", async () => {
     const f = await setup();
     let release!: () => void;

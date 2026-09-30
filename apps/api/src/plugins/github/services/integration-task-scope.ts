@@ -17,7 +17,9 @@ type IntegrationScope = {
 };
 
 // Key-share protects the project/workspace key while allowing task-number
-// allocation. Task locks protect their project until related writes commit.
+// allocation. The integration row is held in share mode instead, so its
+// binding cannot change under the transaction. Task locks protect their
+// project until related writes commit.
 export async function withIntegrationTask<T>(
   taskId: string | null,
   integration: IntegrationScope,
@@ -49,8 +51,25 @@ export async function withIntegrationTask<T>(
             : undefined,
         ),
       )
-      .for("key share", { of: [projectTable, integrationTable] });
+      .for("key share", { of: [projectTable] });
     if (!project) return undefined;
+    // Share mode, not key share: an ordinary UPDATE takes FOR NO KEY UPDATE,
+    // which key share does not conflict with, so the integration could be
+    // disabled or rebound while this transaction was still writing under it.
+    // The caller's own lookup happened outside this transaction, so the active
+    // state is rechecked here, under the lock that holds it still.
+    const [active] = await tx
+      .select({ id: integrationTable.id })
+      .from(integrationTable)
+      .where(
+        and(
+          eq(integrationTable.id, integration.id),
+          eq(integrationTable.projectId, integration.projectId),
+          eq(integrationTable.isActive, true),
+        ),
+      )
+      .for("share");
+    if (!active) return undefined;
     if (expectedBinding) {
       const [binding] = await tx
         .select({

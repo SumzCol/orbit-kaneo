@@ -35,13 +35,17 @@ describe("integration task ownership", () => {
   it("locks and checks the integration project, workspace and task before writing", async () => {
     m.locks
       .mockResolvedValueOnce([{ id: "project" }])
+      .mockResolvedValueOnce([{ id: "integration" }])
       .mockResolvedValueOnce([{ id: "task" }]);
     const apply = vi.fn().mockResolvedValue("updated");
     expect(await withIntegrationTask("task", integration, apply)).toBe(
       "updated",
     );
+    // Share, not key share, on the integration: an ordinary UPDATE takes FOR
+    // NO KEY UPDATE, which key share does not conflict with.
     expect(m.locks.mock.calls.map(([mode]) => mode)).toEqual([
       "key share",
+      "share",
       "no key update",
     ]);
     const predicates = m.predicates.mock.calls.map(([predicate]) =>
@@ -52,8 +56,9 @@ describe("integration task ownership", () => {
       "project",
       "workspace",
     ]);
-    expect(predicates[1].params).toEqual(["task", "project"]);
-    expect(predicates[1].sql).toContain('"task"."project_id"');
+    expect(predicates[1].params).toEqual(["integration", "project", true]);
+    expect(predicates[2].params).toEqual(["task", "project"]);
+    expect(predicates[2].sql).toContain('"task"."project_id"');
     expect(apply).toHaveBeenCalledTimes(1);
   });
   it("ignores a project moved out of the authorized workspace", async () => {
@@ -65,9 +70,22 @@ describe("integration task ownership", () => {
     expect(apply).not.toHaveBeenCalled();
     expect(m.locks).toHaveBeenCalledTimes(1);
   });
+  it("ignores an integration disabled or rebound since the caller looked it up", async () => {
+    m.locks
+      .mockResolvedValueOnce([{ id: "project" }])
+      .mockResolvedValueOnce([]);
+    const apply = vi.fn();
+    expect(
+      await withIntegrationTask("task", integration, apply),
+    ).toBeUndefined();
+    expect(apply).not.toHaveBeenCalled();
+    // The task is never locked: the scope is abandoned at the binding.
+    expect(m.locks).toHaveBeenCalledTimes(2);
+  });
   it("ignores a stale link to a task moved into a different project", async () => {
     m.locks
       .mockResolvedValueOnce([{ id: "project" }])
+      .mockResolvedValueOnce([{ id: "integration" }])
       .mockResolvedValueOnce([]);
     const apply = vi.fn();
     expect(
@@ -78,6 +96,7 @@ describe("integration task ownership", () => {
   it("publishes effects only after committing the scoped writes", async () => {
     m.locks
       .mockResolvedValueOnce([{ id: "project" }])
+      .mockResolvedValueOnce([{ id: "integration" }])
       .mockResolvedValueOnce([{ id: "task" }]);
     const effect = vi.fn(async () => {
       expect(m.commit).toHaveBeenCalledTimes(1);
@@ -95,6 +114,7 @@ describe("integration task ownership", () => {
   it("does not publish an event when related writes fail", async () => {
     m.locks
       .mockResolvedValueOnce([{ id: "project" }])
+      .mockResolvedValueOnce([{ id: "integration" }])
       .mockResolvedValueOnce([{ id: "task" }]);
     const effect = vi.fn();
     await expect(
