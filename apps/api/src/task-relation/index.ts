@@ -132,9 +132,13 @@ async function scopeToRelation(c: Context, next: Next) {
   // Both ends, not just the source. The deleted relation is returned to the
   // caller, so authorizing one end would hand back the id of a task in a
   // project they cannot open -- and let them cut a link they cannot see.
+  //
+  // A foreign or missing target reads as a missing relation, matching what a
+  // legacy cross-workspace row already answered: from the caller's side there
+  // is no such relation to act on, and saying more would confirm the target.
   const target = await scopeOfTask(rel.targetTaskId);
   if (!target || target.workspaceId !== source.workspaceId) {
-    throw new HTTPException(404, { message: "Task not found" });
+    throw new HTTPException(404, { message: "Task relation not found" });
   }
   if (target.projectId !== source.projectId) {
     await requireProjectAccess(c, target.projectId);
