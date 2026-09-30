@@ -109,7 +109,10 @@ async function scopeToRelation(c: Context, next: Next) {
 
   const id = c.req.param("id");
   const [rel] = await db
-    .select({ sourceTaskId: taskRelationTable.sourceTaskId })
+    .select({
+      sourceTaskId: taskRelationTable.sourceTaskId,
+      targetTaskId: taskRelationTable.targetTaskId,
+    })
     .from(taskRelationTable)
     .where(eq(taskRelationTable.id, id ?? ""))
     .limit(1);
@@ -125,6 +128,18 @@ async function scopeToRelation(c: Context, next: Next) {
   await validateWorkspaceAccess(userId, source.workspaceId);
   c.set("workspaceId", source.workspaceId);
   await requireProjectAccess(c, source.projectId);
+
+  // Both ends, not just the source. The deleted relation is returned to the
+  // caller, so authorizing one end would hand back the id of a task in a
+  // project they cannot open -- and let them cut a link they cannot see.
+  const target = await scopeOfTask(rel.targetTaskId);
+  if (!target || target.workspaceId !== source.workspaceId) {
+    throw new HTTPException(404, { message: "Task not found" });
+  }
+  if (target.projectId !== source.projectId) {
+    await requireProjectAccess(c, target.projectId);
+  }
+
   return next();
 }
 
@@ -219,7 +234,7 @@ const deleteTaskRelationRoute = createRoute({
   responses: {
     200: jsonResponse("The deleted relation", taskRelationSchema),
     403: errorResponse(
-      "No workspace access, missing task:update permission, or no access to the source task's project",
+      "No workspace access, missing task:update permission, or no access to a linked task's project",
     ),
     404: errorResponse("Task relation not found, or its source task is gone"),
   },
