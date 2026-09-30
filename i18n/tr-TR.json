@@ -2616,6 +2616,9 @@
 		"checklistProgress": "{{total}} kontrol listesi öğesinin {{completed}} tanesi tamamlandı",
 		"customFields": {
 			"ariaLabel": "Custom fields"
+		},
+		"board": {
+			"reorderFailed": "Could not move task. Please try again."
 		}
 	},
 	"invitations": {

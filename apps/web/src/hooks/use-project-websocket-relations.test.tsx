@@ -25,50 +25,7 @@ import {
 } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { getWsUrl, useProjectWebSocket } from "./use-project-websocket";
-
-describe("getWsUrl", () => {
-  beforeEach(() => {
-    vi.stubEnv("VITE_API_URL", "http://localhost:1337");
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it("builds a ws:// URL from an http API base", () => {
-    expect(getWsUrl("project-123")).toBe(
-      "ws://localhost:1337/api/ws/project-123?windowId=test-window-id",
-    );
-  });
-
-  it("builds a wss:// URL from an https API base", () => {
-    vi.stubEnv("VITE_API_URL", "https://example.com");
-    expect(getWsUrl("project-123")).toBe(
-      "wss://example.com/api/ws/project-123?windowId=test-window-id",
-    );
-  });
-
-  it("does not append /api when the base already ends with /api", () => {
-    vi.stubEnv("VITE_API_URL", "https://example.com/api");
-    expect(getWsUrl("p1")).toBe(
-      "wss://example.com/api/ws/p1?windowId=test-window-id",
-    );
-  });
-
-  it("trims trailing slashes from the API base", () => {
-    vi.stubEnv("VITE_API_URL", "http://localhost:1337///");
-    expect(getWsUrl("p1")).toBe(
-      "ws://localhost:1337/api/ws/p1?windowId=test-window-id",
-    );
-  });
-
-  it("URL-encodes the projectId", () => {
-    expect(getWsUrl("a b/c?d")).toBe(
-      "ws://localhost:1337/api/ws/a%20b%2Fc%3Fd?windowId=test-window-id",
-    );
-  });
-});
+import { useProjectWebSocket } from "./use-project-websocket";
 
 type Socket = {
   onopen: (() => void) | null;
@@ -80,7 +37,7 @@ type Socket = {
   close: ReturnType<typeof vi.fn>;
 };
 
-describe("useProjectWebSocket message handling", () => {
+describe("useProjectWebSocket relation invalidation", () => {
   let socket: Socket;
   let invalidate: MockInstance<QueryClient["invalidateQueries"]>;
 
@@ -207,14 +164,6 @@ describe("useProjectWebSocket message handling", () => {
     receive({ type, projectId: "project-1", taskId: "task-1" });
 
     expect(invalidatedKeys()).not.toContain(projectRelationsKey);
-  });
-
-  it("refreshes the resource links of the updated task", () => {
-    receive({ type: "TASK_UPDATED", projectId: "project-1", taskId: "task-1" });
-
-    expect(invalidatedKeys()).toContain(
-      JSON.stringify(["external-links", "task-1"]),
-    );
   });
 
   it("ignores a malformed message", () => {

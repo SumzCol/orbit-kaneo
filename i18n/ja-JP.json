@@ -2604,6 +2604,9 @@
 		"checklistProgress": "チェックリスト {{total}} 項目中 {{completed}} 項目完了",
 		"customFields": {
 			"ariaLabel": "Custom fields"
+		},
+		"board": {
+			"reorderFailed": "Could not move task. Please try again."
 		}
 	},
 	"invitations": {
