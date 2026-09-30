@@ -2,12 +2,13 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
 import journal from "../../apps/api/drizzle/meta/_journal.json";
 import { createApp } from "../../apps/api/src/index";
 import revokeWorkspaceProjectMemberships from "../../apps/api/src/project/controllers/revoke-workspace-project-memberships";
+import { isProjectMember } from "../../apps/api/src/utils/project-access";
 import { mockAuthenticatedSession } from "./helpers/auth";
 import { resetTestDatabase } from "./helpers/database";
 import {
@@ -452,6 +453,46 @@ describe("the upgrade backfill", () => {
 
     const rows = await db.select().from(schema.projectMemberTable);
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe("a membership that outlived its workspace membership", () => {
+  it("grants nothing, even though the row is still there", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const colleague = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, colleague.id],
+    });
+
+    // Reproduce a cleanup that did not run: drop the workspace membership and
+    // leave the project_member row behind, which is the state a failed
+    // afterRemoveMember hook leaves.
+    await db
+      .delete(schema.workspaceUserTable)
+      .where(
+        and(
+          eq(schema.workspaceUserTable.workspaceId, workspace.id),
+          eq(schema.workspaceUserTable.userId, colleague.id),
+        ),
+      );
+
+    const stale = await db
+      .select()
+      .from(schema.projectMemberTable)
+      .where(
+        and(
+          eq(schema.projectMemberTable.projectId, project.id),
+          eq(schema.projectMemberTable.userId, colleague.id),
+        ),
+      );
+    expect(stale).toHaveLength(1);
+
+    expect(await isProjectMember(project.id, colleague.id)).toBe(false);
+    // The owner is unaffected.
+    expect(await isProjectMember(project.id, owner.id)).toBe(true);
   });
 });
 

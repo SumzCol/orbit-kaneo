@@ -506,6 +506,12 @@ export const auth = betterAuth({
             // Awaited, unlike the seat sync: this is a revocation, and the
             // project rows outlive the workspace membership that justified
             // them.
+            //
+            // The failure below is logged rather than rethrown because it is
+            // no longer what enforces the revocation: `isProjectMember` joins
+            // the workspace, so a row this misses grants nothing, even if the
+            // user is later re-added. Rethrowing would fail the member removal
+            // itself over cleanup that has already stopped mattering.
             if (member.userId) {
               try {
                 await revokeWorkspaceProjectMemberships(
