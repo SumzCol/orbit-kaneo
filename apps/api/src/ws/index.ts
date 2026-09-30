@@ -16,6 +16,7 @@ import type {
   UserBroadcast,
   UserBroadcastMessage,
 } from "./broadcast-adapter";
+import { userCanAccessProject } from "../utils/project-access";
 import { InMemoryBroadcastAdapter } from "./in-memory-broadcast-adapter";
 import { RedisBroadcastAdapter } from "./redis-broadcast-adapter";
 
@@ -158,10 +159,20 @@ export async function initializeWebSocketAdapter() {
   }
 
   adapter = nextAdapter;
+  if (accessSweep === null) {
+    accessSweep = setInterval(() => {
+      void sweepRevokedConnections();
+    }, ACCESS_SWEEP_MS);
+    accessSweep.unref?.();
+  }
   console.log(`📡 WebSockets Initialized using: "${adapter.constructor.name}"`);
 }
 
 export async function shutdownWebSocketAdapter() {
+  if (accessSweep !== null) {
+    clearInterval(accessSweep);
+    accessSweep = null;
+  }
   const pendingQueues = [...projectBroadcastQueues.entries()];
 
   for (const timeout of projectBroadcastTimeouts.values()) {
@@ -234,6 +245,36 @@ function currentProjectWorkspace(projectId: string) {
     workspaceLookups.set(projectId, pending);
   }
   return pending;
+}
+
+// A connection is authorized once, at upgrade. A revocation reaches other
+// instances as a control message, and a control message can be lost: the
+// publish is best-effort and Redis can be down for it. This sweep is the
+// backstop, so a lost message costs at most one interval of access rather
+// than the lifetime of an open board. It is deliberately not on the delivery
+// path, which must not grow a database read per message.
+const ACCESS_SWEEP_MS = 30_000;
+let accessSweep: ReturnType<typeof setInterval> | null = null;
+
+export async function sweepRevokedConnections() {
+  for (const [projectId, connections] of [...projectConnections.entries()]) {
+    const userIds = new Set([...connections].map((conn) => conn.userId));
+    for (const userId of userIds) {
+      let allowed: boolean;
+      try {
+        allowed = await userCanAccessProject(projectId, userId);
+      } catch (error) {
+        // A failed lookup is not evidence of revocation; leave the connection
+        // for the next sweep rather than disconnecting on a blip.
+        console.error(
+          `Failed to revalidate project ${projectId} access:`,
+          error,
+        );
+        continue;
+      }
+      if (!allowed) closeLocalProjectConnectionsForUser(projectId, userId);
+    }
+  }
 }
 
 async function deliverToLocalConnections(

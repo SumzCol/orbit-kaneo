@@ -19,6 +19,18 @@ vi.mock("../../../apps/api/src/database", () => ({
   },
 }));
 
+// The sweep asks this rather than the database directly.
+const access = vi.hoisted(() => ({
+  allowed: new Set<string>(),
+  fail: false,
+}));
+vi.mock("../../../apps/api/src/utils/project-access", () => ({
+  userCanAccessProject: async (projectId: string, userId: string) => {
+    if (access.fail) throw new Error("lookup unavailable");
+    return access.allowed.has(`${projectId}:${userId}`);
+  },
+}));
+
 // No Redis configured means the in-memory adapter, which loops a publish
 // straight back into the subscriber, so one call covers both the local close
 // and the one an instance performs on a message from a peer.
@@ -35,6 +47,7 @@ import {
   initializeWebSocketAdapter,
   removeConnection,
   revokeProjectAccess,
+  sweepRevokedConnections,
   shutdownWebSocketAdapter,
 } from "../../../apps/api/src/ws/index";
 
@@ -115,6 +128,40 @@ describe("revokeProjectAccess", () => {
     await vi.waitFor(() => expect(kept.ws.send).toHaveBeenCalled());
 
     expect(removed.ws.send).not.toHaveBeenCalled();
+  });
+
+  // The control message is best-effort: it is published once and a Redis
+  // outage loses it. The sweep is what makes that recoverable.
+  it("closes a connection whose access is gone even if no message arrived", async () => {
+    await initializeWebSocketAdapter();
+
+    const kept = connect("proj-1", "user-kept");
+    const stale = connect("proj-1", "user-stale");
+    access.allowed.clear();
+    access.allowed.add("proj-1:user-kept");
+
+    await sweepRevokedConnections();
+
+    expect(stale.ws.close).toHaveBeenCalledWith(4403, "Project access revoked");
+    expect(kept.ws.close).not.toHaveBeenCalled();
+  });
+
+  it("leaves connections alone when the lookup fails", async () => {
+    await initializeWebSocketAdapter();
+
+    const conn = connect("proj-1", "user-kept");
+    access.allowed.clear();
+    access.fail = true;
+    try {
+      await sweepRevokedConnections();
+    } finally {
+      access.fail = false;
+    }
+
+    // The user is not in the allow set either, so only the error handling
+    // keeps this connection open: a failed lookup is not evidence of
+    // revocation.
+    expect(conn.ws.close).not.toHaveBeenCalled();
   });
 
   it("never sends the control message to a socket", async () => {
