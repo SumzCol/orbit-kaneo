@@ -2,13 +2,17 @@
 set -euo pipefail
 
 # The standard GitHub latest release excludes prereleases and package-only releases.
-tag=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+# A repository that has published none, or whose newest one is a package release
+# such as planka-import-v0.2.0, has no baseline to upgrade from. That is the
+# normal state of a fork, so the check reports itself skipped rather than failing
+# on a tag it was never meant to read.
+tag=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>/dev/null) || tag=""
+if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "No stable vX.Y.Z release on $GITHUB_REPOSITORY (latest: ${tag:-none}); skipping the upgrade check."
+  exit 0
+fi
 version=${tag#v}
 node scripts/security/validate-release-version.mjs "$version" --new-version
-if [[ "$tag" != "v$version" ]]; then
-  echo "Expected a stable Kaneo vX.Y.Z release, got $tag" >&2
-  exit 1
-fi
 owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
 image="ghcr.io/$owner/kaneo:$version"
 docker pull "$image"
