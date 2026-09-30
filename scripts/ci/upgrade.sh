@@ -19,7 +19,10 @@ if ! tag=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>"$
   fi
   tag=""
 fi
-if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+# Numeric identifiers carry no leading zero, matching validate-release-version.mjs.
+# A tag the guard admits but the validator rejects would fail the job on the very
+# path this skip exists to avoid.
+if [[ ! "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
   echo "No stable vX.Y.Z release on $GITHUB_REPOSITORY (latest: ${tag:-none}); skipping the upgrade check."
   exit 0
 fi
