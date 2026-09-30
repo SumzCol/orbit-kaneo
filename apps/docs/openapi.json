@@ -10671,7 +10671,7 @@
           "Columns"
         ],
         "summary": "Delete column",
-        "description": "Delete an empty column. A column holding tasks is refused until they are moved or deleted.",
+        "description": "Delete an empty column. A column holding tasks is refused until they are moved or deleted, and a project's last remaining column is refused so the board is never left without one.",
         "parameters": [
           {
             "schema": {
@@ -10717,7 +10717,7 @@
             }
           },
           "409": {
-            "description": "The column still contains tasks",
+            "description": "The column still contains tasks, or is the project's last column",
             "content": {
               "text/plain": {
                 "schema": {
