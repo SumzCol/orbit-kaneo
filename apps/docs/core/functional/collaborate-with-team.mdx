@@ -1,20 +1,54 @@
 ---
-title: Collaborate with Your Team
-description: Invite members, assign ownership, and keep team execution aligned
+title: "Members and roles"
+description: "Invite teammates, manage pending invitations, and choose who can change what."
 ---
 
-Good collaboration in Kaneo comes from clear ownership and consistent project conventions.
+Membership belongs to a workspace. Make sure the workspace name at the top of the sidebar is the one you want before inviting someone or changing their role.
 
-## 1. Invite members
+## Invite a teammate
 
-In your workspace:
+1. Open **Members** in the workspace sidebar.
+2. Choose **Invite member** and enter their email address.
+3. Create the invitation, then copy the link shown in the dialog.
+4. Share the link with that person. With SMTP configured, the instance can also send an invitation email.
 
-1. Open **Members**.
-2. Click **Invite member**.
-3. Send invitations to teammates.
-4. Track active and pending members in the members table.
+The person must sign in or sign up with the invited email address and accept the invitation. New invitations created from this dialog use the **Member** role. You can change the role after the person joins.
 
-## 2. Decide who is on each project
+<Frame caption="The Members page shows workspace members, their roles, and invitation controls.">
+  <img className="block dark:hidden" src="/images/product/members-light.png" alt="The Members page shows workspace members, their roles, and invitation controls." />
+  <img className="hidden dark:block" src="/images/product/members-dark.png" alt="The Members page shows workspace members, their roles, and invitation controls." />
+</Frame>
+
+## Find or cancel a pending invitation
+
+Pending invitations appear in the members table. Use the invitation's menu to copy its link again or cancel it.
+
+Cancel an invitation sent to the wrong address. If it has expired, create a new invitation. If someone sees an email mismatch, ask them to sign in with the address you invited.
+
+On an instance without email delivery, share the invitation link yourself. If email delivery reports an error, check the pending invitation before retrying; the operator may need to fix SMTP.
+
+## Choose a role
+
+Use the role selector next to a member in **Members**. You need permission to change roles; you cannot change your own role through that selector.
+
+These are the starting permissions. An administrator can edit the **Viewer**, **Member**, and **Admin** roles, so your workspace may differ.
+
+| Role | Default access |
+| --- | --- |
+| Viewer | Read projects, tasks, labels, and workspace details |
+| Member | Create projects; create and update tasks; manage labels |
+| Admin | Manage projects, tasks, members, and workspace settings |
+| Owner | Full workspace control, including deleting the workspace |
+
+Task assignment and deletion are separate permissions. A member who can edit a task may still be unable to assign or delete it.
+
+## Edit roles or create a custom role
+
+Open **Settings → Workspace → Roles** to inspect the permissions behind a role. If you have role-management permission, you can change the editable roles or create a custom one.
+
+Give people the access their work needs. For example, a reviewer may only need to read tasks, while a project lead may need to assign and delete them. The owner role is fixed.
+
+## Decide who is on each project
 
 A project is visible only to the people added to it. Everyone else in the workspace stops seeing it in the sidebar, in search, on the board, and over the realtime connection.
 
@@ -23,43 +57,25 @@ Two exceptions keep this workable:
 - Whoever administers the workspace sees every project in it.
 - Whoever creates a project is added to it automatically.
 
-Manage the list in **Settings -> Projects -> Visibility**. Changing who is on a project needs the same `project:share` permission as its public link, so workspace administrators and any custom role that carries it. Only people who are already in the workspace can be added, a project always keeps at least one member, and nobody can remove themselves.
+Manage the list in **Settings → Projects → Visibility**. Changing who is on a project needs the same `project:share` permission as its public link, so workspace administrators and any custom role that carries it. Only people who are already in the workspace can be added, a project always keeps at least one member, and nobody can remove themselves.
 
 Removing someone takes effect immediately: any board they have open on that project disconnects. Removing someone from the workspace removes them from its projects too.
 
 When you upgrade an existing instance, every current workspace member is added to every project in their workspace, so nothing disappears on the day of the upgrade. Prune from there, project by project.
 
-## 3. Assign clear ownership
+## Remove a member or transfer ownership
 
-For each active task:
+In **Members**, use the member's menu to remove them and confirm the action. They lose membership in this workspace, but their Kaneo account is not deleted.
 
-- Assign one primary owner
-- Use due dates for time-sensitive work
-- Set priority to support tradeoff decisions
+To change the owner, use **Settings → Workspace → General → Transfer ownership**. Transfer ownership before leaving or deleting your account if you are the only owner of a shared workspace.
 
-## 4. Standardize labels
+## Keep the conversation with the work
 
-Use labels to create a shared language across the team. Manage them at the workspace level in **Settings -> Workspace -> Labels** (see [Manage workspace labels](/core/functional/manage-workspace-labels)).
+Open a task to leave a comment, update its description, or choose the next assignee.
 
-Examples:
+<Frame caption="Comments stay alongside the task description and properties.">
+  <img className="block dark:hidden" src="/images/product/task-light.png" alt="Comments stay alongside the task description and properties." />
+  <img className="hidden dark:block" src="/images/product/task-dark.png" alt="Comments stay alongside the task description and properties." />
+</Frame>
 
-- Work type: `bug`, `feature`, `chore`
-- Domain: `api`, `web`, `infra`
-- Risk/impact: `critical`, `customer-impact`
-
-## 5. Use views intentionally
-
-- **Board** for daily execution
-- **List** for compact review and cleanup
-- **Backlog** for planning and grooming
-
-Switch views depending on the meeting or decision you are making.
-
-## 6. Keep communication in the task
-
-When scope, ownership, or timing changes, update the task directly so project history remains visible.
-
-## Next
-
-- [Configure project workflows](/core/functional/configure-workflows)
-- [Personalize your workspace](/core/functional/personalize-your-workspace)
+Each person can choose their own [notification settings](/core/functional/account-notifications). For updates sent to a team channel, use a [project integration](/core/integrations/index).

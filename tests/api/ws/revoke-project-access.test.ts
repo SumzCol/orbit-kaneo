@@ -1,10 +1,22 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 // ws/index.ts subscribes to events at module load; the real bus would pull in
 // the database.
 vi.mock("../../../apps/api/src/events", () => ({
   subscribeToEvent: vi.fn(),
   publishEvent: vi.fn(),
+}));
+
+// Delivery revalidates the project's workspace against the database before
+// sending, and drops any connection opened on a different one.
+vi.mock("../../../apps/api/src/database", () => ({
+  default: {
+    select: () => ({
+      from: () => ({
+        where: () => ({ limit: async () => [{ workspaceId: "workspace" }] }),
+      }),
+    }),
+  },
 }));
 
 // No Redis configured means the in-memory adapter, which loops a publish
@@ -52,7 +64,13 @@ afterEach(async () => {
 
 function connect(projectId: string, userId: string) {
   const ws = makeFakeWs();
-  const conn = addConnection(projectId, ws, userId, `${userId}:w1`);
+  const conn = addConnection(
+    projectId,
+    ws,
+    userId,
+    `${userId}:w1`,
+    "workspace",
+  );
   tracked.push({ projectId, conn });
   return { ws, conn };
 }

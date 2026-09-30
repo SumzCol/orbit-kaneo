@@ -1,12 +1,13 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, MailQuestion } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { Trans, useTranslation } from "react-i18next";
 import { z } from "zod/v4";
+import { CloudAuthLayout } from "@/components/auth/cloud-auth-layout";
 import { Logo } from "@/components/common/logo";
 import PageTitle from "@/components/page-title";
 import useAuth from "@/components/providers/auth-provider/hooks/use-auth";
@@ -20,38 +21,49 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { useFadeTransition } from "@/hooks/use-fade-transition";
 import { Spinner } from "@/components/ui/spinner";
+import useGetConfig from "@/hooks/queries/config/use-get-config";
+import {
+  DEFAULT_WORKSPACE_USAGE,
+  type WorkspaceUsage,
+} from "@/constants/onboarding";
+import { getBilling } from "@/fetchers/billing/get-billing";
 import useCreateWorkspace from "@/hooks/queries/workspace/use-create-workspace";
 import useWorkspaceCreationAccess from "@/hooks/use-workspace-creation-access";
 import { authClient } from "@/lib/auth-client";
+import { getTrialState } from "@/lib/billing";
+import { readCheckoutIntent } from "@/lib/checkout-intent";
 import { toast } from "@/lib/toast";
+import { InviteStep } from "./invite-step";
+import { PlanStep } from "./plan-step";
+import { UsagePicker } from "./usage-picker";
 
-type OnboardingStep = "workspace" | "success";
+type OnboardingStep = "workspace" | "invite" | "plan" | "success";
 
 export type WorkspaceFormValues = {
   name: string;
   description?: string;
 };
 
-function useFadeTransition() {
-  const reduceMotion = useReducedMotion();
-  return {
-    initial: { opacity: 0, y: reduceMotion ? 0 : 20 },
-    animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: reduceMotion ? 0 : -20 },
-  };
-}
-
 export function OnboardingFlow() {
   const fadeTransition = useFadeTransition();
   const { t } = useTranslation();
   const [step, setStep] = useState<OnboardingStep>("workspace");
   const [createdWorkspaceName, setCreatedWorkspaceName] = useState("");
+  const [createdWorkspaceId, setCreatedWorkspaceId] = useState<string | null>(
+    null,
+  );
+  const [usage, setUsage] = useState<WorkspaceUsage>(DEFAULT_WORKSPACE_USAGE);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { mutateAsync: createWorkspace, isPending } = useCreateWorkspace();
   const { user } = useAuth();
-  const { isCreationRestricted, isDecided } = useWorkspaceCreationAccess();
+  const { isCreationRestricted, isDecided: isAccessDecided } =
+    useWorkspaceCreationAccess();
+  const { data: config, isPending: isConfigPending } = useGetConfig();
+  const isDecided = isAccessDecided && !isConfigPending;
+  const isCloud = config?.isCloud === true;
 
   const workspaceSchema = useMemo(
     () =>
@@ -84,18 +96,23 @@ export function OnboardingFlow() {
       await authClient.organization.setActive({
         organizationId: workspace.id,
       });
+      const goToWorkspace = () => goToCreatedWorkspace(workspace.id);
+
+      if (isCloud) {
+        setCreatedWorkspaceId(workspace.id);
+        setCreatedWorkspaceName(data.name.trim());
+        if (usage === "team") {
+          setStep("invite");
+        } else {
+          await continueAfterInvites(workspace.id);
+        }
+        return;
+      }
+
       setCreatedWorkspaceName(data.name);
       toast.success(t("auth:onboarding.toast.workspaceCreated"));
-
       setStep("success");
-
-      setTimeout(() => {
-        navigate({
-          to: "/dashboard/workspace/$workspaceId",
-          params: { workspaceId: workspace.id },
-          replace: true,
-        });
-      }, 1500);
+      setTimeout(goToWorkspace, 1500);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -104,6 +121,89 @@ export function OnboardingFlow() {
       );
     }
   };
+
+  const goToCreatedWorkspace = (workspaceId: string) =>
+    navigate({
+      to: "/dashboard/workspace/$workspaceId",
+      params: { workspaceId },
+      replace: true,
+    });
+
+  const continueAfterInvites = async (workspaceId: string) => {
+    if (readCheckoutIntent()) {
+      await goToCreatedWorkspace(workspaceId);
+      return;
+    }
+    try {
+      const billing = await queryClient.fetchQuery({
+        queryKey: ["billing", workspaceId],
+        queryFn: () => getBilling(workspaceId),
+      });
+      if (getTrialState(billing).kind !== "none") {
+        setStep("plan");
+        return;
+      }
+    } catch {}
+    await goToCreatedWorkspace(workspaceId);
+  };
+
+  const isSubmitting = isPending || form.formState.isSubmitting;
+  const workspaceName = useWatch({ control: form.control, name: "name" });
+
+  const workspaceForm = (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+        <div className="space-y-3">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-medium">
+                  {t("auth:onboarding.workspaceName")}
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder={t("auth:onboarding.workspaceNamePlaceholder")}
+                    autoFocus
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-medium text-muted-foreground">
+                  {t("auth:onboarding.descriptionOptional")}
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder={t("auth:onboarding.descriptionPlaceholder")}
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {isCloud ? <UsagePicker value={usage} onChange={setUsage} /> : null}
+        </div>
+
+        <Button type="submit" disabled={isSubmitting} className="w-full mt-4">
+          {isSubmitting
+            ? t("auth:onboarding.creating")
+            : t("auth:onboarding.createWorkspace")}
+        </Button>
+      </form>
+    </Form>
+  );
 
   const renderWorkspaceStep = () => (
     <motion.div
@@ -127,60 +227,7 @@ export function OnboardingFlow() {
           </p>
         </div>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-            <div className="space-y-3">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">
-                      {t("auth:onboarding.workspaceName")}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder={t(
-                          "auth:onboarding.workspaceNamePlaceholder",
-                        )}
-                        autoFocus
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-muted-foreground">
-                      {t("auth:onboarding.descriptionOptional")}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder={t(
-                          "auth:onboarding.descriptionPlaceholder",
-                        )}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <Button type="submit" disabled={isPending} className="w-full mt-4">
-              {isPending
-                ? t("auth:onboarding.creating")
-                : t("auth:onboarding.createWorkspace")}
-            </Button>
-          </form>
-        </Form>
+        {workspaceForm}
       </div>
     </motion.div>
   );
@@ -263,6 +310,62 @@ export function OnboardingFlow() {
       </div>
     </motion.div>
   );
+  if (step === "invite" && createdWorkspaceId) {
+    return (
+      <>
+        <PageTitle title={t("auth:onboarding.workspacePageTitle")} />
+        <CloudAuthLayout
+          title={t("auth:onboarding.cloud.invite.title")}
+          subtitle={t("auth:onboarding.cloud.invite.subtitle", {
+            name: createdWorkspaceName,
+          })}
+          workspaceName={createdWorkspaceName}
+          note="invite"
+        >
+          <InviteStep
+            workspaceId={createdWorkspaceId}
+            onDone={() => continueAfterInvites(createdWorkspaceId)}
+          />
+        </CloudAuthLayout>
+      </>
+    );
+  }
+
+  if (step === "plan" && createdWorkspaceId) {
+    return (
+      <>
+        <PageTitle title={t("auth:onboarding.workspacePageTitle")} />
+        <CloudAuthLayout
+          title={t("auth:onboarding.cloud.plan.title")}
+          workspaceName={createdWorkspaceName}
+          note="plan"
+          contentClassName="max-w-xl"
+        >
+          <PlanStep
+            workspaceId={createdWorkspaceId}
+            usage={usage}
+            onContinue={() => goToCreatedWorkspace(createdWorkspaceId)}
+          />
+        </CloudAuthLayout>
+      </>
+    );
+  }
+
+  if (step === "workspace" && isCloud && isDecided && !isCreationRestricted) {
+    return (
+      <>
+        <PageTitle title={t("auth:onboarding.workspacePageTitle")} />
+        <CloudAuthLayout
+          title={t("auth:onboarding.cloud.title")}
+          subtitle={t("auth:onboarding.cloud.subtitle")}
+          workspaceName={workspaceName.trim()}
+          note="onboarding"
+        >
+          {workspaceForm}
+        </CloudAuthLayout>
+      </>
+    );
+  }
 
   return (
     <>

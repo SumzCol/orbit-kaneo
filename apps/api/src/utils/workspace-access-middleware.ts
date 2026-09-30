@@ -255,9 +255,10 @@ async function lookupScope(
         // it and is what the visibility rule applies to.
         const [label] = await db
           .select({
-            labelWorkspaceId: schema.labelTable.workspaceId,
+            workspaceId: schema.labelTable.workspaceId,
+            taskId: schema.labelTable.taskId,
             projectId: schema.projectTable.id,
-            projectWorkspaceId: schema.projectTable.workspaceId,
+            taskWorkspaceId: schema.projectTable.workspaceId,
           })
           .from(schema.labelTable)
           .leftJoin(
@@ -271,8 +272,13 @@ async function lookupScope(
           .where(eq(schema.labelTable.id, id))
           .limit(1);
         if (!label) return null;
+        // Older releases allowed inconsistent label/task references. Never use
+        // such a row to authorize reads, mutations or external provider sync.
+        if (label.taskId && label.taskWorkspaceId !== label.workspaceId) {
+          return null;
+        }
         return {
-          workspaceId: label.projectWorkspaceId ?? label.labelWorkspaceId,
+          workspaceId: label.workspaceId ?? null,
           projectIds: label.projectId ? [label.projectId] : [],
         };
       }

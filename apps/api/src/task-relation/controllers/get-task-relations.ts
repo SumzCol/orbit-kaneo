@@ -7,6 +7,7 @@ import {
   userTable,
 } from "../../database/schema";
 import { visibleProjectCondition } from "../../utils/project-access";
+import { taskIsCompleted } from "../../task/task-is-completed";
 
 async function getTaskRelations(
   taskId: string,
@@ -41,6 +42,7 @@ async function getTaskRelations(
       id: string;
       title: string;
       status: string;
+      isCompleted: boolean;
       priority: string | null;
       number: number | null;
       projectId: string;
@@ -55,6 +57,7 @@ async function getTaskRelations(
         id: taskTable.id,
         title: taskTable.title,
         status: taskTable.status,
+        isCompleted: taskIsCompleted,
         priority: taskTable.priority,
         number: taskTable.number,
         projectId: taskTable.projectId,

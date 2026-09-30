@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -74,9 +74,8 @@ vi.mock("../../../apps/api/src/utils/project-access", () => ({
     state.projectAccess && !state.deniedProjects.includes(projectId),
 }));
 
-const { workspaceAccess } = await import(
-  "../../../apps/api/src/utils/workspace-access-middleware"
-);
+const { workspaceAccess } =
+  await import("../../../apps/api/src/utils/workspace-access-middleware");
 
 // Mirrors POST /api/activity/comment: there is no `taskId` path param, the id
 // travels in the JSON body, and the handler acts on that body value.
