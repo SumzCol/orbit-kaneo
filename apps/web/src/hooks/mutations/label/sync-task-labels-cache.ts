@@ -50,6 +50,7 @@ export function syncTaskLabelsInTasksCache(
   queryClient.setQueriesData<ProjectWithTasks | undefined>(
     {
       queryKey: ["tasks"],
+      predicate: (query) => query.queryKey.length === 2,
     },
     (existing) => {
       // `setQueriesData` matches by prefix, and not everything cached under
