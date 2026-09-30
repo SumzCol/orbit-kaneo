@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { getLabelColor as giteaLabelColor } from "../../../../../apps/api/src/plugins/gitea/utils/labels";
 import { getLabelColor as githubLabelColor } from "../../../../../apps/api/src/plugins/github/utils/labels";
 

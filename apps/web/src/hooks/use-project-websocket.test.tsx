@@ -6,7 +6,7 @@ import {
   it,
   type MockInstance,
   vi,
-} from "vitest";
+} from "vite-plus/test";
 
 vi.mock("@kaneo/libs", () => ({
   windowId: "test-window-id",
@@ -207,6 +207,14 @@ describe("useProjectWebSocket message handling", () => {
     receive({ type, projectId: "project-1", taskId: "task-1" });
 
     expect(invalidatedKeys()).not.toContain(projectRelationsKey);
+  });
+
+  it("refreshes the resource links of the updated task", () => {
+    receive({ type: "TASK_UPDATED", projectId: "project-1", taskId: "task-1" });
+
+    expect(invalidatedKeys()).toContain(
+      JSON.stringify(["external-links", "task-1"]),
+    );
   });
 
   it("ignores a malformed message", () => {

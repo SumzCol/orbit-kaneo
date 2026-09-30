@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { assignBucketColors } from "./bucket-colors";
 
 const bucket = (key: string | null, color: string | null = null) => ({
