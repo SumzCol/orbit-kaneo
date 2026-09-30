@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
 import journal from "../../apps/api/drizzle/meta/_journal.json";
 import { createApp } from "../../apps/api/src/index";
+import moveProject from "../../apps/api/src/project/controllers/move-project";
 import revokeWorkspaceProjectMemberships from "../../apps/api/src/project/controllers/revoke-workspace-project-memberships";
 import { isProjectMember } from "../../apps/api/src/utils/project-access";
 import { mockAuthenticatedSession } from "./helpers/auth";
@@ -453,6 +454,128 @@ describe("the upgrade backfill", () => {
 
     const rows = await db.select().from(schema.projectMemberTable);
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe("read paths that do not resolve a project by id", () => {
+  it("does not serve a hidden project's task by its ticket id", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const outsider = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+    const [task] = await db
+      .insert(schema.taskTable)
+      .values({
+        projectId: project.id,
+        title: "Hidden work",
+        number: 1,
+        status: "to-do",
+      })
+      .returning();
+
+    mockAuthenticatedSession(outsider);
+    const { app } = createApp();
+    const hidden = await app.request(
+      `/api/task/by-ticket-id/${project.slug}-${task.number}`,
+    );
+    expect(hidden.status).toBe(404);
+
+    // The project's own member still reaches it.
+    mockAuthenticatedSession(owner);
+    const { app: asOwner } = createApp();
+    const visible = await asOwner.request(
+      `/api/task/by-ticket-id/${project.slug}-${task.number}`,
+    );
+    expect(visible.status).toBe(200);
+  });
+
+  it("omits a hidden project's task labels from the workspace label list", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const outsider = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+    const [task] = await db
+      .insert(schema.taskTable)
+      .values({
+        projectId: project.id,
+        title: "Hidden work",
+        number: 1,
+        status: "to-do",
+      })
+      .returning();
+    await db.insert(schema.labelTable).values([
+      {
+        taskId: task.id,
+        workspaceId: workspace.id,
+        name: "secret-release",
+        color: "red",
+      },
+      {
+        taskId: null,
+        workspaceId: workspace.id,
+        name: "workspace-wide",
+        color: "blue",
+      },
+    ]);
+
+    mockAuthenticatedSession(outsider);
+    const { app } = createApp();
+    const response = await app.request(`/api/label/workspace/${workspace.id}`);
+    expect(response.status).toBe(200);
+    const names = ((await response.json()) as { name: string }[]).map(
+      (label) => label.name,
+    );
+
+    expect(names).not.toContain("secret-release");
+    // Workspace-level labels are not project data and stay visible.
+    expect(names).toContain("workspace-wide");
+  });
+});
+
+describe("moving a project between workspaces", () => {
+  it("leaves the source workspace's members behind", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const sourceOnly = await addWorkspaceMember(source.workspace.id, "member");
+    const target = await createWorkspaceMember({ role: "owner" });
+    // The mover belongs to both, which is what the move route requires.
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id, sourceOnly.id],
+    });
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    const members = await db
+      .select({ userId: schema.projectMemberTable.userId })
+      .from(schema.projectMemberTable)
+      .where(eq(schema.projectMemberTable.projectId, project.id));
+    const ids = members.map((member) => member.userId);
+
+    // The source-only member would otherwise still be listed, and the member
+    // endpoint returns names and email addresses.
+    expect(ids).not.toContain(sourceOnly.id);
+    // The project keeps at least one member: whoever moved it.
+    expect(ids).toContain(source.user.id);
   });
 });
 

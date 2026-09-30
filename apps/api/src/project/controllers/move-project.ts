@@ -21,6 +21,7 @@ import {
   taskTable,
   userNotificationWorkspaceProjectTable,
   workspaceUserTable,
+  projectMemberTable,
 } from "../../database/schema";
 import { publishEvent } from "../../events";
 import { closeProjectConnections } from "../../ws";
@@ -224,6 +225,37 @@ async function moveProject(
           ),
         ),
       );
+
+    // Project membership is scoped to the project's workspace, so the source
+    // workspace's members cannot come along: the member list would hand their
+    // names and email addresses to the destination. Dropped rather than
+    // translated, the same way an assignee outside the target is unassigned
+    // above.
+    await tx
+      .delete(projectMemberTable)
+      .where(
+        and(
+          eq(projectMemberTable.projectId, id),
+          notInArray(
+            projectMemberTable.userId,
+            tx
+              .select({ userId: workspaceUserTable.userId })
+              .from(workspaceUserTable)
+              .where(eq(workspaceUserTable.workspaceId, targetWorkspaceId)),
+          ),
+        ),
+      );
+
+    // A project keeps at least one member, and the move may have removed them
+    // all. Whoever moved it is in the target workspace by construction, so
+    // they take the project with them rather than leaving it reachable only by
+    // an administrator.
+    await tx
+      .insert(projectMemberTable)
+      .values({ projectId: id, userId: currentUserId })
+      .onConflictDoNothing({
+        target: [projectMemberTable.projectId, projectMemberTable.userId],
+      });
 
     // Assets and task labels denormalize the project's workspace.
     await tx
