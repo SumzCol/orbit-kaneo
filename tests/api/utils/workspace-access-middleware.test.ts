@@ -184,21 +184,18 @@ describe("workspaceAccess secondary targets", () => {
     expect(res.status).toBe(403);
   });
 
-  it("refuses a destination in another workspace", async () => {
-    const res = await move({
-      taskId: "task-in-my-workspace",
-      destinationProjectId: "project-in-other-workspace",
-    });
+  // A foreign destination answers exactly like a missing one. Anything else
+  // lets a caller probe for project ids belonging to other workspaces.
+  it.each(["project-in-other-workspace", "project-gone"])(
+    "refuses %s the same way",
+    async (destinationProjectId) => {
+      const res = await move({
+        taskId: "task-in-my-workspace",
+        destinationProjectId,
+      });
 
-    expect(res.status).toBe(403);
-  });
-
-  it("refuses a destination that does not exist", async () => {
-    const res = await move({
-      taskId: "task-in-my-workspace",
-      destinationProjectId: "project-gone",
-    });
-
-    expect(res.status).toBe(404);
-  });
+      expect(res.status).toBe(404);
+      expect(await res.text()).toBe("Project not found");
+    },
+  );
 });

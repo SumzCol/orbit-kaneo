@@ -184,7 +184,11 @@ export function workspaceAccessMiddleware(
       );
       const targetProjectId = target?.projectIds[0];
 
-      if (!target || !targetProjectId) {
+      // A target in another workspace answers exactly like a missing one.
+      // Visibility is evaluated against the workspace this request was scoped
+      // to, so a foreign one is never measured against it -- and telling the
+      // two apart would let a caller probe for ids across tenants.
+      if (!target || !targetProjectId || target.workspaceId !== workspaceId) {
         throw new HTTPException(404, {
           message:
             source.type === "projectFromBody"
@@ -193,13 +197,9 @@ export function workspaceAccessMiddleware(
         });
       }
 
-      // Same workspace first: visibility is evaluated against the workspace
-      // this request was scoped to, so a project from another workspace must
-      // never be measured against it.
-      if (
-        target.workspaceId !== workspaceId ||
-        !(await canAccessProject(c, targetProjectId))
-      ) {
+      // Inside the caller's own workspace, not being on the project is a
+      // different answer: the resource is theirs to know about.
+      if (!(await canAccessProject(c, targetProjectId))) {
         throw new HTTPException(403, {
           message: "You don't have access to this project",
         });
