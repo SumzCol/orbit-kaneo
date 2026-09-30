@@ -1,3 +1,7 @@
+import {
+  getBoardCacheVersion,
+  markBoardCacheChanged,
+} from "@/lib/board-cache-version";
 import type { QueryClient } from "@tanstack/react-query";
 import type { ProjectWithTasks } from "@/types/project";
 import type Task from "@/types/task";
@@ -47,32 +51,38 @@ export function syncTaskLabelsInTasksCache(
   taskId: string,
   updater: TaskLabelsUpdater,
 ) {
-  queryClient.setQueriesData<ProjectWithTasks | undefined>(
-    {
-      queryKey: ["tasks"],
-      predicate: (query) => query.queryKey.length === 2,
-    },
-    (existing) => {
-      // `setQueriesData` matches by prefix, and not everything cached under
-      // ["tasks"] is a project: the analytics queries live beneath a project's
-      // task key so that the invalidation every task mutation already performs
-      // reaches them too. Checking the shape rather than the key keeps this
-      // correct for whatever else is nested there later — the alternative is
-      // that the next such key throws here on the first label change.
-      if (
-        !Array.isArray((existing as { columns?: unknown } | undefined)?.columns)
-      ) {
-        return existing;
+  const boards = queryClient.getQueryCache().findAll({
+    queryKey: ["tasks"],
+    predicate: (query) => query.queryKey.length === 2,
+  });
+  for (const query of boards) {
+    const projectId = query.queryKey[1];
+    if (typeof projectId !== "string") continue;
+    markBoardCacheChanged(queryClient, projectId, taskId);
+    const version = getBoardCacheVersion(queryClient, projectId, taskId);
+    const apply = () => {
+      if (getBoardCacheVersion(queryClient, projectId, taskId) !== version) {
+        void queryClient.invalidateQueries({ queryKey: query.queryKey });
+        return;
       }
-      return updateTaskLabelsInProject(
-        existing as ProjectWithTasks,
-        taskId,
-        updater,
+      queryClient.setQueryData<ProjectWithTasks>(query.queryKey, (board) =>
+        board ? updateTaskLabelsInProject(board, taskId, updater) : board,
       );
-    },
-  );
+    };
+    if (query.state.fetchStatus === "fetching") {
+      const unsubscribe = queryClient
+        .getQueryCache()
+        .subscribe(({ query: updated, type }) => {
+          if (updated !== query) return;
+          if (type === "removed" || updated.state.fetchStatus === "idle") {
+            unsubscribe();
+            if (type !== "removed") apply();
+          }
+        });
+    } else apply();
+  }
 
-  // Writing through the task cache leaves the analytics counts untouched, and
+  // Writing through the board caches leaves the analytics counts untouched, and
   // the label mutations invalidate only their own `["labels", ...]` keys. The
   // project id is not in scope here, so this reaches every cached analytics
   // query rather than one project's: there are at most a couple, and a label

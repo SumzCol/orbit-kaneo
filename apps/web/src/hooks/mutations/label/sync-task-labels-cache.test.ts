@@ -1,6 +1,9 @@
 import { QueryClient } from "@tanstack/react-query";
+import type { ProjectWithTasks } from "@/types/project";
 import { describe, expect, it } from "vite-plus/test";
 import {
+  addLabelToTaskInTasksCache,
+  removeLabelFromTaskInTasksCache,
   syncTaskLabelsInTasksCache,
   updateTaskLabelsInProject,
 } from "./sync-task-labels-cache";
@@ -180,19 +183,61 @@ describe("updateTaskLabelsInProject", () => {
       },
     ]);
   });
-
-  it("leaves a cached value that is not a project untouched", () => {
-    const client = new QueryClient();
-    // Analytics is cached beneath a project's task key so that the
-    // invalidation every task mutation performs reaches it. `setQueriesData`
-    // matches by prefix, so this updater sees it too, and it has no columns.
-    const analyticsKey = ["tasks", "project-1", "analytics", "summary"];
-    const summary = { total: 4, completed: 1 };
-    client.setQueryData(analyticsKey, summary);
-
-    expect(() =>
-      syncTaskLabelsInTasksCache(client, "task-1", (labels) => labels),
-    ).not.toThrow();
-    expect(client.getQueryData(analyticsKey)).toEqual(summary);
-  });
 });
+
+it("leaves a cached value that is not a project untouched", () => {
+  const client = new QueryClient();
+  // Analytics is cached beneath a project's task key so that the invalidation
+  // every task mutation performs reaches it. Only the two-segment board keys
+  // are written through, so this one must come back untouched.
+  const analyticsKey = ["tasks", "project-1", "analytics", "summary"];
+  const summary = { total: 4, completed: 1 };
+  client.setQueryData(analyticsKey, summary);
+
+  expect(() =>
+    syncTaskLabelsInTasksCache(client, "task-1", (labels) => labels),
+  ).not.toThrow();
+  expect(client.getQueryData(analyticsKey)).toEqual(summary);
+  client.clear();
+});
+
+it.each(["attach", "detach"])(
+  "preserves a local label %s after an older board fetch completes",
+  async (action) => {
+    const client = new QueryClient();
+    const label = { id: "label", name: "bug", color: "red" };
+    const board = {
+      id: "project",
+      columns: [
+        {
+          id: "todo",
+          tasks: [{ id: "task", labels: action === "attach" ? [] : [label] }],
+        },
+      ],
+      plannedTasks: [],
+      archivedTasks: [],
+    } as unknown as ProjectWithTasks;
+    client.setQueryData(["tasks", "project"], board);
+    let release!: () => void;
+    const wait = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetch = client.fetchQuery({
+      queryKey: ["tasks", "project"],
+      queryFn: async () => {
+        await wait;
+        return board;
+      },
+      staleTime: 0,
+    });
+    if (action === "attach") addLabelToTaskInTasksCache(client, "task", label);
+    else removeLabelFromTaskInTasksCache(client, "task", label.id);
+    release();
+    await fetch;
+    expect(
+      client.getQueryData<ProjectWithTasks>(["tasks", "project"])?.columns[0]
+        .tasks[0].labels,
+    ).toEqual(action === "attach" ? [label] : []);
+    client.clear();
+  },
+);
