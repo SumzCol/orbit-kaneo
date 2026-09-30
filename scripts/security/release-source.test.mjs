@@ -166,6 +166,67 @@ test("a new planned release and unversioned nightly retain the workflow SHA", ()
     assert.notEqual(verify("nightly", "1.2.3").status, 0);
     assert.notEqual(verify("unknown", "1.2.3").status, 0);
   }));
+test("a fork publishes its own branch only when PUBLISH_REF names it", () =>
+  fixture(({ git, commit, verify }) => {
+    git("checkout", "-b", "orbit");
+    const tip = commit();
+    git("update-ref", "refs/remotes/origin/orbit", tip);
+    const env = {
+      GITHUB_REF: "refs/heads/orbit",
+      GITHUB_SHA: tip,
+      PUBLISH_REF: "refs/heads/orbit",
+    };
+    const result = verify("nightly", "", env);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.output, `source_sha=${tip}\n`);
+
+    // The ref is pinned in the workflow file, so a push to another branch
+    // cannot borrow the fork's permission to publish.
+    assert.notEqual(
+      verify("nightly", "", { ...env, GITHUB_REF: "refs/heads/main" }).status,
+      0,
+    );
+    // And the default stays main: the same push is refused without the input.
+    assert.notEqual(
+      verify("nightly", "", { GITHUB_REF: "refs/heads/orbit", GITHUB_SHA: tip })
+        .status,
+      0,
+    );
+  }));
+test("a commit outside the published branch cannot publish", () =>
+  fixture(({ git, first, commit, verify }) => {
+    git("checkout", "-b", "orbit");
+    git("update-ref", "refs/remotes/origin/orbit", first);
+    const unpublished = commit();
+    assert.notEqual(
+      verify("nightly", "", {
+        GITHUB_REF: "refs/heads/orbit",
+        GITHUB_SHA: unpublished,
+        PUBLISH_REF: "refs/heads/orbit",
+      }).status,
+      0,
+    );
+  }));
+test("PUBLISH_REF must name a branch", () =>
+  fixture(({ first, verify }) => {
+    // An unset PUBLISH_REF is not in this list: empty means "use the default",
+    // which the other tests already cover.
+    for (const ref of ["refs/tags/v1.2.3", "orbit", "refs/heads/", "refs/"]) {
+      const result = verify("nightly", "", {
+        GITHUB_REF: ref,
+        GITHUB_SHA: first,
+        PUBLISH_REF: ref,
+      });
+      assert.notEqual(result.status, 0, `expected ${ref} to be refused`);
+      // Asserted on the message, not just the exit code: a malformed ref also
+      // makes git fail on its own, so a status-only check passes even with the
+      // guard removed.
+      assert.match(
+        result.stderr,
+        /Publication ref must be a refs\/heads\/ branch/,
+      );
+    }
+  }));
 test("malformed release inputs cannot execute code or produce workflow outputs", () =>
   fixture(({ dir, verify }) => {
     for (const version of [

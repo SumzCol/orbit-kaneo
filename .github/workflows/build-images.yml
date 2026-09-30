@@ -17,6 +17,11 @@ on:
         required: false
         type: string
         default: released
+      publish_ref:
+        description: "The only ref allowed to publish. The caller sets it in the workflow file, so a trigger cannot widen it."
+        required: false
+        type: string
+        default: refs/heads/main
       platforms:
         required: false
         type: string
@@ -36,7 +41,7 @@ on:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == inputs.publish_ref
     name: ${{ matrix.name }}
     timeout-minutes: 45
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -70,6 +75,7 @@ jobs:
         env:
           SOURCE_MODE: ${{ inputs.source_mode }}
           RELEASE_VERSION: ${{ inputs.version }}
+          PUBLISH_REF: ${{ inputs.publish_ref }}
         run: node scripts/security/verify-release-source.mjs "$SOURCE_MODE" "$RELEASE_VERSION"
 
       - name: Checkout verified source

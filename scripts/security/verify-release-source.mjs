@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 
-// Run from the workflow's main-branch checkout BEFORE checking out a release
+// Run from the workflow's publish-branch checkout BEFORE checking out a release
 // tag. Never execute verification code taken from an unverified tag.
 const [mode, version = ""] = process.argv.slice(2);
 const git = (...args) =>
@@ -10,17 +10,27 @@ const git = (...args) =>
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
 const source = process.env.GITHUB_SHA;
+// The branch a build may publish from. The caller pins it in the workflow file,
+// so the triggering event cannot widen it; a fork deploying its own branch sets
+// its own value rather than loosening the check for everyone.
+const publishRef = process.env.PUBLISH_REF || "refs/heads/main";
+const branch = publishRef.startsWith("refs/heads/")
+  ? publishRef.slice("refs/heads/".length)
+  : "";
+if (!/^[\w.\-/]+$/.test(branch))
+  throw new Error("Publication ref must be a refs/heads/ branch");
+const publishedBranch = `refs/remotes/origin/${branch}`;
 if (
-  process.env.GITHUB_REF !== "refs/heads/main" ||
+  process.env.GITHUB_REF !== publishRef ||
   !/^[0-9a-f]{40}$/.test(source ?? "")
 ) {
   throw new Error(
-    "Publication must use a main-branch workflow with a full source SHA",
+    `Publication must use a ${branch}-branch workflow with a full source SHA`,
   );
 }
 if (git("rev-parse", "HEAD") !== source)
   throw new Error("Checkout does not match the workflow source");
-git("merge-base", "--is-ancestor", source, "refs/remotes/origin/main");
+git("merge-base", "--is-ancestor", source, publishedBranch);
 
 let approved = source;
 if (mode === "nightly") {
@@ -34,9 +44,9 @@ if (mode === "nightly") {
   );
   const tag = `refs/tags/v${version}`;
   if (mode === "planned") {
-    if (git("rev-parse", "refs/remotes/origin/main") !== source) {
+    if (git("rev-parse", publishedBranch) !== source) {
       throw new Error(
-        "Main advanced since release planning; start a new release run",
+        `${branch} advanced since release planning; start a new release run`,
       );
     }
     let exists = false;
@@ -47,7 +57,7 @@ if (mode === "nightly") {
     if (exists) throw new Error("The planned release tag already exists");
   } else {
     approved = git("rev-parse", "--verify", `${tag}^{commit}`);
-    git("merge-base", "--is-ancestor", approved, "refs/remotes/origin/main");
+    git("merge-base", "--is-ancestor", approved, publishedBranch);
     const pkg = JSON.parse(git("show", `${approved}:package.json`));
     const chart = git("show", `${approved}:charts/kaneo/Chart.yaml`);
     const field = (name) =>
