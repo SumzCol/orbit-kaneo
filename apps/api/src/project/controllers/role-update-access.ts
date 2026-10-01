@@ -1,4 +1,4 @@
-import { APIError } from "better-auth/api";
+import { APIError, getSessionFromCtx } from "better-auth/api";
 import { and, eq, inArray } from "drizzle-orm";
 import db from "../../database";
 import { workspaceRoleTable, workspaceUserTable } from "../../database/schema";
@@ -17,18 +17,35 @@ const BEFORE_KEY = "kaneoRoleReachedAllProjects";
 
 type RoleBefore = { workspaceId: string; roleName: string; sawAll: boolean };
 
-type HookContext = {
+type HookContext = Parameters<typeof getSessionFromCtx>[0] & {
   body?: {
     organizationId?: string;
     roleName?: string;
     roleId?: string;
     data?: { roleName?: string };
   };
-  context: object;
 };
 
 function slot(ctx: HookContext) {
-  return ctx.context as Record<string, unknown> & { returned?: unknown };
+  return ctx.context as unknown as Record<string, unknown> & {
+    returned?: unknown;
+  };
+}
+
+/**
+ * The workspace the edit applies to. Better Auth falls back to the session's
+ * active workspace when none is named, and so does this. Before hooks get no
+ * session of their own, so it is loaded unless one is already on the context.
+ */
+async function resolveWorkspaceId(ctx: HookContext) {
+  if (ctx.body?.organizationId) return ctx.body.organizationId;
+  const session =
+    (slot(ctx).session as Awaited<ReturnType<typeof getSessionFromCtx>>) ??
+    (await getSessionFromCtx(ctx, { disableRefresh: true }).catch(() => null));
+  return (
+    (session?.session as { activeOrganizationId?: string | null })
+      ?.activeOrganizationId ?? null
+  );
 }
 
 async function resolveRoleName(workspaceId: string, body: HookContext["body"]) {
@@ -49,10 +66,7 @@ async function resolveRoleName(workspaceId: string, body: HookContext["body"]) {
 
 export async function rememberRoleReach(ctx: HookContext) {
   try {
-    // Kaneo always names the workspace. Without it Better Auth falls back to
-    // the session's active one, which is not worth resolving here; the sweep
-    // still closes boards for an edit this skips.
-    const workspaceId = ctx.body?.organizationId;
+    const workspaceId = await resolveWorkspaceId(ctx);
     if (!workspaceId) return;
     const roleName = await resolveRoleName(workspaceId, ctx.body);
     if (!roleName) return;
