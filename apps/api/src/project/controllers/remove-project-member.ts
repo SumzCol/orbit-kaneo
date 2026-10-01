@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
+import { pruneCalendarFeeds } from "../../calendar-feed/service";
 import db from "../../database";
 import {
   projectMemberTable,
@@ -126,6 +127,10 @@ async function removeProjectMember(
   // Removal applies from the user's next request and next connection: the
   // WebSocket upgrade checks access, but a board already open is not closed
   // here. Ending open sessions as well is its own change.
+  //
+  // Their calendar feeds read as them and carry no session, so they go too,
+  // unless their role still reaches the project.
+  await pruneCalendarFeeds(projectId, [userId]);
 
   return removed;
 }

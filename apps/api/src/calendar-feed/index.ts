@@ -45,7 +45,7 @@ export const publicCalendarFeed = apiRouter().openapi(
     tags: ["Calendar feeds"],
     summary: "Subscribe to a calendar feed",
     description:
-      "Read scheduled project tasks using a secret calendar feed link. Anyone with the link can read matching task titles, descriptions, and dates. Responses are streamed; descriptions longer than 4096 characters and titles or calendar names longer than 1024 characters are truncated with an ellipsis.",
+      "Read scheduled project tasks using a secret calendar feed link. Anyone with the link can read matching task titles, descriptions, and dates. Each link reads as the member who created it, and stops working when they lose access to the project. Responses are streamed; descriptions longer than 4096 characters and titles or calendar names longer than 1024 characters are truncated with an ellipsis.",
     security: [],
     request: { params: calendarFeedTokenParam },
     responses: {
@@ -75,7 +75,7 @@ const calendarFeed = apiRouter<BaseVariables & { workspaceId: string }>()
       tags: ["Calendar feeds"],
       summary: "List project calendar feeds",
       description:
-        "List secret calendar subscription links. Requires project sharing permission.",
+        "List the caller's own secret calendar subscription links for this project. Requires project sharing permission.",
       middleware: sharingMiddleware,
       request: { params: calendarFeedProjectParam },
       responses: {
@@ -86,7 +86,10 @@ const calendarFeed = apiRouter<BaseVariables & { workspaceId: string }>()
     async (c) => {
       c.header("Cache-Control", "private, no-store");
       return c.json(
-        await listCalendarFeeds(c.req.valid("param").projectId),
+        await listCalendarFeeds(
+          c.req.valid("param").projectId,
+          c.get("userId"),
+        ),
         200,
       );
     },
@@ -123,6 +126,7 @@ const calendarFeed = apiRouter<BaseVariables & { workspaceId: string }>()
         await createCalendarFeed(
           c.req.valid("param").projectId,
           c.get("workspaceId"),
+          c.get("userId"),
           labelIds,
           timeZone,
           await hasWorkspacePermission(c, { label: ["create"] }),
@@ -139,7 +143,7 @@ const calendarFeed = apiRouter<BaseVariables & { workspaceId: string }>()
       tags: ["Calendar feeds"],
       summary: "Revoke a calendar feed",
       description:
-        "Revoke a calendar subscription link, preventing further access through it.",
+        "Revoke one of the caller's calendar subscription links, preventing further access through it.",
       middleware: sharingMiddleware,
       request: { params: calendarFeedDeleteParam },
       responses: {
@@ -147,7 +151,9 @@ const calendarFeed = apiRouter<BaseVariables & { workspaceId: string }>()
           "Calendar feed revoked",
           z.object({ success: z.boolean() }),
         ),
-        404: errorResponse("Calendar feed not found in this project"),
+        404: errorResponse(
+          "Calendar feed not found among the caller's feeds in this project",
+        ),
         ...managementErrors,
       },
     }),
@@ -155,6 +161,7 @@ const calendarFeed = apiRouter<BaseVariables & { workspaceId: string }>()
       c.json(
         await revokeCalendarFeed(
           c.req.valid("param").projectId,
+          c.get("userId"),
           c.req.valid("param").id,
         ),
         200,

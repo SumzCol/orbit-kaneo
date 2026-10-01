@@ -22,6 +22,7 @@ import {
   taskTable,
 } from "../database/schema";
 import { boundedTaskRead } from "../task/bounded-read";
+import { userCanAccessProject } from "../utils/project-access";
 import { type CalendarTask, streamCalendar } from "./ical";
 
 export const CALENDAR_TASK_BATCH_SIZE = 50;
@@ -35,9 +36,21 @@ function excerpt(column: SQLWrapper, characters: number) {
     else ${column} end`;
 }
 
+// The documented CalendarFeed fields. The owner is the caller, so it is left
+// out of what they are shown.
+const feedColumns = {
+  id: calendarFeedTable.id,
+  projectId: calendarFeedTable.projectId,
+  token: calendarFeedTable.token,
+  labelIds: calendarFeedTable.labelIds,
+  timeZone: calendarFeedTable.timeZone,
+  createdAt: calendarFeedTable.createdAt,
+};
+
 export async function createCalendarFeed(
   projectId: string,
   workspaceId: string,
+  userId: string,
   labelIds: string[],
   timeZone: string,
   canCreateLabels: boolean,
@@ -114,29 +127,45 @@ export async function createCalendarFeed(
       .insert(calendarFeedTable)
       .values({
         projectId,
+        userId,
         labelIds: roots.map((label) => label.id),
         timeZone,
         token: randomBytes(32).toString("hex"),
       })
-      .returning();
+      .returning(feedColumns);
     return feed;
   });
 }
 
-export function listCalendarFeeds(projectId: string) {
+/**
+ * The caller's own feeds. Each link reads as the member it was made for, so
+ * another member's links are theirs to share or revoke, and listing them would
+ * hand out tokens that read with someone else's access.
+ */
+export function listCalendarFeeds(projectId: string, userId: string) {
   return db
-    .select()
+    .select(feedColumns)
     .from(calendarFeedTable)
-    .where(eq(calendarFeedTable.projectId, projectId))
+    .where(
+      and(
+        eq(calendarFeedTable.projectId, projectId),
+        eq(calendarFeedTable.userId, userId),
+      ),
+    )
     .orderBy(asc(calendarFeedTable.createdAt), asc(calendarFeedTable.id));
 }
 
-export async function revokeCalendarFeed(projectId: string, id: string) {
+export async function revokeCalendarFeed(
+  projectId: string,
+  userId: string,
+  id: string,
+) {
   const [feed] = await db
     .delete(calendarFeedTable)
     .where(
       and(
         eq(calendarFeedTable.projectId, projectId),
+        eq(calendarFeedTable.userId, userId),
         eq(calendarFeedTable.id, id),
       ),
     )
@@ -162,6 +191,13 @@ export async function getCalendarFeed(token: string) {
   if (!record)
     throw new HTTPException(404, { message: "Calendar feed not found" });
   const { feed, project } = record;
+  // The link carries no session, so it is checked against its owner on every
+  // refresh: a feed must not outlive the access of the member it was made
+  // for. Removal deletes their feeds too, but that cleanup can be missed --
+  // a move, a role change -- and this check cannot. Answered as not found so
+  // the link reveals nothing about why it stopped.
+  if (!(await userCanAccessProject(project.id, feed.userId)))
+    throw new HTTPException(404, { message: "Calendar feed not found" });
   // Resolve IDs on every refresh so renaming a label preserves subscriptions.
   // Missing/deleted labels must never broaden a feed to all project tasks.
   const labels = feed.labelIds.length
@@ -232,4 +268,47 @@ export async function getCalendarFeed(token: string) {
     timeZone: feed.timeZone,
     tasks: tasks(),
   });
+}
+
+/**
+ * Deletes the feeds on a project whose owners can no longer open it, or just
+ * those of `userIds` when given.
+ *
+ * The fetch already refuses such a feed. Deleting it keeps the link from
+ * working again if the same person is given access back, which would revive a
+ * link they may have passed on while it was valid. Asked per owner rather
+ * than assumed, so an administrator removed from a project keeps the feeds
+ * they still read with their role.
+ *
+ * Callers run this after their own change has committed, so it never throws:
+ * a feed it misses is still refused at fetch.
+ */
+export async function pruneCalendarFeeds(
+  projectId: string,
+  userIds?: string[],
+) {
+  try {
+    const owners = await db
+      .selectDistinct({ userId: calendarFeedTable.userId })
+      .from(calendarFeedTable)
+      .where(
+        and(
+          eq(calendarFeedTable.projectId, projectId),
+          userIds ? inArray(calendarFeedTable.userId, userIds) : undefined,
+        ),
+      );
+    for (const { userId } of owners) {
+      if (await userCanAccessProject(projectId, userId)) continue;
+      await db
+        .delete(calendarFeedTable)
+        .where(
+          and(
+            eq(calendarFeedTable.projectId, projectId),
+            eq(calendarFeedTable.userId, userId),
+          ),
+        );
+    }
+  } catch (error) {
+    console.error(`Failed to prune calendar feeds for ${projectId}:`, error);
+  }
 }

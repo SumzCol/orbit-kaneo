@@ -25,6 +25,7 @@ import {
 } from "../../database/schema";
 import { publishEvent } from "../../events";
 import { closeProjectConnections } from "../../ws";
+import { pruneCalendarFeeds } from "../../calendar-feed/service";
 
 async function moveProject(
   id: string,
@@ -387,6 +388,9 @@ async function moveProject(
   });
 
   await closeProjectConnections(id);
+  // A feed reads as its owner, and an owner left in the source workspace no
+  // longer reaches the project.
+  await pruneCalendarFeeds(id);
 
   if (unassignedTasks.length > 0) {
     await publishEvent("task.bulk_unassigned", {
