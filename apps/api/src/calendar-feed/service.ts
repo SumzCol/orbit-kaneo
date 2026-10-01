@@ -196,8 +196,20 @@ export async function getCalendarFeed(token: string) {
   // for. Removal deletes their feeds too, but that cleanup can be missed --
   // a move, a role change -- and this check cannot. Answered as not found so
   // the link reveals nothing about why it stopped.
-  if (!(await userCanAccessProject(project.id, feed.userId)))
+  if (!(await userCanAccessProject(project.id, feed.userId))) {
+    // Deleted as well as refused, so restoring the owner's access later --
+    // a role given back, a cleanup that failed -- cannot revive the link.
+    await db
+      .delete(calendarFeedTable)
+      .where(eq(calendarFeedTable.id, feed.id))
+      .catch((error) => {
+        console.error(
+          `Failed to delete refused calendar feed ${feed.id}:`,
+          error,
+        );
+      });
     throw new HTTPException(404, { message: "Calendar feed not found" });
+  }
   // Resolve IDs on every refresh so renaming a label preserves subscriptions.
   // Missing/deleted labels must never broaden a feed to all project tasks.
   const labels = feed.labelIds.length
@@ -310,5 +322,41 @@ export async function pruneCalendarFeeds(
     }
   } catch (error) {
     console.error(`Failed to prune calendar feeds for ${projectId}:`, error);
+  }
+}
+
+/**
+ * `pruneCalendarFeeds` for every feed these members hold in one workspace,
+ * for changes that can end their access to any of its projects at once:
+ * leaving it, or a role change that took away workspace-wide access.
+ * Never throws, for the same reason.
+ */
+export async function pruneWorkspaceCalendarFeeds(
+  workspaceId: string,
+  userIds: string[],
+) {
+  if (userIds.length === 0) return;
+  try {
+    const feeds = await db
+      .selectDistinct({
+        projectId: calendarFeedTable.projectId,
+        userId: calendarFeedTable.userId,
+      })
+      .from(calendarFeedTable)
+      .innerJoin(projectTable, eq(projectTable.id, calendarFeedTable.projectId))
+      .where(
+        and(
+          inArray(calendarFeedTable.userId, userIds),
+          eq(projectTable.workspaceId, workspaceId),
+        ),
+      );
+    for (const feed of feeds) {
+      await pruneCalendarFeeds(feed.projectId, [feed.userId]);
+    }
+  } catch (error) {
+    console.error(
+      `Failed to prune calendar feeds in workspace ${workspaceId}:`,
+      error,
+    );
   }
 }

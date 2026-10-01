@@ -1,11 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { pruneCalendarFeeds } from "../../calendar-feed/service";
+import { pruneWorkspaceCalendarFeeds } from "../../calendar-feed/service";
 import db from "../../database";
-import {
-  calendarFeedTable,
-  projectMemberTable,
-  projectTable,
-} from "../../database/schema";
+import { projectMemberTable, projectTable } from "../../database/schema";
 
 /**
  * Drops every project membership a user holds inside one workspace.
@@ -37,19 +33,7 @@ async function revokeWorkspaceProjectMemberships(
   // Their calendar feeds read as them, so every one in this workspace is
   // asked again. Taken from the feeds rather than the rows just deleted: an
   // administrator held feeds on projects they reached without a row.
-  const feeds = await db
-    .selectDistinct({ projectId: calendarFeedTable.projectId })
-    .from(calendarFeedTable)
-    .innerJoin(projectTable, eq(projectTable.id, calendarFeedTable.projectId))
-    .where(
-      and(
-        eq(calendarFeedTable.userId, userId),
-        eq(projectTable.workspaceId, workspaceId),
-      ),
-    );
-  for (const feed of feeds) {
-    await pruneCalendarFeeds(feed.projectId, [userId]);
-  }
+  await pruneWorkspaceCalendarFeeds(workspaceId, [userId]);
 
   return removed.map((row) => row.projectId);
 }

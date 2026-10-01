@@ -2,9 +2,12 @@ import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { APIError } from "better-auth/api";
 import { and, eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import journal from "../../apps/api/drizzle/meta/_journal.json";
+import { pruneFeedsAfterRoleEdit } from "../../apps/api/src/calendar-feed/prune-after-role-change";
+import { pruneWorkspaceCalendarFeeds } from "../../apps/api/src/calendar-feed/service";
 import db, { schema } from "../../apps/api/src/database";
 import { calendarFeedTable } from "../../apps/api/src/database/schema";
 import { createApp } from "../../apps/api/src/index";
@@ -280,5 +283,133 @@ describe("upgrading an instance with existing feeds", () => {
         throw rollback;
       }),
     ).rejects.toBe(rollback);
+  });
+});
+
+async function setRole(workspaceId: string, userId: string, role: string) {
+  await db
+    .update(schema.workspaceUserTable)
+    .set({ role })
+    .where(
+      and(
+        eq(schema.workspaceUserTable.workspaceId, workspaceId),
+        eq(schema.workspaceUserTable.userId, userId),
+      ),
+    );
+}
+
+describe("a feed that lost its access stays gone", () => {
+  // Refusing alone would let the link work again once access came back.
+  it("is deleted by the fetch that refuses it", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const admin = await addWorkspaceMember(workspace.id, "admin");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+    const feed = await insertFeed(project.id, admin.id);
+
+    // Demoted with no cleanup run.
+    await setRole(workspace.id, admin.id, "member");
+    expect(await fetchFeed(feed.token)).toBe(404);
+    await setRole(workspace.id, admin.id, "admin");
+
+    expect(await fetchFeed(feed.token)).toBe(404);
+    expect(await feedsOf(admin.id)).toEqual([]);
+  });
+
+  it("is deleted when a role change takes away the access it read with", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const admin = await addWorkspaceMember(workspace.id, "admin");
+    const { project: byRole } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+    const { project: joined } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, admin.id],
+    });
+    await insertFeed(byRole.id, admin.id);
+    const kept = await insertFeed(joined.id, admin.id);
+
+    await setRole(workspace.id, admin.id, "member");
+    // What afterUpdateMemberRole runs.
+    await pruneWorkspaceCalendarFeeds(workspace.id, [admin.id]);
+    await setRole(workspace.id, admin.id, "admin");
+
+    // Promoting them again does not bring the link back.
+    expect((await feedsOf(admin.id)).map((feed) => feed.id)).toEqual([kept.id]);
+    // They are an explicit member of the other project, so that one stays.
+    expect(await fetchFeed(kept.token)).toBe(200);
+  });
+
+  it("is kept through a role change that keeps access", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const admin = await addWorkspaceMember(workspace.id, "admin");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+    const feed = await insertFeed(project.id, admin.id);
+
+    await setRole(workspace.id, admin.id, "owner");
+    await pruneWorkspaceCalendarFeeds(workspace.id, [admin.id]);
+
+    expect(await fetchFeed(feed.token)).toBe(200);
+  });
+
+  async function leadWithFeed() {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const lead = await addWorkspaceMember(workspace.id, "lead");
+    await db.insert(schema.workspaceRoleTable).values({
+      workspaceId: workspace.id,
+      role: "lead",
+      permission: JSON.stringify({ workspace: ["manage_settings"] }),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+    const feed = await insertFeed(project.id, lead.id);
+    await db
+      .update(schema.workspaceRoleTable)
+      .set({ permission: JSON.stringify({ task: ["read"] }) })
+      .where(eq(schema.workspaceRoleTable.workspaceId, workspace.id));
+    // The request as Kaneo's roles page sends it, after the edit landed.
+    const ctx = {
+      body: {
+        organizationId: workspace.id,
+        roleName: "lead",
+        data: { permission: { task: ["read"] } },
+      },
+      context: {} as Record<string, unknown>,
+    };
+    return { lead, feed, ctx };
+  }
+
+  it("is deleted when its owner's role is edited so it no longer reaches the project", async () => {
+    const { lead, ctx } = await leadWithFeed();
+    ctx.context.returned = { success: true };
+
+    await pruneFeedsAfterRoleEdit(ctx);
+
+    expect(await feedsOf(lead.id)).toEqual([]);
+  });
+
+  it("is left alone when the role edit failed", async () => {
+    const { lead, ctx } = await leadWithFeed();
+    ctx.context.returned = new APIError("FORBIDDEN");
+
+    await pruneFeedsAfterRoleEdit(ctx);
+
+    expect(await feedsOf(lead.id)).toHaveLength(1);
   });
 });

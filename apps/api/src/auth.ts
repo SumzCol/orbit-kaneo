@@ -41,6 +41,8 @@ import {
   formatBillableWorkspacesMessage,
 } from "./billing/controllers/find-billable-workspaces";
 import { syncWorkspaceSeats } from "./billing/controllers/sync-seats";
+import { pruneFeedsAfterRoleEdit } from "./calendar-feed/prune-after-role-change";
+import { pruneWorkspaceCalendarFeeds } from "./calendar-feed/service";
 import db, { schema } from "./database";
 import { authDatabaseAdapter } from "./database/auth-adapter";
 import { publishEvent } from "./events";
@@ -501,6 +503,14 @@ export const auth = betterAuth({
             });
           }
         },
+        // A calendar feed reads as its owner, and a narrower role can end
+        // access they had through the old one. Deleted rather than left to
+        // the fetch check, which would let the old role revive the link.
+        afterUpdateMemberRole: async ({ member, organization }) => {
+          if (member?.userId && organization?.id) {
+            await pruneWorkspaceCalendarFeeds(organization.id, [member.userId]);
+          }
+        },
         afterRemoveMember: async ({ member }) => {
           if (member?.organizationId) {
             // Awaited, unlike the seat sync: this is a revocation, and the
@@ -805,6 +815,12 @@ export const auth = betterAuth({
       }
     }),
     after: createAuthMiddleware(async (ctx) => {
+      // Role edits run through Better Auth with no lifecycle hook of their
+      // own, and can narrow what every member holding the role reaches.
+      if (ctx.path === "/organization/update-role") {
+        await pruneFeedsAfterRoleEdit(ctx);
+      }
+
       if (ctx.path.startsWith("/sign-up") || ctx.path.startsWith("/sign-in")) {
         const newSession = ctx.context.newSession;
         if (newSession) {
