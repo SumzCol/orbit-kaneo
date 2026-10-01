@@ -62,9 +62,27 @@ export function useUserWebSocket() {
         try {
           const message = JSON.parse(event.data as string) as {
             type?: string;
+            projectId?: string;
+            hasAccess?: boolean;
           };
           if (message.type === "NOTIFICATION_CREATED") {
             queryClient.invalidateQueries({ queryKey: ["notifications"] });
+          }
+          if (message.type === "PROJECT_ACCESS_CHANGED") {
+            // Every session gets this, not only one with that board open, so
+            // the sidebar is what it has to fix.
+            void queryClient.invalidateQueries({ queryKey: ["projects"] });
+            if (message.projectId && message.hasAccess === false) {
+              // Queries do not refetch on mount here, so a board cached from
+              // earlier would open on its old tasks the next time it is
+              // visited, despite access having ended.
+              queryClient.removeQueries({
+                queryKey: ["tasks", message.projectId],
+              });
+              queryClient.removeQueries({
+                queryKey: ["project", message.projectId],
+              });
+            }
           }
         } catch {
           // Ignore malformed messages

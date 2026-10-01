@@ -2,7 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import db from "../../database";
 import { projectMemberTable, projectTable } from "../../database/schema";
 import { userCanAccessProject } from "../../utils/project-access";
-import { revokeProjectAccess } from "../../ws";
+import { notifyProjectAccessChanged, revokeProjectAccess } from "../../ws";
 
 /**
  * Drops every project membership a user holds inside one workspace.
@@ -37,9 +37,11 @@ async function revokeWorkspaceProjectMemberships(
     // workspace membership, so the close would cost them realtime updates
     // they are still entitled to. Only the ones who actually lost access are
     // disconnected.
-    if (!(await userCanAccessProject(row.projectId, userId))) {
+    const stillHasAccess = await userCanAccessProject(row.projectId, userId);
+    if (!stillHasAccess) {
       revokeProjectAccess(row.projectId, userId);
     }
+    notifyProjectAccessChanged(userId, row.projectId, stillHasAccess);
   }
 
   return removed.map((row) => row.projectId);

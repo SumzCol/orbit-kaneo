@@ -4429,6 +4429,9 @@
 						"membersAddPlaceholder": {
 							"type": "string"
 						},
+						"membersAddLabel": {
+							"type": "string"
+						},
 						"memberAddedToast": {
 							"type": "string"
 						},
@@ -4476,6 +4479,7 @@
 						"membersEmpty",
 						"membersAdd",
 						"membersAddPlaceholder",
+						"membersAddLabel",
 						"memberAddedToast",
 						"memberAddErrorToast",
 						"memberRemovedToast",
@@ -10805,6 +10809,16 @@
 				},
 				"descriptionLoadError": {
 					"type": "string"
+				},
+				"board": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"reorderFailed": {
+							"type": "string"
+						}
+					},
+					"required": ["reorderFailed"]
 				}
 			},
 			"required": [
@@ -10846,7 +10860,8 @@
 				"descriptionSearchError",
 				"descriptionRetry",
 				"descriptionLoading",
-				"descriptionLoadError"
+				"descriptionLoadError",
+				"board"
 			]
 		},
 		"invitations": {

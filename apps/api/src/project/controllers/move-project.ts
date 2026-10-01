@@ -25,7 +25,7 @@ import {
 } from "../../database/schema";
 import { publishEvent } from "../../events";
 import { userCanAccessProject } from "../../utils/project-access";
-import { closeProjectConnections } from "../../ws";
+import { closeProjectConnections, notifyProjectAccessChanged } from "../../ws";
 
 async function moveProject(
   id: string,
@@ -348,6 +348,9 @@ async function moveProject(
   // message would race this one -- on a peer the move close would usually win,
   // leaving a removed member retrying a connection they can no longer make.
   await closeProjectConnections(id, lostAccess);
+  for (const userId of lostAccess) {
+    notifyProjectAccessChanged(userId, id, false);
+  }
 
   if (unassignedTasks.length > 0) {
     await publishEvent("task.bulk_unassigned", {

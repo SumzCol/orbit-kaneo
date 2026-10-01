@@ -18,6 +18,7 @@ const EMPTY_STATISTICS: ProjectStatistics = {
 async function getProjectStatistics(
   workspaceId: string,
   includeArchived: boolean,
+  visible: ReturnType<typeof visibleProjectCondition>,
 ) {
   const statisticsByProject = new Map<string, ProjectStatistics>();
 
@@ -55,12 +56,17 @@ async function getProjectStatistics(
     // counts above are taken over.
     .leftJoin(columnTable, eq(columnTable.id, taskTable.columnId))
     .where(
-      includeArchived
-        ? eq(projectTable.workspaceId, workspaceId)
-        : and(
-            eq(projectTable.workspaceId, workspaceId),
-            isNull(projectTable.archivedAt),
-          ),
+      and(
+        // Without this the counting still walks every hidden project's tasks,
+        // so a member who sees one project pays for the whole workspace.
+        visible,
+        includeArchived
+          ? eq(projectTable.workspaceId, workspaceId)
+          : and(
+              eq(projectTable.workspaceId, workspaceId),
+              isNull(projectTable.archivedAt),
+            ),
+      ),
     )
     .groupBy(taskTable.projectId);
 
@@ -112,6 +118,7 @@ async function getProjects(
   const statisticsByProject = await getProjectStatistics(
     workspaceId,
     includeArchived,
+    visibleProjectCondition(userId, seesAllProjects),
   );
 
   return projects.map((project) => ({

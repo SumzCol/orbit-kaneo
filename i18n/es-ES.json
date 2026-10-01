@@ -721,6 +721,7 @@
 			"membersEmpty": "Aún no hay miembros",
 			"membersAdd": "Añadir",
 			"membersAddPlaceholder": "Selecciona un miembro del espacio",
+			"membersAddLabel": "Miembro del proyecto a añadir",
 			"memberAddedToast": "Miembro añadido",
 			"memberAddErrorToast": "No se pudo añadir el miembro",
 			"memberRemovedToast": "Miembro eliminado",

@@ -142,6 +142,7 @@ describe("authorizeAssetAccess", () => {
         workspaceId: "workspace-1",
         projectId: "project-1",
         isPublic: false,
+        surface: "description",
       }),
     );
 

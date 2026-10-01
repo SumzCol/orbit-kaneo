@@ -10,7 +10,7 @@ import {
 import { useUserWebSocket } from "./use-user-websocket";
 
 const { client, auth } = vi.hoisted(() => ({
-  client: { invalidateQueries: vi.fn() },
+  client: { invalidateQueries: vi.fn(), removeQueries: vi.fn() },
   auth: { userId: "user-a" as string | null },
 }));
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => client }));
@@ -49,6 +49,7 @@ describe("user WebSocket lifecycle", () => {
     TestSocket.instances = [];
     auth.userId = "user-a";
     client.invalidateQueries.mockClear();
+    client.removeQueries.mockClear();
   });
   afterEach(() => {
     cleanup();
@@ -129,5 +130,64 @@ describe("user WebSocket lifecycle", () => {
     expect(TestSocket.instances).toHaveLength(6);
     unmount();
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("project access changes on the user socket", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal("WebSocket", TestSocket);
+    vi.stubEnv("VITE_API_URL", "http://localhost:1337");
+    TestSocket.instances = [];
+    auth.userId = "user-a";
+    client.invalidateQueries.mockClear();
+    client.removeQueries.mockClear();
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  function receive(message: Record<string, unknown>) {
+    renderHook(() => useUserWebSocket());
+    const [socket] = TestSocket.instances;
+    act(() => socket.open());
+    act(() => socket.onmessage?.({ data: JSON.stringify(message) }));
+  }
+
+  // Every session gets this, so the sidebar is the thing to fix. Without it
+  // a project someone was added to, or removed from, stays as it was in every
+  // tab that does not have that board open.
+  it("refreshes the project list when access is granted", () => {
+    receive({
+      type: "PROJECT_ACCESS_CHANGED",
+      projectId: "project-1",
+      hasAccess: true,
+    });
+
+    expect(client.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["projects"],
+    });
+    expect(client.removeQueries).not.toHaveBeenCalled();
+  });
+
+  it("also drops the project's cached board when access ends", () => {
+    receive({
+      type: "PROJECT_ACCESS_CHANGED",
+      projectId: "project-1",
+      hasAccess: false,
+    });
+
+    expect(client.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["projects"],
+    });
+    expect(client.removeQueries).toHaveBeenCalledWith({
+      queryKey: ["tasks", "project-1"],
+    });
+    expect(client.removeQueries).toHaveBeenCalledWith({
+      queryKey: ["project", "project-1"],
+    });
   });
 });

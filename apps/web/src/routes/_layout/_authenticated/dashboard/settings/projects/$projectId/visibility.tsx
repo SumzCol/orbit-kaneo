@@ -262,7 +262,13 @@ function RouteComponent() {
                   if (typeof value === "string") setMemberToAdd(value);
                 }}
               >
-                <SelectTrigger size="sm" className="h-8 w-64">
+                <SelectTrigger
+                  size="sm"
+                  className="h-8 w-64"
+                  // Once someone is picked the visible text is their name, so
+                  // the control needs a name of its own.
+                  aria-label={t("settings:projectVisibility.membersAddLabel")}
+                >
                   <SelectValue>
                     {memberToAdd
                       ? (addableMembers.find(

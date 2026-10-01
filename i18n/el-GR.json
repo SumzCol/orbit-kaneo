@@ -832,7 +832,8 @@
 			"memberRemoveLabel": "Remove {{name}}",
 			"memberRemoveSelfHint": "You cannot remove yourself from a project",
 			"memberRemoveLastHint": "A project must keep at least one member",
-			"membersManageHint": "Only people who can share this project may change who is on it."
+			"membersManageHint": "Only people who can share this project may change who is on it.",
+			"membersAddLabel": "Project member to add"
 		},
 		"projectWorkflow": {
 			"pageTitle": "Ρυθμίσεις ροής εργασίας",

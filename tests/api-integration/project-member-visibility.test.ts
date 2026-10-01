@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
 import journal from "../../apps/api/drizzle/meta/_journal.json";
 import { createApp } from "../../apps/api/src/index";
+import addProjectMember from "../../apps/api/src/project/controllers/add-project-member";
 import createProject from "../../apps/api/src/project/controllers/create-project";
 import moveProject from "../../apps/api/src/project/controllers/move-project";
 import removeProjectMember from "../../apps/api/src/project/controllers/remove-project-member";
@@ -29,6 +30,8 @@ import {
 const closed: { projectId: string; revokedUserIds: string[] }[] = vi.hoisted(
   () => [],
 );
+const notified: { userId: string; projectId: string; hasAccess: boolean }[] =
+  vi.hoisted(() => []);
 vi.mock("../../apps/api/src/ws", async (original) => ({
   ...(await original<typeof import("../../apps/api/src/ws")>()),
   closeProjectConnections: async (
@@ -36,6 +39,13 @@ vi.mock("../../apps/api/src/ws", async (original) => ({
     revokedUserIds: string[] = [],
   ) => {
     closed.push({ projectId, revokedUserIds });
+  },
+  notifyProjectAccessChanged: (
+    userId: string,
+    projectId: string,
+    hasAccess: boolean,
+  ) => {
+    notified.push({ userId, projectId, hasAccess });
   },
 }));
 
@@ -763,6 +773,109 @@ describe("keeping a project populated", () => {
       owner.id,
     );
     expect(await isProjectMember(byOwner.id, owner.id)).toBe(true);
+  });
+});
+
+describe("telling every session that access changed", () => {
+  it("notifies a member who is added, and one who is removed", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const member = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+
+    await addProjectMember(project.id, workspace.id, member.id);
+    expect(notified).toContainEqual({
+      userId: member.id,
+      projectId: project.id,
+      hasAccess: true,
+    });
+
+    await removeProjectMember(project.id, member.id, owner.id);
+    expect(notified).toContainEqual({
+      userId: member.id,
+      projectId: project.id,
+      hasAccess: false,
+    });
+  });
+
+  it("says an administrator removed from a project still has it", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const admin = await addWorkspaceMember(workspace.id, "admin");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, admin.id],
+    });
+
+    await removeProjectMember(project.id, admin.id, owner.id);
+    // Telling them access ended would make their client drop a board they
+    // can still open.
+    expect(notified).toContainEqual({
+      userId: admin.id,
+      projectId: project.id,
+      hasAccess: true,
+    });
+  });
+
+  it("notifies someone who leaves the workspace, for each of its projects", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const member = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, member.id],
+    });
+
+    await db
+      .delete(schema.workspaceUserTable)
+      .where(
+        and(
+          eq(schema.workspaceUserTable.workspaceId, workspace.id),
+          eq(schema.workspaceUserTable.userId, member.id),
+        ),
+      );
+    await revokeWorkspaceProjectMemberships(workspace.id, member.id);
+
+    expect(notified).toContainEqual({
+      userId: member.id,
+      projectId: project.id,
+      hasAccess: false,
+    });
+  });
+
+  it("notifies the members a move leaves behind", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const sourceOnly = await addWorkspaceMember(source.workspace.id, "member");
+    const target = await createWorkspaceMember({ role: "owner" });
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id, sourceOnly.id],
+    });
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    expect(notified).toContainEqual({
+      userId: sourceOnly.id,
+      projectId: project.id,
+      hasAccess: false,
+    });
   });
 });
 

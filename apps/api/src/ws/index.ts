@@ -82,6 +82,24 @@ export function broadcastToUser(userId: string, message: UserBroadcastMessage) {
     });
 }
 
+/**
+ * Tells every session a user has open, not only a board on this project, that
+ * their access to it changed. The project socket only reaches someone who has
+ * that board open; the sidebar in every other tab keeps listing the project
+ * (or keeps not listing it) until something unrelated refetches.
+ */
+export function notifyProjectAccessChanged(
+  userId: string,
+  projectId: string,
+  hasAccess: boolean,
+) {
+  broadcastToUser(userId, {
+    type: "PROJECT_ACCESS_CHANGED",
+    projectId,
+    hasAccess,
+  });
+}
+
 function deliverToLocalUserConnections(
   userId: string,
   message: UserBroadcastMessage,

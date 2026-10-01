@@ -7,7 +7,7 @@ import {
   workspaceUserTable,
 } from "../../database/schema";
 import { userCanAccessProject } from "../../utils/project-access";
-import { revokeProjectAccess } from "../../ws";
+import { notifyProjectAccessChanged, revokeProjectAccess } from "../../ws";
 
 async function removeProjectMember(
   projectId: string,
@@ -108,9 +108,11 @@ async function removeProjectMember(
   // so removing the row does not necessarily remove their access. Closing
   // their board with 4403 would stop the client reconnecting and drop its
   // caches while they are still entitled to both.
-  if (!(await userCanAccessProject(projectId, userId))) {
+  const stillHasAccess = await userCanAccessProject(projectId, userId);
+  if (!stillHasAccess) {
     revokeProjectAccess(projectId, userId);
   }
+  notifyProjectAccessChanged(userId, projectId, stillHasAccess);
 
   return removed;
 }

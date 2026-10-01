@@ -1139,6 +1139,7 @@
 			"membersEmpty": "No members yet",
 			"membersAdd": "Add",
 			"membersAddPlaceholder": "Select a workspace member",
+			"membersAddLabel": "Project member to add",
 			"memberAddedToast": "Member added",
 			"memberAddErrorToast": "Failed to add the member",
 			"memberRemovedToast": "Member removed",
