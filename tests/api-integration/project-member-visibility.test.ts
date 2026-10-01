@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
 import journal from "../../apps/api/drizzle/meta/_journal.json";
 import { createApp } from "../../apps/api/src/index";
+import createProject from "../../apps/api/src/project/controllers/create-project";
 import moveProject from "../../apps/api/src/project/controllers/move-project";
 import removeProjectMember from "../../apps/api/src/project/controllers/remove-project-member";
 import revokeWorkspaceProjectMemberships from "../../apps/api/src/project/controllers/revoke-workspace-project-memberships";
@@ -679,6 +680,89 @@ describe("a move performed by someone outside the target workspace", () => {
       instanceAdmin.id,
     );
     expect(await isProjectMember(project.id, target.user.id)).toBe(true);
+  });
+});
+
+describe("keeping a project populated", () => {
+  it("adds nobody on a move when a member survives it", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    // In both workspaces, so their membership survives the move.
+    const both = await addWorkspaceMember(source.workspace.id, "member");
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: both.id,
+      role: "member",
+      joinedAt: new Date(),
+    });
+    // The mover is in the target too, so an unconditional fallback would
+    // pick them.
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [both.id],
+    });
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    const members = await db
+      .select({ userId: schema.projectMemberTable.userId })
+      .from(schema.projectMemberTable)
+      .where(eq(schema.projectMemberTable.projectId, project.id));
+    // The surviving member is enough. Seeding the mover anyway would hand
+    // them a standing membership they never asked for.
+    expect(members.map((member) => member.userId)).toEqual([both.id]);
+  });
+
+  it("records a creator only when the membership would count", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const [instanceAdmin] = await db
+      .insert(schema.userTable)
+      .values({
+        id: `user-${randomUUID()}`,
+        email: `admin-${randomUUID()}@example.com`,
+        emailVerified: true,
+        name: "Instance admin",
+        role: "admin",
+      })
+      .returning();
+
+    // Created by an instance administrator who never joined the workspace.
+    const byAdmin = await createProject(
+      workspace.id,
+      "By an administrator",
+      "Layout",
+      `adm${randomUUID().slice(0, 6)}`,
+      instanceAdmin.id,
+    );
+    const adminRows = await db
+      .select()
+      .from(schema.projectMemberTable)
+      .where(eq(schema.projectMemberTable.projectId, byAdmin.id));
+    // An inert row would claim a creator the project does not really have.
+    expect(adminRows).toEqual([]);
+
+    // An ordinary creator is still joined.
+    const byOwner = await createProject(
+      workspace.id,
+      "By the owner",
+      "Layout",
+      `own${randomUUID().slice(0, 6)}`,
+      owner.id,
+    );
+    expect(await isProjectMember(byOwner.id, owner.id)).toBe(true);
   });
 });
 
