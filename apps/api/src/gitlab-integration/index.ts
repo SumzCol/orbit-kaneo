@@ -220,7 +220,7 @@ const importIssuesRoute = createRoute({
     200: jsonResponse("Import summary", gitlabImportResultSchema),
     400: errorResponse("projectId is required"),
     403: errorResponse(
-      "No workspace access, or missing task:create or task:update permission",
+      "No workspace access, missing task:create or task:update permission, or no access to the project",
     ),
     404: errorResponse("Project not found"),
   },

@@ -14805,7 +14805,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:create or task:update permission",
+            "description": "No workspace access, missing task:create or task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {

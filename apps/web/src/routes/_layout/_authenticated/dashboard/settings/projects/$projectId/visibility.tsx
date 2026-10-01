@@ -311,24 +311,42 @@ function RouteComponent() {
                       </Avatar>
                       <span className="text-sm truncate">{member.name}</span>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      // The visible label is the same on every row, so the
-                      // accessible name has to carry which member it removes.
-                      aria-label={t(
-                        "settings:projectVisibility.memberRemoveLabel",
-                        { name: member.name },
+                    <div className="flex items-center gap-2">
+                      {/* Rendered as text rather than a title: the button it
+                          explains is disabled, so it takes neither focus nor
+                          a pointer, and a tooltip on it can be reached by
+                          nobody. */}
+                      {removalBlockedReason(member.userId) && (
+                        <span
+                          id={`member-remove-blocked-${member.userId}`}
+                          className="text-xs text-muted-foreground"
+                        >
+                          {removalBlockedReason(member.userId)}
+                        </span>
                       )}
-                      title={removalBlockedReason(member.userId) ?? undefined}
-                      disabled={
-                        !canShare ||
-                        removalBlockedReason(member.userId) !== null
-                      }
-                      onClick={() => void handleRemoveMember(member.userId)}
-                    >
-                      {t("settings:projectVisibility.memberRemove")}
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        // The visible label is the same on every row, so the
+                        // accessible name has to carry which member it removes.
+                        aria-label={t(
+                          "settings:projectVisibility.memberRemoveLabel",
+                          { name: member.name },
+                        )}
+                        aria-describedby={
+                          removalBlockedReason(member.userId)
+                            ? `member-remove-blocked-${member.userId}`
+                            : undefined
+                        }
+                        disabled={
+                          !canShare ||
+                          removalBlockedReason(member.userId) !== null
+                        }
+                        onClick={() => void handleRemoveMember(member.userId)}
+                      >
+                        {t("settings:projectVisibility.memberRemove")}
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>
