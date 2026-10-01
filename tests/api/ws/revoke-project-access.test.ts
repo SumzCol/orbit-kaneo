@@ -23,9 +23,11 @@ vi.mock("../../../apps/api/src/database", () => ({
 const access = vi.hoisted(() => ({
   allowed: new Set<string>(),
   fail: false,
+  gate: undefined as (() => Promise<void>) | undefined,
 }));
 vi.mock("../../../apps/api/src/utils/project-access", () => ({
   userCanAccessProject: async (projectId: string, userId: string) => {
+    if (access.gate) await access.gate();
     if (access.fail) throw new Error("lookup unavailable");
     return access.allowed.has(`${projectId}:${userId}`);
   },
@@ -162,6 +164,40 @@ describe("revokeProjectAccess", () => {
     // keeps this connection open: a failed lookup is not evidence of
     // revocation.
     expect(conn.ws.close).not.toHaveBeenCalled();
+  });
+
+  it("does not start a second sweep while one is still running", async () => {
+    await initializeWebSocketAdapter();
+    connect("proj-1", "user-kept");
+    access.allowed.clear();
+    access.allowed.add("proj-1:user-kept");
+
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let calls = 0;
+    access.gate = async () => {
+      calls += 1;
+      await held;
+    };
+    try {
+      const first = sweepRevokedConnections();
+      // A tick arriving mid-sweep is dropped rather than queued: overlapping
+      // runs would multiply the database load instead of catching up.
+      await sweepRevokedConnections();
+      expect(calls).toBe(1);
+      release();
+      await first;
+
+      // Once it finishes, the next tick runs normally.
+      access.gate = undefined;
+      await sweepRevokedConnections();
+      expect(calls).toBe(1);
+    } finally {
+      release();
+      access.gate = undefined;
+    }
   });
 
   it("never sends the control message to a socket", async () => {

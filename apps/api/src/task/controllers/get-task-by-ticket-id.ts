@@ -13,9 +13,6 @@ import { hasInstanceAdminRole } from "../../utils/instance-admin-role";
 import { userCanAccessProject } from "../../utils/project-access";
 import getTask from "./get-task";
 
-// Bounds the work when a slug and number collide across many workspaces.
-const VISIBILITY_CANDIDATES = 20;
-
 export default async function getTaskByTicketId(
   ticketId: string,
   userId: string,
@@ -58,12 +55,12 @@ export default async function getTaskByTicketId(
           ? undefined
           : inArray(projectTable.workspaceId, memberWorkspaces),
       ),
-    )
-    // Two would be enough to spot an ambiguous ticket, but the ones the caller
-    // cannot open are dropped below, and a hidden match must not hide a
-    // visible one behind it. A slug and number pair is close to unique per
-    // workspace, so this stays a handful of rows.
-    .limit(VISIBILITY_CANDIDATES);
+    );
+  // Deliberately unbounded. Any cap can truncate to a set of hidden matches
+  // and answer 404 while a visible one sits just past the limit, and the
+  // rows are already narrowed to one slug, one number and the workspaces
+  // this caller belongs to -- at most one task per project that shares the
+  // slug, which is what the 409 below exists to report.
 
   // This route resolves a task from a slug and a number rather than an id, so
   // there is no project for the access middleware to check before the lookup.

@@ -1,7 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import db from "../../database";
-import { projectMemberTable, projectTable } from "../../database/schema";
+import {
+  projectMemberTable,
+  projectTable,
+  workspaceUserTable,
+} from "../../database/schema";
 import { revokeProjectAccess } from "../../ws";
 
 async function removeProjectMember(
@@ -27,18 +31,48 @@ async function removeProjectMember(
       .where(eq(projectTable.id, projectId))
       .for("update");
 
+    // Rows whose workspace membership is gone grant no access, so they cannot
+    // be what keeps a project populated either. Counting them would let the
+    // last real member leave behind a project nobody reaches.
     const members = await tx
       .select({ userId: projectMemberTable.userId })
       .from(projectMemberTable)
+      .innerJoin(
+        projectTable,
+        eq(projectTable.id, projectMemberTable.projectId),
+      )
+      .innerJoin(
+        workspaceUserTable,
+        and(
+          eq(workspaceUserTable.workspaceId, projectTable.workspaceId),
+          eq(workspaceUserTable.userId, projectMemberTable.userId),
+        ),
+      )
       .where(eq(projectMemberTable.projectId, projectId));
 
-    if (!members.some((member) => member.userId === userId)) {
+    const [target] = await tx
+      .select({ userId: projectMemberTable.userId })
+      .from(projectMemberTable)
+      .where(
+        and(
+          eq(projectMemberTable.projectId, projectId),
+          eq(projectMemberTable.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    if (!target) {
       throw new HTTPException(404, {
         message: "User is not a member of this project",
       });
     }
 
-    if (members.length === 1) {
+    // Removing a row that already grants nothing cannot empty the project, so
+    // the guard only applies when the target is one of the effective members.
+    if (
+      members.some((member) => member.userId === userId) &&
+      members.length === 1
+    ) {
       // A project with no members is reachable only by whoever administers the
       // workspace, which is a state nobody asks for on purpose.
       throw new HTTPException(400, {

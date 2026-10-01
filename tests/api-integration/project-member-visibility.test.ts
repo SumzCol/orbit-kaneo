@@ -8,6 +8,7 @@ import db, { schema } from "../../apps/api/src/database";
 import journal from "../../apps/api/drizzle/meta/_journal.json";
 import { createApp } from "../../apps/api/src/index";
 import moveProject from "../../apps/api/src/project/controllers/move-project";
+import removeProjectMember from "../../apps/api/src/project/controllers/remove-project-member";
 import revokeWorkspaceProjectMemberships from "../../apps/api/src/project/controllers/revoke-workspace-project-memberships";
 import { isProjectMember } from "../../apps/api/src/utils/project-access";
 import { mockAuthenticatedSession } from "./helpers/auth";
@@ -537,6 +538,41 @@ describe("read paths that do not resolve a project by id", () => {
     expect(names).not.toContain("secret-release");
     // Workspace-level labels are not project data and stay visible.
     expect(names).toContain("workspace-wide");
+  });
+});
+
+describe("the last-member guard and stale rows", () => {
+  it("counts only members who are still in the workspace", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const departed = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, departed.id],
+    });
+
+    // The cleanup did not run: the workspace membership is gone, the project
+    // membership is not. That row grants no access, so it cannot be what
+    // keeps the project populated either.
+    await db
+      .delete(schema.workspaceUserTable)
+      .where(
+        and(
+          eq(schema.workspaceUserTable.workspaceId, workspace.id),
+          eq(schema.workspaceUserTable.userId, departed.id),
+        ),
+      );
+
+    await expect(
+      removeProjectMember(project.id, owner.id, departed.id),
+    ).rejects.toMatchObject({ status: 400 });
+
+    // The stale row itself can still be cleaned up: removing it empties
+    // nothing, because it was already granting nothing.
+    await expect(
+      removeProjectMember(project.id, departed.id, owner.id),
+    ).resolves.toMatchObject({ userId: departed.id });
   });
 });
 

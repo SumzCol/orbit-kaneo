@@ -255,8 +255,23 @@ function currentProjectWorkspace(projectId: string) {
 // path, which must not grow a database read per message.
 const ACCESS_SWEEP_MS = 30_000;
 let accessSweep: ReturnType<typeof setInterval> | null = null;
+let sweepInFlight = false;
 
 export async function sweepRevokedConnections() {
+  // One sweep walks every connected project and user sequentially, so a slow
+  // database or enough open boards can outlast the interval. Overlapping runs
+  // would multiply that load rather than catch up, so a tick that arrives
+  // while one is still going is dropped.
+  if (sweepInFlight) return;
+  sweepInFlight = true;
+  try {
+    await runRevocationSweep();
+  } finally {
+    sweepInFlight = false;
+  }
+}
+
+async function runRevocationSweep() {
   for (const [projectId, connections] of [...projectConnections.entries()]) {
     const userIds = new Set([...connections].map((conn) => conn.userId));
     for (const userId of userIds) {
