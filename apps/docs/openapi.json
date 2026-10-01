@@ -7392,7 +7392,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7591,7 +7591,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8847,7 +8847,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9818,7 +9818,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10659,7 +10659,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13364,7 +13364,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13957,7 +13957,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14499,7 +14499,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14870,7 +14870,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15254,7 +15254,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15588,7 +15588,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15922,7 +15922,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16256,7 +16256,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17224,7 +17224,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the project's workspace",
+            "description": "No access to the project's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {

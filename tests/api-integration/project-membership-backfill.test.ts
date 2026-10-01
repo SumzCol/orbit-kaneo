@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
 import journal from "../../apps/api/drizzle/meta/_journal.json";
+import { isProjectMember } from "../../apps/api/src/utils/project-access";
 import { resetTestDatabase } from "./helpers/database";
 import {
   addWorkspaceMember,
@@ -28,6 +29,24 @@ const backfillPath = resolve(
     )?.tag
   }.sql`,
 );
+
+// The migration that links each row to the workspace membership it stands on.
+// Found by its statement rather than its name, for the same reason as above.
+// Only the UPDATE runs here: the rest of the file adds the column and its
+// constraint, which the test database already has.
+const linkBackfill = (() => {
+  const dir = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../apps/api/drizzle",
+  );
+  for (const entry of journal.entries) {
+    const statement = readFileSync(resolve(dir, `${entry.tag}.sql`), "utf8")
+      .split("--> statement-breakpoint")
+      .find((part) => part.includes('SET "workspace_member_id"'));
+    if (statement) return statement;
+  }
+  throw new Error("No migration backfills project_member.workspace_member_id");
+})();
 
 describe("the upgrade backfill", () => {
   it("gives every existing workspace member access to every project they could already see", async () => {
@@ -80,5 +99,101 @@ describe("the upgrade backfill", () => {
 
     const rows = await db.select().from(schema.projectMemberTable);
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe("linking existing memberships on upgrade", () => {
+  // Rows as an older version left them: no link, so the access check grants
+  // nothing until the backfill fills it in.
+  async function unlink(projectId: string) {
+    await db
+      .update(schema.projectMemberTable)
+      .set({ workspaceMemberId: null })
+      .where(eq(schema.projectMemberTable.projectId, projectId));
+  }
+
+  async function membershipId(workspaceId: string, userId: string) {
+    const [row] = await db
+      .select({ id: schema.workspaceUserTable.id })
+      .from(schema.workspaceUserTable)
+      .where(
+        and(
+          eq(schema.workspaceUserTable.workspaceId, workspaceId),
+          eq(schema.workspaceUserTable.userId, userId),
+        ),
+      );
+    return row?.id;
+  }
+
+  it("restores access to every member who is still in the workspace", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const colleague = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, colleague.id],
+    });
+    await unlink(project.id);
+    expect(await isProjectMember(project.id, colleague.id)).toBe(false);
+
+    await db.execute(sql.raw(linkBackfill));
+
+    // Without this, every upgraded member who isn't an administrator loses
+    // every project they had.
+    expect(await isProjectMember(project.id, owner.id)).toBe(true);
+    expect(await isProjectMember(project.id, colleague.id)).toBe(true);
+  });
+
+  it("links the membership in the project's own workspace", async () => {
+    const { workspace } = await createWorkspaceMember({ role: "owner" });
+    const other = await createWorkspaceMember({ role: "owner" });
+    // In both workspaces, so a join that ignores the project's workspace could
+    // pick either membership.
+    const both = await addWorkspaceMember(other.workspace.id, "member");
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: workspace.id,
+      userId: both.id,
+      role: "member",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [both.id],
+    });
+    await unlink(project.id);
+
+    await db.execute(sql.raw(linkBackfill));
+
+    const [row] = await db
+      .select({ link: schema.projectMemberTable.workspaceMemberId })
+      .from(schema.projectMemberTable)
+      .where(eq(schema.projectMemberTable.projectId, project.id));
+    expect(row?.link).toBe(await membershipId(workspace.id, both.id));
+  });
+
+  it("leaves a row for someone who has left the workspace unlinked", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const departed = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, departed.id],
+    });
+    await unlink(project.id);
+    await db
+      .delete(schema.workspaceUserTable)
+      .where(
+        and(
+          eq(schema.workspaceUserTable.workspaceId, workspace.id),
+          eq(schema.workspaceUserTable.userId, departed.id),
+        ),
+      );
+
+    await db.execute(sql.raw(linkBackfill));
+
+    // Already stale before the upgrade, so it stays granting nothing.
+    expect(await isProjectMember(project.id, departed.id)).toBe(false);
   });
 });
