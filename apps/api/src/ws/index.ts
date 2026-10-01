@@ -16,7 +16,12 @@ import type {
   UserBroadcast,
   UserBroadcastMessage,
 } from "./broadcast-adapter";
-import { userCanAccessProject } from "../utils/project-access";
+import {
+  accessibleProjectPairs,
+  type ProjectUserPair,
+  projectUserKey,
+  userCanAccessProject,
+} from "../utils/project-access";
 import { InMemoryBroadcastAdapter } from "./in-memory-broadcast-adapter";
 import { RedisBroadcastAdapter } from "./redis-broadcast-adapter";
 
@@ -346,23 +351,33 @@ export async function sweepRevokedConnections() {
   }
 }
 
+// Pairs per batched lookup. Keeps each query's IN lists bounded however many
+// boards are open, while a sweep still costs a handful of queries per batch
+// rather than several per connection.
+const SWEEP_BATCH_SIZE = 500;
+
 async function runRevocationSweep() {
-  for (const [projectId, connections] of [...projectConnections.entries()]) {
+  const pairs: ProjectUserPair[] = [];
+  for (const [projectId, connections] of projectConnections.entries()) {
     const userIds = new Set([...connections].map((conn) => conn.userId));
-    for (const userId of userIds) {
-      let allowed: boolean;
-      try {
-        allowed = await userCanAccessProject(projectId, userId);
-      } catch (error) {
-        // A failed lookup is not evidence of revocation; leave the connection
-        // for the next sweep rather than disconnecting on a blip.
-        console.error(
-          `Failed to revalidate project ${projectId} access:`,
-          error,
-        );
-        continue;
+    for (const userId of userIds) pairs.push({ projectId, userId });
+  }
+
+  for (let start = 0; start < pairs.length; start += SWEEP_BATCH_SIZE) {
+    const batch = pairs.slice(start, start + SWEEP_BATCH_SIZE);
+    let allowed: Set<string>;
+    try {
+      allowed = await accessibleProjectPairs(batch);
+    } catch (error) {
+      // A failed lookup is not evidence of revocation; leave these
+      // connections for the next sweep rather than disconnecting on a blip.
+      console.error("Failed to revalidate open project connections:", error);
+      continue;
+    }
+    for (const pair of batch) {
+      if (!allowed.has(projectUserKey(pair))) {
+        closeLocalProjectConnectionsForUser(pair.projectId, pair.userId);
       }
-      if (!allowed) closeLocalProjectConnectionsForUser(projectId, userId);
     }
   }
 }

@@ -28,14 +28,28 @@ const access = vi.hoisted(() => ({
   allowed: new Set<string>(),
   fail: false,
   gate: undefined as (() => Promise<void>) | undefined,
+  batches: [] as number[],
 }));
-vi.mock("../../../apps/api/src/utils/project-access", () => ({
-  userCanAccessProject: async (projectId: string, userId: string) => {
-    if (access.gate) await access.gate();
-    if (access.fail) throw new Error("lookup unavailable");
-    return access.allowed.has(`${projectId}:${userId}`);
-  },
-}));
+vi.mock("../../../apps/api/src/utils/project-access", () => {
+  const key = (pair: { projectId: string; userId: string }) =>
+    `${pair.projectId}:${pair.userId}`;
+  return {
+    projectUserKey: key,
+    userCanAccessProject: async (projectId: string, userId: string) => {
+      if (access.gate) await access.gate();
+      if (access.fail) throw new Error("lookup unavailable");
+      return access.allowed.has(`${projectId}:${userId}`);
+    },
+    accessibleProjectPairs: async (
+      pairs: { projectId: string; userId: string }[],
+    ) => {
+      access.batches.push(pairs.length);
+      if (access.gate) await access.gate();
+      if (access.fail) throw new Error("lookup unavailable");
+      return new Set(pairs.map(key).filter((k) => access.allowed.has(k)));
+    },
+  };
+});
 
 // No Redis configured means the in-memory adapter, which loops a publish
 // straight back into the subscriber, so one call covers both the local close
@@ -174,6 +188,23 @@ describe("revokeProjectAccess", () => {
 
     expect(stale.ws.close).toHaveBeenCalledWith(4403, "Project access revoked");
     expect(kept.ws.close).not.toHaveBeenCalled();
+  });
+
+  // One lookup per connection made a sweep's cost, and so how long a revoked
+  // user stayed connected, grow with every open board.
+  it("checks every open board in one batched lookup", async () => {
+    await initializeWebSocketAdapter();
+    connect("proj-1", "user-a");
+    connect("proj-1", "user-b");
+    connect("proj-2", "user-a");
+    // A second tab of the same user on the same board is one pair, not two.
+    connect("proj-2", "user-a");
+    access.allowed.clear();
+    access.batches.length = 0;
+
+    await sweepRevokedConnections();
+
+    expect(access.batches).toEqual([3]);
   });
 
   it("leaves connections alone when the lookup fails", async () => {
