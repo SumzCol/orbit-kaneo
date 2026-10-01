@@ -30,7 +30,7 @@ import { useProjectWebSocket } from "./use-project-websocket";
 type Socket = {
   onopen: (() => void) | null;
   onmessage: ((event: { data: string }) => void) | null;
-  onclose: ((event?: CloseEvent) => void) | null;
+  onclose: (() => void) | null;
   onerror: (() => void) | null;
   readyState: number;
   send: ReturnType<typeof vi.fn>;
@@ -40,14 +40,12 @@ type Socket = {
 describe("useProjectWebSocket relation invalidation", () => {
   let socket: Socket;
   let invalidate: MockInstance<QueryClient["invalidateQueries"]>;
-  let remove: MockInstance<QueryClient["removeQueries"]>;
 
   function mount() {
     const client = new QueryClient();
     invalidate = vi
       .spyOn(client, "invalidateQueries")
       .mockResolvedValue(undefined);
-    remove = vi.spyOn(client, "removeQueries").mockReturnValue(undefined);
 
     renderHook(
       () => {
@@ -166,26 +164,6 @@ describe("useProjectWebSocket relation invalidation", () => {
     receive({ type, projectId: "project-1", taskId: "task-1" });
 
     expect(invalidatedKeys()).not.toContain(projectRelationsKey);
-  });
-
-  // The socket closing is the only signal a revoked member gets, so the caches
-  // have to be dropped here or the project stays in the sidebar and the board
-  // keeps showing what it held when access ended.
-  it("drops the project's caches when access is revoked", () => {
-    socket.onclose?.({ code: 4403 } as CloseEvent);
-
-    const removed = remove.mock.calls.map((call) =>
-      JSON.stringify(call[0]?.queryKey),
-    );
-    expect(removed).toContain(JSON.stringify(["tasks", "project-1"]));
-    expect(removed).toContain(JSON.stringify(["project", "project-1"]));
-    expect(invalidatedKeys()).toContain(JSON.stringify(["projects"]));
-  });
-
-  it("leaves them alone on an ordinary close", () => {
-    socket.onclose?.({ code: 1006 } as CloseEvent);
-
-    expect(remove).not.toHaveBeenCalled();
   });
 
   it("ignores a malformed message", () => {

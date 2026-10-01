@@ -24,8 +24,7 @@ import {
   projectMemberTable,
 } from "../../database/schema";
 import { publishEvent } from "../../events";
-import { userCanAccessProject } from "../../utils/project-access";
-import { closeProjectConnections, notifyProjectAccessChanged } from "../../ws";
+import { closeProjectConnections } from "../../ws";
 
 async function moveProject(
   id: string,
@@ -39,7 +38,6 @@ async function moveProject(
     });
   }
 
-  let revoked: string[] = [];
   const { movedProject, unassignedTasks } = await db.transaction(async (tx) => {
     // Use a stable order for both workspaces before locking the project row.
     // This also keeps source reorders from updating a project after it moves.
@@ -233,7 +231,7 @@ async function moveProject(
     // names and email addresses to the destination. Dropped rather than
     // translated, the same way an assignee outside the target is unassigned
     // above.
-    const droppedMembers = await tx
+    await tx
       .delete(projectMemberTable)
       .where(
         and(
@@ -246,9 +244,7 @@ async function moveProject(
               .where(eq(workspaceUserTable.workspaceId, targetWorkspaceId)),
           ),
         ),
-      )
-      .returning({ userId: projectMemberTable.userId });
-    revoked = droppedMembers.map((member) => member.userId);
+      );
 
     // The members who survive are in the target workspace too, but their rows
     // still point at the source membership. Left alone they would keep access
@@ -359,24 +355,7 @@ async function moveProject(
     return { movedProject, unassignedTasks: unassigned };
   });
 
-  // A deleted row does not always mean access is gone: an instance
-  // administrator reaches the project from either workspace without one. Asked
-  // again before anybody is told their access ended.
-  const lostAccess: string[] = [];
-  for (const userId of revoked) {
-    if (!(await userCanAccessProject(id, userId))) {
-      lostAccess.push(userId);
-    }
-  }
-
-  // Carried on the move message rather than sent separately. The client only
-  // drops the project's caches and stops retrying on 4403, and a second
-  // message would race this one -- on a peer the move close would usually win,
-  // leaving a removed member retrying a connection they can no longer make.
-  await closeProjectConnections(id, lostAccess);
-  for (const userId of lostAccess) {
-    notifyProjectAccessChanged(userId, id, false);
-  }
+  await closeProjectConnections(id);
 
   if (unassignedTasks.length > 0) {
     await publishEvent("task.bulk_unassigned", {

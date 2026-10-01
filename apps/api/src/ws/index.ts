@@ -16,21 +16,10 @@ import type {
   UserBroadcast,
   UserBroadcastMessage,
 } from "./broadcast-adapter";
-import { userCanAccessProject } from "../utils/project-access";
 import { InMemoryBroadcastAdapter } from "./in-memory-broadcast-adapter";
 import { RedisBroadcastAdapter } from "./redis-broadcast-adapter";
 
 const INSTANCE_ID = randomUUID();
-
-/**
- * Control message rather than a client notification: it never reaches a
- * socket, it closes one. Access is checked once at upgrade time, so without it
- * a removed member keeps receiving a project's events until they reconnect.
- */
-const PROJECT_ACCESS_REVOKED = "PROJECT_ACCESS_REVOKED";
-
-// 4403 mirrors the HTTP status the reconnect attempt will get.
-const ACCESS_REVOKED_CLOSE_CODE = 4403;
 
 type ProjectConnection = {
   ws: WSContext;
@@ -80,24 +69,6 @@ export function broadcastToUser(userId: string, message: UserBroadcastMessage) {
     .catch((err) => {
       console.error("Failed to publish a user broadcast:", err);
     });
-}
-
-/**
- * Tells every session a user has open, not only a board on this project, that
- * their access to it changed. The project socket only reaches someone who has
- * that board open; the sidebar in every other tab keeps listing the project
- * (or keeps not listing it) until something unrelated refetches.
- */
-export function notifyProjectAccessChanged(
-  userId: string,
-  projectId: string,
-  hasAccess: boolean,
-) {
-  broadcastToUser(userId, {
-    type: "PROJECT_ACCESS_CHANGED",
-    projectId,
-    hasAccess,
-  });
 }
 
 function deliverToLocalUserConnections(
@@ -150,32 +121,6 @@ export async function initializeWebSocketAdapter() {
 
   try {
     await nextAdapter.subscribe((msg: BroadcastMessage) => {
-      if (msg.message.type === PROJECT_ACCESS_REVOKED) {
-        const revokedUserId = msg.message.userId;
-        if (revokedUserId) {
-          // The publish is asynchronous, so this can arrive after the user has
-          // been added back. The client treats 4403 as permanent and purges
-          // its caches on it, so a late message would cost a reconnected user
-          // their board. Asked again before acting, failing open on a lookup
-          // error the way the sweep does.
-          void userCanAccessProject(msg.projectId, revokedUserId)
-            .then((allowed) => {
-              if (!allowed) {
-                closeLocalProjectConnectionsForUser(
-                  msg.projectId,
-                  revokedUserId,
-                );
-              }
-            })
-            .catch((error) => {
-              console.error(
-                `Failed to revalidate a revocation for project ${msg.projectId}:`,
-                error,
-              );
-            });
-        }
-        return;
-      }
       return deliverToLocalConnections(
         msg.projectId,
         msg.message,
@@ -194,20 +139,10 @@ export async function initializeWebSocketAdapter() {
   }
 
   adapter = nextAdapter;
-  if (accessSweep === null) {
-    accessSweep = setInterval(() => {
-      void sweepRevokedConnections();
-    }, ACCESS_SWEEP_MS);
-    accessSweep.unref?.();
-  }
   console.log(`📡 WebSockets Initialized using: "${adapter.constructor.name}"`);
 }
 
 export async function shutdownWebSocketAdapter() {
-  if (accessSweep !== null) {
-    clearInterval(accessSweep);
-    accessSweep = null;
-  }
   const pendingQueues = [...projectBroadcastQueues.entries()];
 
   for (const timeout of projectBroadcastTimeouts.values()) {
@@ -231,50 +166,33 @@ export async function shutdownWebSocketAdapter() {
   adapter = null;
 }
 
-function closeLocalProjectConnections(
-  projectId: string,
-  revokedUserIds: string[] = [],
-) {
+function closeLocalProjectConnections(projectId: string) {
   const timeout = projectBroadcastTimeouts.get(projectId);
   if (timeout) clearTimeout(timeout);
   projectBroadcastTimeouts.delete(projectId);
   projectBroadcastQueues.delete(projectId);
   const connections = projectConnections.get(projectId);
   projectConnections.delete(projectId);
-  // Whoever lost access in this move needs the permanent code, and it has to
-  // be decided here rather than by a second message: the two would race, and
-  // on a peer the move close would usually win.
-  const revoked = new Set(revokedUserIds);
   for (const conn of connections ?? []) {
-    const lostAccess = revoked.has(conn.userId);
-    if (!lostAccess) {
-      try {
-        conn.ws.send(JSON.stringify({ type: "PROJECT_MOVED", projectId }));
-      } catch {
-        /* The socket may already be closed. */
-      }
+    try {
+      conn.ws.send(JSON.stringify({ type: "PROJECT_MOVED", projectId }));
+    } catch {
+      /* The socket may already be closed. */
     }
     try {
-      if (lostAccess) {
-        conn.ws.close(ACCESS_REVOKED_CLOSE_CODE, "Project access revoked");
-      } else {
-        conn.ws.close(1008, "Project workspace changed");
-      }
+      conn.ws.close(1008, "Project workspace changed");
     } catch {
       /* Already closed. */
     }
   }
 }
 
-export async function closeProjectConnections(
-  projectId: string,
-  revokedUserIds: string[] = [],
-) {
-  closeLocalProjectConnections(projectId, revokedUserIds);
+export async function closeProjectConnections(projectId: string) {
+  closeLocalProjectConnections(projectId);
   try {
     await adapter?.publish({
       projectId,
-      message: { type: "PROJECT_MOVED", projectId, revokedUserIds },
+      message: { type: "PROJECT_MOVED", projectId },
     });
   } catch (error) {
     // Delivery also checks the workspace, so missed Redis notifications cannot
@@ -299,58 +217,13 @@ function currentProjectWorkspace(projectId: string) {
   return pending;
 }
 
-// A connection is authorized once, at upgrade. A revocation reaches other
-// instances as a control message, and a control message can be lost: the
-// publish is best-effort and Redis can be down for it. This sweep is the
-// backstop, so a lost message costs at most one interval of access rather
-// than the lifetime of an open board. It is deliberately not on the delivery
-// path, which must not grow a database read per message.
-const ACCESS_SWEEP_MS = 30_000;
-let accessSweep: ReturnType<typeof setInterval> | null = null;
-let sweepInFlight = false;
-
-export async function sweepRevokedConnections() {
-  // One sweep walks every connected project and user sequentially, so a slow
-  // database or enough open boards can outlast the interval. Overlapping runs
-  // would multiply that load rather than catch up, so a tick that arrives
-  // while one is still going is dropped.
-  if (sweepInFlight) return;
-  sweepInFlight = true;
-  try {
-    await runRevocationSweep();
-  } finally {
-    sweepInFlight = false;
-  }
-}
-
-async function runRevocationSweep() {
-  for (const [projectId, connections] of [...projectConnections.entries()]) {
-    const userIds = new Set([...connections].map((conn) => conn.userId));
-    for (const userId of userIds) {
-      let allowed: boolean;
-      try {
-        allowed = await userCanAccessProject(projectId, userId);
-      } catch (error) {
-        // A failed lookup is not evidence of revocation; leave the connection
-        // for the next sweep rather than disconnecting on a blip.
-        console.error(
-          `Failed to revalidate project ${projectId} access:`,
-          error,
-        );
-        continue;
-      }
-      if (!allowed) closeLocalProjectConnectionsForUser(projectId, userId);
-    }
-  }
-}
-
 async function deliverToLocalConnections(
   projectId: string,
   message: ProjectBroadcastMessage,
   excludeInitiatorId?: string,
 ) {
   if (message.type === "PROJECT_MOVED") {
-    closeLocalProjectConnections(projectId, message.revokedUserIds ?? []);
+    closeLocalProjectConnections(projectId);
     return;
   }
   const connections = projectConnections.get(projectId);
@@ -383,55 +256,6 @@ async function deliverToLocalConnections(
       removeConnection(projectId, conn);
     }
   }
-}
-
-function closeLocalProjectConnectionsForUser(
-  projectId: string,
-  userId: string,
-) {
-  const connections = projectConnections.get(projectId);
-  if (!connections) return;
-
-  for (const conn of connections) {
-    if (conn.userId !== userId) continue;
-    try {
-      conn.ws.close(ACCESS_REVOKED_CLOSE_CODE, "Project access revoked");
-    } catch {
-      // Already gone; dropping it reaches the same end state.
-    }
-    connections.delete(conn);
-  }
-
-  if (connections.size === 0) {
-    projectConnections.delete(projectId);
-  }
-}
-
-/**
- * Drops a user's live connections to a project on every instance, for when
- * their access to it is taken away.
- */
-export function revokeProjectAccess(projectId: string, userId: string) {
-  closeLocalProjectConnectionsForUser(projectId, userId);
-
-  if (!adapter) {
-    return;
-  }
-
-  // Published straight through rather than queued: the batching queue's dedup
-  // key does not include the user, so two revocations in the same window would
-  // collapse into one.
-  void adapter
-    .publish({
-      projectId,
-      message: { type: PROJECT_ACCESS_REVOKED, projectId, userId },
-    })
-    .catch((err) => {
-      console.error(
-        `Failed to publish an access revocation for project ${projectId}:`,
-        err,
-      );
-    });
 }
 
 export function addConnection(

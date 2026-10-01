@@ -464,7 +464,7 @@ const removeProjectMemberRoute = createRoute({
   tags: ["Projects"],
   summary: "Remove project member",
   description:
-    "Take away a member's access to this project, closing any board they have open on it. Requires the project:share permission. This route keeps a project's last member, and nobody can remove themselves. Leaving the workspace is not bound by that: it can leave a project with no members, which workspace administrators still see and can add to.",
+    "Take away a member's access to this project. It applies from their next request and next connection; a board they already have open is not closed. Requires the project:share permission. This route keeps a project's last member, and nobody can remove themselves. Leaving the workspace is not bound by that: it can leave a project with no members, which workspace administrators still see and can add to.",
   middleware: [
     workspaceAccess.fromProject(),
     requireWorkspacePermission({ project: ["share"] }),

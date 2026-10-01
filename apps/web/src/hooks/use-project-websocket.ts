@@ -24,10 +24,6 @@ export function getWsUrl(projectId: string) {
 const MAX_RETRIES = 5;
 const BASE_DELAY = 1000; // 1 second
 
-// Sent by the API when the user is removed from the project; mirrors the 403
-// their next upgrade attempt would get.
-const ACCESS_REVOKED_CLOSE_CODE = 4403;
-
 // Cloudflare closes idle WebSocket connections after 100 seconds of no traffic.
 // We send a lightweight ping every 30 seconds to keep the connection alive.
 const WS_PING_INTERVAL_MS = 30_000;
@@ -454,7 +450,7 @@ export function useProjectWebSocket(projectId: string) {
         }
       };
 
-      ws.onclose = (event) => {
+      ws.onclose = () => {
         if (disposed || activeSocket !== ws) return;
         clearPing();
         if (healthyTimeout !== null) {
@@ -462,22 +458,6 @@ export function useProjectWebSocket(projectId: string) {
           healthyTimeout = null;
         }
         activeSocket = null;
-
-        // The server closes with this code when the user's access to the
-        // project is taken away. Reconnecting would only be refused at the
-        // upgrade, and the fallback poll would be refused too, so stop
-        // entirely rather than falling through to either.
-        if (event?.code === ACCESS_REVOKED_CLOSE_CODE) {
-          retries = MAX_RETRIES;
-          // The socket closing is the only signal that arrives, so the caches
-          // have to be dropped here. Otherwise the project keeps sitting in
-          // the sidebar and the board keeps showing the tasks it had when
-          // access ended, until something unrelated happens to refetch.
-          queryClient.removeQueries({ queryKey: ["tasks", projectId] });
-          queryClient.removeQueries({ queryKey: ["project", projectId] });
-          void queryClient.invalidateQueries({ queryKey: ["projects"] });
-          return;
-        }
 
         if (retries < MAX_RETRIES) {
           const delay = BASE_DELAY * 2 ** retries; // 1s, 2s, 4s, 8s, 16s
