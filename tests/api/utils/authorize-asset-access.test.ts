@@ -9,6 +9,10 @@ const { state } = vi.hoisted(() => ({
     projectChecks: [] as { userId: unknown; projectId: string }[],
     caller: "anonymous" as "anonymous" | "member" | "outsider",
     projectMember: true,
+    apiKey: undefined as
+      | { id: string; userId: string; enabled: boolean; permissions: unknown }
+      | undefined,
+    keysSeen: [] as unknown[],
   },
 }));
 
@@ -20,7 +24,7 @@ vi.mock("../../../apps/api/src/utils/authenticate-api-request", () => ({
     if (state.caller === "anonymous") {
       throw new HTTPException(401, { message: "Unauthorized" });
     }
-    return { userId: `user-${state.caller}` };
+    return { userId: `user-${state.caller}`, apiKey: state.apiKey };
   },
 }));
 
@@ -38,6 +42,7 @@ vi.mock("../../../apps/api/src/utils/validate-workspace-access", () => ({
 vi.mock("../../../apps/api/src/utils/project-access", () => ({
   canAccessProject: async (c: Context, projectId: string) => {
     state.projectChecks.push({ userId: c.get("userId"), projectId });
+    state.keysSeen.push(c.get("apiKey"));
     return state.projectMember;
   },
 }));
@@ -151,6 +156,35 @@ describe("authorizeAssetAccess", () => {
       { userId: "user-member", projectId: "project-1" },
     ]);
   });
+  // The administrator exception is decided by hasWorkspacePermission, which
+  // reads the key's permission scope from the context. Without it a narrow key
+  // gets its owner's full rights.
+  it("hands the verified API key to the project check", async () => {
+    state.caller = "member";
+    state.projectMember = true;
+    state.keysSeen.length = 0;
+    state.apiKey = {
+      id: "key-1",
+      userId: "user-member",
+      enabled: true,
+      permissions: { task: ["read"] },
+    };
+    try {
+      await authorizeAssetAccess(createContext(), {
+        workspaceId: "workspace-1",
+        projectId: "project-1",
+        isPublic: false,
+        surface: "description",
+      });
+    } finally {
+      state.apiKey = undefined;
+    }
+
+    expect(state.keysSeen).toEqual([
+      expect.objectContaining({ permissions: { task: ["read"] } }),
+    ]);
+  });
+
   it.each(["comment", "unknown"])(
     "keeps %s assets private even in a public project",
     async (surface) => {

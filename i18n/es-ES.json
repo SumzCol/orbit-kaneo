@@ -719,6 +719,7 @@
 			"membersSectionTitle": "Miembros del proyecto",
 			"membersSectionSubtitle": "Solo estas personas pueden abrir este proyecto cuando inician sesión. Los administradores del espacio siempre pueden, y el acceso público de arriba permite que cualquiera con el enlace lo vea sin estar en esta lista.",
 			"membersEmpty": "Aún no hay miembros",
+			"membersLoadError": "No se pudieron cargar los miembros de este proyecto.",
 			"membersAdd": "Añadir",
 			"membersAddPlaceholder": "Selecciona un miembro del espacio",
 			"membersAddLabel": "Miembro del proyecto a añadir",

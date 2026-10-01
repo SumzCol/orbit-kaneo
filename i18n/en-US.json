@@ -1137,6 +1137,7 @@
 			"membersSectionTitle": "Project members",
 			"membersSectionSubtitle": "Only these people can open this project when signed in. Workspace administrators always can, and public access above lets anyone with the URL view it regardless of this list.",
 			"membersEmpty": "No members yet",
+			"membersLoadError": "Couldn't load this project's members.",
 			"membersAdd": "Add",
 			"membersAddPlaceholder": "Select a workspace member",
 			"membersAddLabel": "Project member to add",

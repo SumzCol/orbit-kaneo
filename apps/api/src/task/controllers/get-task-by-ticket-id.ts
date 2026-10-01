@@ -10,12 +10,14 @@ import {
 import { escapeLikePattern } from "../../search/like-pattern";
 import { TASK_SHORT_ID_PATTERN } from "../../search/task-short-id";
 import { hasInstanceAdminRole } from "../../utils/instance-admin-role";
-import { userCanAccessProject } from "../../utils/project-access";
 import getTask from "./get-task";
 
 export default async function getTaskByTicketId(
   ticketId: string,
   userId: string,
+  // Decided by the caller, which has the request: the check has to see the
+  // API key's scope, not only the user behind it.
+  canAccess: (projectId: string, workspaceId: string) => Promise<boolean>,
   workspaceId?: string,
   projectId?: string,
 ) {
@@ -42,7 +44,11 @@ export default async function getTaskByTicketId(
     .where(eq(workspaceUserTable.userId, userId));
 
   const matches = await db
-    .select({ id: taskTable.id, projectId: taskTable.projectId })
+    .select({
+      id: taskTable.id,
+      projectId: taskTable.projectId,
+      workspaceId: projectTable.workspaceId,
+    })
     .from(taskTable)
     .innerJoin(projectTable, eq(taskTable.projectId, projectTable.id))
     .where(
@@ -68,7 +74,7 @@ export default async function getTaskByTicketId(
   // answers exactly like a ticket that does not exist.
   const visible: typeof matches = [];
   for (const candidate of matches) {
-    if (await userCanAccessProject(candidate.projectId, userId)) {
+    if (await canAccess(candidate.projectId, candidate.workspaceId)) {
       visible.push(candidate);
     }
   }

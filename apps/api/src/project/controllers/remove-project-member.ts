@@ -88,7 +88,15 @@ async function removeProjectMember(
           eq(projectMemberTable.userId, userId),
         ),
       )
-      .returning();
+      // The public ProjectMembership fields only. The row also holds the
+      // workspace membership it stands on, which is internal and absent from
+      // the documented response.
+      .returning({
+        id: projectMemberTable.id,
+        projectId: projectMemberTable.projectId,
+        userId: projectMemberTable.userId,
+        createdAt: projectMemberTable.createdAt,
+      });
 
     if (!row) {
       throw new HTTPException(404, {

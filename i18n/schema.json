@@ -4423,6 +4423,9 @@
 						"membersEmpty": {
 							"type": "string"
 						},
+						"membersLoadError": {
+							"type": "string"
+						},
 						"membersAdd": {
 							"type": "string"
 						},
@@ -4477,6 +4480,7 @@
 						"membersSectionTitle",
 						"membersSectionSubtitle",
 						"membersEmpty",
+						"membersLoadError",
 						"membersAdd",
 						"membersAddPlaceholder",
 						"membersAddLabel",

@@ -65,19 +65,30 @@ function RouteComponent() {
   const { data: workspaceUsers } = useGetActiveWorkspaceUsers(
     workspace?.id || "",
   );
-  const { data: projectMembers = [] } = useGetProjectMembers({
+  const {
+    data: projectMembers = [],
+    isLoading: membersLoading,
+    isError: membersFailed,
+    refetch: refetchMembers,
+  } = useGetProjectMembers({
     projectId: projectId || "",
   });
+  // The empty default stands in for "not known yet" as well as "none", so
+  // nothing is derived from it until the request has actually answered.
+  // Otherwise a slow load offers every workspace user as addable, members
+  // included, and a failed one claims the project has nobody on it.
+  const membersKnown = !membersLoading && !membersFailed;
   const { mutateAsync: addProjectMember } = useAddProjectMember();
   const { mutateAsync: removeProjectMember } = useRemoveProjectMember();
   const [memberToAdd, setMemberToAdd] = useState("");
 
   const addableMembers = useMemo(() => {
+    if (!membersKnown) return [];
     const taken = new Set(projectMembers.map((member) => member.userId));
     return (workspaceUsers?.members ?? []).filter(
       (member) => !taken.has(member.userId),
     );
-  }, [workspaceUsers?.members, projectMembers]);
+  }, [workspaceUsers?.members, projectMembers, membersKnown]);
 
   const handleAddMember = useCallback(async () => {
     if (!project || !memberToAdd) return;
@@ -257,7 +268,7 @@ function RouteComponent() {
             <div className="flex items-center gap-2">
               <Select
                 value={memberToAdd}
-                disabled={!canShare}
+                disabled={!canShare || !membersKnown}
                 onValueChange={(value) => {
                   if (typeof value === "string") setMemberToAdd(value);
                 }}
@@ -294,7 +305,24 @@ function RouteComponent() {
               </Button>
             </div>
 
-            {projectMembers.length === 0 ? (
+            {membersLoading ? (
+              <p className="text-xs text-muted-foreground">
+                {t("common:empty.loading")}
+              </p>
+            ) : membersFailed ? (
+              <div className="flex items-center gap-2">
+                <p role="alert" className="text-xs text-destructive">
+                  {t("settings:projectVisibility.membersLoadError")}
+                </p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void refetchMembers()}
+                >
+                  {t("common:error.tryAgain")}
+                </Button>
+              </div>
+            ) : projectMembers.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 {t("settings:projectVisibility.membersEmpty")}
               </p>

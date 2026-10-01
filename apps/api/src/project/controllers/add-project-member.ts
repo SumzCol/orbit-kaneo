@@ -68,7 +68,15 @@ async function addProjectMember(
       target: [projectMemberTable.projectId, projectMemberTable.userId],
       set: { workspaceMemberId: membership.id },
     })
-    .returning();
+    // The public ProjectMembership fields only. The row also holds the
+    // workspace membership it stands on, which is internal and absent from
+    // the documented response.
+    .returning({
+      id: projectMemberTable.id,
+      projectId: projectMemberTable.projectId,
+      userId: projectMemberTable.userId,
+      createdAt: projectMemberTable.createdAt,
+    });
 
   // The upsert returns the row either way, so adding someone who is already a
   // member is the same end state as adding them once.

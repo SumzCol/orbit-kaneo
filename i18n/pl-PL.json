@@ -1537,7 +1537,8 @@
 			"memberRemoveSelfHint": "You cannot remove yourself from a project",
 			"memberRemoveLastHint": "A project must keep at least one member",
 			"membersManageHint": "Only people who can share this project may change who is on it.",
-			"membersAddLabel": "Project member to add"
+			"membersAddLabel": "Project member to add",
+			"membersLoadError": "Couldn't load this project's members."
 		},
 		"projectWorkflow": {
 			"automationDescription": "Mapuj zdarzenia integracji na kolumny. Gdy wystąpi zdarzenie, powiązane zadanie zostanie przeniesione do wybranej kolumny.",

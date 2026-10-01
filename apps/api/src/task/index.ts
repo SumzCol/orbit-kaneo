@@ -24,6 +24,7 @@ import {
   validateTaskAssetUploadInput,
   verifyTaskAssetUpload,
 } from "../storage/s3";
+import { canAccessProjectInWorkspace } from "../utils/project-access";
 import { normalizeApiServerUrl } from "../utils/openapi-spec";
 import {
   hasWorkspacePermission,
@@ -811,6 +812,12 @@ const task = apiRouter<BaseVariables & { workspaceId: string }>()
       await getTaskByTicketId(
         ticketId,
         c.get("userId"),
+        (candidateProjectId, candidateWorkspaceId) =>
+          canAccessProjectInWorkspace(
+            c,
+            candidateProjectId,
+            candidateWorkspaceId,
+          ),
         workspaceId,
         projectId,
       ),

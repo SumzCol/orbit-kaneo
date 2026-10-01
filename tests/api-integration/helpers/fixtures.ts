@@ -147,3 +147,26 @@ export async function createProjectFixture({
     },
   };
 }
+
+/** A user added to an existing workspace with the given role. */
+export async function addWorkspaceMember(workspaceId: string, role: string) {
+  const userId = `user-${randomUUID()}`;
+  const [user] = await db
+    .insert(schema.userTable)
+    .values({
+      id: userId,
+      email: `${userId}@example.com`,
+      emailVerified: true,
+      name: `Member ${role}`,
+    })
+    .returning();
+
+  await db.insert(schema.workspaceUserTable).values({
+    workspaceId,
+    userId: user.id,
+    role,
+    joinedAt: new Date(),
+  });
+
+  return user;
+}

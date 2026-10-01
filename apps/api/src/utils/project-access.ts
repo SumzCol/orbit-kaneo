@@ -95,6 +95,37 @@ export async function canAccessProject(
 }
 
 /**
+ * The same rule as `canAccessProject`, for a project whose workspace is not
+ * the one the request was scoped to -- or a request scoped to none, like the
+ * ticket lookup, which only learns the workspace from the task it finds.
+ *
+ * Takes the request rather than the ids so the administrator exception goes
+ * through `hasWorkspacePermission`, which honours a scoped API key. Deciding
+ * it from the user's role alone would let an administrator's narrow key reach
+ * projects every other route refuses it.
+ */
+export async function canAccessProjectInWorkspace(
+  c: Context,
+  projectId: string,
+  workspaceId: string,
+): Promise<boolean> {
+  const userId = c.get("userId");
+  if (!userId) {
+    return false;
+  }
+
+  if (await isProjectMember(projectId, userId)) {
+    return true;
+  }
+
+  return hasWorkspacePermission(
+    c,
+    { workspace: ["manage_settings"] },
+    workspaceId,
+  );
+}
+
+/**
  * Row filter for the same rule, for the list and search queries that return
  * many projects at once and so cannot check them one by one. Returns
  * `undefined` when the caller sees everything, which drizzle drops from an
