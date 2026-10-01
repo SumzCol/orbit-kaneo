@@ -5,12 +5,13 @@ import { userCanAccessProject } from "../../utils/project-access";
 import { notifyProjectAccessChanged, revokeProjectAccess } from "../../ws";
 
 /**
- * Drops every project membership a user holds inside one workspace.
+ * Drops every project membership a user holds inside one workspace, and
+ * ends the sessions that relied on them.
  *
- * Project membership is keyed on the user rather than on their workspace
- * membership row, so leaving a workspace would otherwise leave these rows
- * behind and silently restore the old project access if the user were ever
- * re-added.
+ * The rows already grant nothing once the workspace membership is gone --
+ * deleting it nulls their link, and a null link never matches. Removing them
+ * keeps them out of the table and the member list, and the projects they
+ * return are the ones whose open sessions need telling.
  */
 async function revokeWorkspaceProjectMemberships(
   workspaceId: string,

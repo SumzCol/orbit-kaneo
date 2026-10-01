@@ -1,5 +1,6 @@
 import { windowId } from "@kaneo/libs";
 import { useQueryClient } from "@tanstack/react-query";
+import { dropProjectCaches } from "@/lib/drop-project-caches";
 import { useEffect } from "react";
 import { getApiUrl } from "@/fetchers/get-api-url";
 import { authClient } from "@/lib/auth-client";
@@ -81,15 +82,7 @@ export function useUserWebSocket() {
               void queryClient.invalidateQueries({ queryKey: ["search"] });
             }
             if (message.projectId && message.hasAccess === false) {
-              // Queries do not refetch on mount here, so a board cached from
-              // earlier would open on its old tasks the next time it is
-              // visited, despite access having ended.
-              queryClient.removeQueries({
-                queryKey: ["tasks", message.projectId],
-              });
-              queryClient.removeQueries({
-                queryKey: ["project", message.projectId],
-              });
+              dropProjectCaches(queryClient, message.projectId);
             }
           }
         } catch {

@@ -41,13 +41,15 @@ describe("useProjectWebSocket relation invalidation", () => {
   let socket: Socket;
   let invalidate: MockInstance<QueryClient["invalidateQueries"]>;
   let remove: MockInstance<QueryClient["removeQueries"]>;
+  let client: QueryClient;
 
   function mount() {
-    const client = new QueryClient();
+    client = new QueryClient();
     invalidate = vi
       .spyOn(client, "invalidateQueries")
       .mockResolvedValue(undefined);
-    remove = vi.spyOn(client, "removeQueries").mockReturnValue(undefined);
+    // Spied but not stubbed: the revocation test reads the cache afterwards.
+    remove = vi.spyOn(client, "removeQueries");
 
     renderHook(
       () => {
@@ -172,13 +174,20 @@ describe("useProjectWebSocket relation invalidation", () => {
   // have to be dropped here or the project stays in the sidebar and the board
   // keeps showing what it held when access ended.
   it("drops the project's caches when access is revoked", () => {
+    // Seeded under the keys the app's hooks really use. An earlier version
+    // asserted on the removal call's own arguments and so could not notice
+    // that the detail key it removed was one no query used.
+    client.setQueryData(["tasks", "project-1"], { columns: [] });
+    client.setQueryData(["projects", "workspace-1", "project-1"], {
+      name: "Private",
+    });
+
     socket.onclose?.({ code: 4403 } as CloseEvent);
 
-    const removed = remove.mock.calls.map((call) =>
-      JSON.stringify(call[0]?.queryKey),
-    );
-    expect(removed).toContain(JSON.stringify(["tasks", "project-1"]));
-    expect(removed).toContain(JSON.stringify(["project", "project-1"]));
+    expect(client.getQueryData(["tasks", "project-1"])).toBeUndefined();
+    expect(
+      client.getQueryData(["projects", "workspace-1", "project-1"]),
+    ).toBeUndefined();
     expect(invalidatedKeys()).toContain(JSON.stringify(["projects"]));
   });
 

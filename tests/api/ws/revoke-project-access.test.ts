@@ -224,6 +224,47 @@ describe("revokeProjectAccess", () => {
     expect(parsed.message.revokedUserIds).toEqual(["user-removed"]);
   });
 
+  // A peer acts on the sender's list, which can be out of date by the time
+  // it arrives. broadcastToProject takes the message through the adapter and
+  // the subscriber, which is the path a peer instance uses.
+  it("gives a user added back since the move the ordinary close", async () => {
+    await initializeWebSocketAdapter();
+    const readded = connect("proj-1", "user-readded");
+    access.allowed.clear();
+    access.allowed.add("proj-1:user-readded");
+
+    broadcastToProject("proj-1", {
+      type: "PROJECT_MOVED",
+      projectId: "proj-1",
+      revokedUserIds: ["user-readded"],
+    });
+    await vi.waitFor(() => expect(readded.ws.close).toHaveBeenCalled());
+
+    // 4403 would make their client stop reconnecting and drop the project.
+    expect(readded.ws.close).toHaveBeenCalledWith(
+      1008,
+      "Project workspace changed",
+    );
+  });
+
+  it("still revokes a user who has no access when the move arrives", async () => {
+    await initializeWebSocketAdapter();
+    const removed = connect("proj-1", "user-removed");
+    access.allowed.clear();
+
+    broadcastToProject("proj-1", {
+      type: "PROJECT_MOVED",
+      projectId: "proj-1",
+      revokedUserIds: ["user-removed"],
+    });
+    await vi.waitFor(() => expect(removed.ws.close).toHaveBeenCalled());
+
+    expect(removed.ws.close).toHaveBeenCalledWith(
+      4403,
+      "Project access revoked",
+    );
+  });
+
   it("never sends the control message to a socket", async () => {
     await initializeWebSocketAdapter();
 

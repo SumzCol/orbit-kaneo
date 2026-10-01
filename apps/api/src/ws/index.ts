@@ -350,7 +350,27 @@ async function deliverToLocalConnections(
   excludeInitiatorId?: string,
 ) {
   if (message.type === "PROJECT_MOVED") {
-    closeLocalProjectConnections(projectId, message.revokedUserIds ?? []);
+    // The list is the sender's answer at the time of the move. A peer can
+    // process the message after one of those users was added back, and the
+    // permanent code would then end a session they are entitled to: the
+    // client stops reconnecting and drops the project. So each id is asked
+    // again here, and only the ones still without access get 4403. A lookup
+    // that fails is not evidence of revocation, so that user gets the move's
+    // ordinary close instead.
+    const stillRevoked: string[] = [];
+    for (const userId of message.revokedUserIds ?? []) {
+      try {
+        if (!(await userCanAccessProject(projectId, userId))) {
+          stillRevoked.push(userId);
+        }
+      } catch (error) {
+        console.error(
+          `Failed to revalidate a moved project's revocation for ${projectId}:`,
+          error,
+        );
+      }
+    }
+    closeLocalProjectConnections(projectId, stillRevoked);
     return;
   }
   const connections = projectConnections.get(projectId);

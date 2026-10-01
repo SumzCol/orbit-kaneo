@@ -189,9 +189,20 @@ describe("project access changes on the user socket", () => {
     expect(client.removeQueries).toHaveBeenCalledWith({
       queryKey: ["tasks", "project-1"],
     });
-    expect(client.removeQueries).toHaveBeenCalledWith({
-      queryKey: ["project", "project-1"],
-    });
+    // The detail is cached as ["projects", workspaceId, projectId], with a
+    // workspace the message does not carry, so it is removed by predicate.
+    // Checked against that real key rather than against the arguments alone.
+    const predicates = client.removeQueries.mock.calls
+      .map(([filters]) => (filters as { predicate?: unknown })?.predicate)
+      .filter(
+        (predicate): predicate is (query: { queryKey: unknown[] }) => boolean =>
+          typeof predicate === "function",
+      );
+    const removesKey = (queryKey: unknown[]) =>
+      predicates.some((predicate) => predicate({ queryKey }));
+    expect(removesKey(["projects", "workspace-1", "project-1"])).toBe(true);
+    expect(removesKey(["projects", "workspace-1"])).toBe(false);
+    expect(removesKey(["projects", "workspace-1", "project-2"])).toBe(false);
     // Queries do not refetch on mount here, so cached search hits from the
     // project would otherwise stay on screen.
     expect(client.removeQueries).toHaveBeenCalledWith({

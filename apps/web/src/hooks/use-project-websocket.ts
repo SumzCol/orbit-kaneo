@@ -12,6 +12,7 @@ import getTask from "@/fetchers/task/get-task";
 import getLabelsByTask from "@/fetchers/label/get-labels-by-task";
 import getExternalLinks from "@/fetchers/external-link/get-external-links";
 import { patchBoardTask } from "@/lib/patch-board-task";
+import { dropProjectCaches } from "@/lib/drop-project-caches";
 import { isPerTaskRelationQuery } from "@/lib/relation-query-keys";
 import type { ProjectWithTasks } from "@/types/project";
 
@@ -473,8 +474,7 @@ export function useProjectWebSocket(projectId: string) {
           // have to be dropped here. Otherwise the project keeps sitting in
           // the sidebar and the board keeps showing the tasks it had when
           // access ended, until something unrelated happens to refetch.
-          queryClient.removeQueries({ queryKey: ["tasks", projectId] });
-          queryClient.removeQueries({ queryKey: ["project", projectId] });
+          dropProjectCaches(queryClient, projectId);
           void queryClient.invalidateQueries({ queryKey: ["projects"] });
           return;
         }
