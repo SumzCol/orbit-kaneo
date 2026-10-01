@@ -1,6 +1,7 @@
 import { and, count, eq, isNull, min, sql } from "drizzle-orm";
 import db from "../../database";
 import { columnTable, projectTable, taskTable } from "../../database/schema";
+import { visibleProjectCondition } from "../../utils/project-access";
 
 type ProjectStatistics = {
   completionPercentage: number;
@@ -17,6 +18,7 @@ const EMPTY_STATISTICS: ProjectStatistics = {
 async function getProjectStatistics(
   workspaceId: string,
   includeArchived: boolean,
+  visible: ReturnType<typeof visibleProjectCondition>,
 ) {
   const statisticsByProject = new Map<string, ProjectStatistics>();
 
@@ -54,12 +56,17 @@ async function getProjectStatistics(
     // counts above are taken over.
     .leftJoin(columnTable, eq(columnTable.id, taskTable.columnId))
     .where(
-      includeArchived
-        ? eq(projectTable.workspaceId, workspaceId)
-        : and(
-            eq(projectTable.workspaceId, workspaceId),
-            isNull(projectTable.archivedAt),
-          ),
+      and(
+        // Without this the counting still walks every hidden project's tasks,
+        // so a member who sees one project pays for the whole workspace.
+        visible,
+        includeArchived
+          ? eq(projectTable.workspaceId, workspaceId)
+          : and(
+              eq(projectTable.workspaceId, workspaceId),
+              isNull(projectTable.archivedAt),
+            ),
+      ),
     )
     .groupBy(taskTable.projectId);
 
@@ -79,14 +86,26 @@ async function getProjectStatistics(
   return statisticsByProject;
 }
 
-async function getProjects(workspaceId: string, includeArchived = false) {
+type GetProjectsOptions = {
+  includeArchived?: boolean;
+  // The caller, and whether they reach projects they are not a member of. The
+  // statistics query is scoped by workspace only, which is safe: its rows are
+  // keyed by project id and only projects that survive the visibility filter
+  // are ever read out of the map.
+  userId: string;
+  seesAllProjects: boolean;
+};
+
+async function getProjects(
+  workspaceId: string,
+  { includeArchived = false, userId, seesAllProjects }: GetProjectsOptions,
+) {
   const projects = await db.query.projectTable.findMany({
-    where: includeArchived
-      ? eq(projectTable.workspaceId, workspaceId)
-      : and(
-          eq(projectTable.workspaceId, workspaceId),
-          isNull(projectTable.archivedAt),
-        ),
+    where: and(
+      eq(projectTable.workspaceId, workspaceId),
+      includeArchived ? undefined : isNull(projectTable.archivedAt),
+      visibleProjectCondition(userId, seesAllProjects),
+    ),
     // `id` is the deterministic tie-breaker: without it, rows sharing both a
     // position and a createdAt come back in an unspecified order.
     orderBy: (project, { asc }) => [
@@ -99,6 +118,7 @@ async function getProjects(workspaceId: string, includeArchived = false) {
   const statisticsByProject = await getProjectStatistics(
     workspaceId,
     includeArchived,
+    visibleProjectCondition(userId, seesAllProjects),
   );
 
   return projects.map((project) => ({

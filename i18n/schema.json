@@ -4413,6 +4413,54 @@
 						},
 						"toastUpdateError": {
 							"type": "string"
+						},
+						"membersSectionTitle": {
+							"type": "string"
+						},
+						"membersSectionSubtitle": {
+							"type": "string"
+						},
+						"membersEmpty": {
+							"type": "string"
+						},
+						"membersLoadError": {
+							"type": "string"
+						},
+						"membersAdd": {
+							"type": "string"
+						},
+						"membersAddPlaceholder": {
+							"type": "string"
+						},
+						"membersAddLabel": {
+							"type": "string"
+						},
+						"memberAddedToast": {
+							"type": "string"
+						},
+						"memberAddErrorToast": {
+							"type": "string"
+						},
+						"memberRemovedToast": {
+							"type": "string"
+						},
+						"memberRemoveErrorToast": {
+							"type": "string"
+						},
+						"memberRemove": {
+							"type": "string"
+						},
+						"memberRemoveLabel": {
+							"type": "string"
+						},
+						"memberRemoveSelfHint": {
+							"type": "string"
+						},
+						"memberRemoveLastHint": {
+							"type": "string"
+						},
+						"membersManageHint": {
+							"type": "string"
 						}
 					},
 					"required": [
@@ -4428,7 +4476,23 @@
 						"copy",
 						"copiedToast",
 						"toastUpdated",
-						"toastUpdateError"
+						"toastUpdateError",
+						"membersSectionTitle",
+						"membersSectionSubtitle",
+						"membersEmpty",
+						"membersLoadError",
+						"membersAdd",
+						"membersAddPlaceholder",
+						"membersAddLabel",
+						"memberAddedToast",
+						"memberAddErrorToast",
+						"memberRemovedToast",
+						"memberRemoveErrorToast",
+						"memberRemove",
+						"memberRemoveLabel",
+						"memberRemoveSelfHint",
+						"memberRemoveLastHint",
+						"membersManageHint"
 					]
 				},
 				"projectWorkflow": {
@@ -10749,6 +10813,16 @@
 				},
 				"descriptionLoadError": {
 					"type": "string"
+				},
+				"board": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"reorderFailed": {
+							"type": "string"
+						}
+					},
+					"required": ["reorderFailed"]
 				}
 			},
 			"required": [
@@ -10790,7 +10864,8 @@
 				"descriptionSearchError",
 				"descriptionRetry",
 				"descriptionLoading",
-				"descriptionLoadError"
+				"descriptionLoadError",
+				"board"
 			]
 		},
 		"invitations": {

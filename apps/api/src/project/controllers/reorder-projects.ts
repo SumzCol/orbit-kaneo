@@ -1,11 +1,13 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import db from "../../database";
 import { projectTable } from "../../database/schema";
+import { visibleProjectCondition } from "../../utils/project-access";
 
 async function reorderProjects(
   workspaceId: string,
   projects: Array<{ id: string; position: number }>,
+  visibility: { userId: string; seesAllProjects: boolean },
 ) {
   const ids = projects.map((project) => project.id);
   const uniqueIds = new Set(ids);
@@ -49,6 +51,35 @@ async function reorderProjects(
       });
     }
 
+    // Renumbering still spans the whole workspace -- hidden projects have to
+    // hold their rank -- but the caller may only name the ones they can see,
+    // and only those come back. Otherwise reorder would be a way to both
+    // enumerate and shuffle projects the caller cannot open.
+    const visibleIds = new Set(
+      (
+        await tx
+          .select({ id: projectTable.id })
+          .from(projectTable)
+          .where(
+            and(
+              eq(projectTable.workspaceId, workspaceId),
+              visibleProjectCondition(
+                visibility.userId,
+                visibility.seesAllProjects,
+              ),
+            ),
+          )
+      ).map((project) => project.id),
+    );
+
+    const hiddenId = ids.find((id) => !visibleIds.has(id));
+
+    if (hiddenId) {
+      throw new HTTPException(403, {
+        message: "You don't have access to this project",
+      });
+    }
+
     // Positions are derived server-side rather than trusted from the client:
     // the payload only expresses a relative order. This keeps stored positions
     // in 0..n-1, so they can't drift out of the integer column's range and
@@ -85,7 +116,10 @@ async function reorderProjects(
     }
 
     return tx.query.projectTable.findMany({
-      where: eq(projectTable.workspaceId, workspaceId),
+      where: and(
+        eq(projectTable.workspaceId, workspaceId),
+        visibleProjectCondition(visibility.userId, visibility.seesAllProjects),
+      ),
       orderBy: [
         asc(projectTable.position),
         asc(projectTable.createdAt),

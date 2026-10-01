@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import db, { schema } from "../../../apps/api/src/database";
 import { DEFAULT_PROJECT_COLUMNS } from "../../../apps/api/src/project/controllers/create-project";
 
@@ -52,11 +53,15 @@ export async function createProjectFixture({
   name = "Integration Project",
   icon = "Folder",
   slug = `project-${randomUUID()}`,
+  members,
 }: {
   workspaceId: string;
   name?: string;
   icon?: string;
   slug?: string;
+  // Defaults to every current member of the workspace. Pass an explicit list
+  // (`[]` included) to test who can and cannot reach the project.
+  members?: string[];
 }) {
   const [project] = await db
     .insert(schema.projectTable)
@@ -67,6 +72,39 @@ export async function createProjectFixture({
       slug,
     })
     .returning();
+
+  // A project is only readable by its members, and real creation adds the
+  // creator. Mirror that here by seeding everyone who is already in the
+  // workspace, which is also what the upgrade backfill does, so tests about
+  // other subjects keep reading the project they just made.
+  const workspaceMembers = await db
+    .select({
+      id: schema.workspaceUserTable.id,
+      userId: schema.workspaceUserTable.userId,
+    })
+    .from(schema.workspaceUserTable)
+    .where(eq(schema.workspaceUserTable.workspaceId, workspaceId));
+
+  const memberIds = members ?? workspaceMembers.map((row) => row.userId);
+  // Linked to their membership in this workspace, as real creation does. A
+  // listed user who is not in the workspace gets no link, which is how such a
+  // row behaves in production: it grants nothing.
+  const membershipOf = new Map(
+    workspaceMembers.map((row) => [row.userId, row.id]),
+  );
+
+  if (memberIds.length > 0) {
+    await db
+      .insert(schema.projectMemberTable)
+      .values(
+        memberIds.map((userId) => ({
+          projectId: project.id,
+          userId,
+          workspaceMemberId: membershipOf.get(userId) ?? null,
+        })),
+      )
+      .onConflictDoNothing();
+  }
 
   const insertedColumns: (typeof schema.columnTable.$inferSelect)[] = [];
 
@@ -108,4 +146,27 @@ export async function createProjectFixture({
       done,
     },
   };
+}
+
+/** A user added to an existing workspace with the given role. */
+export async function addWorkspaceMember(workspaceId: string, role: string) {
+  const userId = `user-${randomUUID()}`;
+  const [user] = await db
+    .insert(schema.userTable)
+    .values({
+      id: userId,
+      email: `${userId}@example.com`,
+      emailVerified: true,
+      name: `Member ${role}`,
+    })
+    .returning();
+
+  await db.insert(schema.workspaceUserTable).values({
+    workspaceId,
+    userId: user.id,
+    role,
+    joinedAt: new Date(),
+  });
+
+  return user;
 }

@@ -118,7 +118,9 @@ const getIntegrationRoute = createRoute({
     400: errorResponse(
       "Unknown project, or its workspace could not be determined",
     ),
-    403: errorResponse("No access to the project's workspace"),
+    403: errorResponse(
+      "No access to the project's workspace, or no access to the project",
+    ),
   },
 });
 
@@ -216,7 +218,7 @@ const importIssuesRoute = createRoute({
     200: jsonResponse("Import summary", giteaImportResultSchema),
     400: errorResponse("projectId is required"),
     403: errorResponse(
-      "No workspace access, or missing task:create permission",
+      "No workspace access, missing task:create permission, or no access to the project",
     ),
     404: errorResponse("Project not found"),
   },

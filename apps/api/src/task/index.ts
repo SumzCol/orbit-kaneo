@@ -24,6 +24,7 @@ import {
   validateTaskAssetUploadInput,
   verifyTaskAssetUpload,
 } from "../storage/s3";
+import { canAccessProjectInWorkspace } from "../utils/project-access";
 import { normalizeApiServerUrl } from "../utils/openapi-spec";
 import {
   hasWorkspacePermission,
@@ -115,7 +116,9 @@ const listTasksRoute = createRoute({
     400: errorResponse(
       "Unknown project, or its workspace could not be determined",
     ),
-    403: errorResponse("No access to the project's workspace"),
+    403: errorResponse(
+      "No access to the project's workspace, or no access to the project",
+    ),
   },
 });
 
@@ -144,7 +147,7 @@ const bulkUpdateTasksRoute = createRoute({
       "Invalid body, or the tasks span more than one workspace",
     ),
     403: errorResponse(
-      "No workspace access, or missing the permission the operation needs",
+      "No workspace access, or missing the permission the operation needs, or no access to the project",
     ),
     404: errorResponse("No tasks found"),
     409: errorResponse("Tasks changed projects; retry the operation"),
@@ -178,7 +181,9 @@ const reorderTasksRoute = createRoute({
         .array(),
     ),
     400: errorResponse("Invalid positions or column"),
-    403: errorResponse("Missing task:update permission"),
+    403: errorResponse(
+      "Missing task:update permission, or no access to the project",
+    ),
     404: errorResponse("Tasks do not belong to the project"),
     409: errorResponse(
       "Board changed or task moved; refresh before reordering",
@@ -209,7 +214,7 @@ const createTaskRoute = createRoute({
     200: jsonResponse("The created task", taskSchema),
     400: errorResponse("Invalid body, or unknown project"),
     403: errorResponse(
-      "No workspace access, or missing task:create permission",
+      "No workspace access, or missing task:create permission, or no access to the project",
     ),
   },
 });
@@ -239,7 +244,7 @@ const duplicateTaskRoute = createRoute({
     400: errorResponse("Invalid task fields or request"),
     401: errorResponse("Unauthorized"),
     403: errorResponse(
-      "No workspace access, missing task:create, or missing task:update when copying parent links",
+      "No workspace access, missing task:create, or missing task:update when copying parent links, or no access to the project",
     ),
     404: errorResponse("Task or project not found"),
     409: errorResponse("Task column has reached its capacity"),
@@ -265,7 +270,9 @@ const getTaskRoute = createRoute({
     400: errorResponse(
       "Unknown task, or its workspace could not be determined",
     ),
-    403: errorResponse("No access to the task's workspace"),
+    403: errorResponse(
+      "No access to the task's workspace, or no access to the project",
+    ),
   },
 });
 
@@ -295,7 +302,11 @@ const moveTaskRoute = createRoute({
   description:
     "Move a task to another project, optionally into a named column. Both projects must be in the same workspace.",
   middleware: [
-    workspaceAccess.fromTask(),
+    // The destination is authorized alongside the task: reaching a task you
+    // can see must not let you file it into a project you cannot.
+    workspaceAccess.fromTask("id", [
+      { type: "projectFromBody", key: "destinationProjectId" },
+    ]),
     requireWorkspacePermission({ task: ["update"] }),
     requireEntitlement,
   ] as const,
@@ -313,7 +324,7 @@ const moveTaskRoute = createRoute({
     ),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission",
+      "No workspace access, missing task:update permission, or no access to the source or destination project",
     ),
     404: errorResponse("Task or destination project not found"),
     409: errorResponse("Task or project moved concurrently; retry the move"),
@@ -345,7 +356,7 @@ const updateTaskRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update or task:assign permission",
+      "No workspace access, or missing task:update or task:assign permission, or no access to the project",
     ),
   },
 });
@@ -365,7 +376,9 @@ const exportTasksRoute = createRoute({
     400: errorResponse(
       "Unknown project, or its workspace could not be determined",
     ),
-    403: errorResponse("No access to the project's workspace"),
+    403: errorResponse(
+      "No access to the project's workspace, or no access to the project",
+    ),
   },
 });
 
@@ -393,7 +406,7 @@ const importTasksRoute = createRoute({
     200: jsonResponse("Per-task import outcome", taskImportResultSchema),
     400: errorResponse("Invalid body, or unknown project"),
     403: errorResponse(
-      "No workspace access, or missing task:create permission",
+      "No workspace access, or missing task:create permission, or no access to the project",
     ),
   },
 });
@@ -417,7 +430,7 @@ const deleteTaskRoute = createRoute({
       "Unknown task, or its workspace could not be determined",
     ),
     403: errorResponse(
-      "No workspace access, or missing task:delete permission",
+      "No workspace access, or missing task:delete permission, or no access to the project",
     ),
   },
 });
@@ -445,7 +458,7 @@ const updateTaskStatusRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission",
+      "No workspace access, or missing task:update permission, or no access to the project",
     ),
   },
 });
@@ -473,7 +486,7 @@ const updateTaskPriorityRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid priority, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission",
+      "No workspace access, or missing task:update permission, or no access to the project",
     ),
   },
 });
@@ -502,7 +515,7 @@ const updateTaskAssigneeRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:assign permission",
+      "No workspace access, or missing task:assign permission, or no access to the project",
     ),
     404: errorResponse("Assignee is not a member of the workspace"),
   },
@@ -531,7 +544,7 @@ const updateTaskDueDateRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid date, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission",
+      "No workspace access, or missing task:update permission, or no access to the project",
     ),
   },
 });
@@ -559,7 +572,7 @@ const updateTaskTitleRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission",
+      "No workspace access, or missing task:update permission, or no access to the project",
     ),
   },
 });
@@ -588,7 +601,7 @@ const createTaskImageUploadRoute = createRoute({
     200: jsonResponse("The presigned upload", imageUploadSchema),
     400: errorResponse("Unsupported content type, or the file is too large"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission",
+      "No workspace access, or missing task:update permission, or no access to the project",
     ),
     404: errorResponse("Task not found"),
     503: errorResponse("Image uploads are not configured on this instance"),
@@ -621,7 +634,7 @@ const finalizeTaskImageUploadRoute = createRoute({
       "Invalid upload, or the key does not belong to this task",
     ),
     403: errorResponse(
-      "No workspace access, or missing task:update permission",
+      "No workspace access, or missing task:update permission, or no access to the project",
     ),
     404: errorResponse("Task not found"),
   },
@@ -650,7 +663,7 @@ const updateTaskDescriptionRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission",
+      "No workspace access, or missing task:update permission, or no access to the project",
     ),
   },
 });
@@ -666,7 +679,7 @@ const descriptionPageRoute = createRoute({
   responses: {
     200: jsonResponse("Description page", descriptionPageSchema),
     400: errorResponse("Invalid offset or version"),
-    403: errorResponse("No workspace access"),
+    403: errorResponse("No workspace access, or no access to the project"),
     404: errorResponse("Task not found"),
     409: errorResponse("Description changed; reload from offset zero"),
     503: errorResponse("Description request timed out"),
@@ -683,7 +696,7 @@ const descriptionMatchesRoute = createRoute({
   responses: {
     200: jsonResponse("Matching task IDs", descriptionMatchesSchema),
     400: errorResponse("Invalid search query or cursor"),
-    403: errorResponse("No workspace access"),
+    403: errorResponse("No workspace access, or no access to the project"),
     503: errorResponse("Description search timed out"),
   },
 });
@@ -807,6 +820,12 @@ const task = apiRouter<BaseVariables & { workspaceId: string }>()
       await getTaskByTicketId(
         ticketId,
         c.get("userId"),
+        (candidateProjectId, candidateWorkspaceId) =>
+          canAccessProjectInWorkspace(
+            c,
+            candidateProjectId,
+            candidateWorkspaceId,
+          ),
         workspaceId,
         projectId,
       ),

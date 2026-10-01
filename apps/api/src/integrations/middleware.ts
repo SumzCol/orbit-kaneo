@@ -3,6 +3,7 @@ import type { Context, Next } from "hono";
 import { HTTPException } from "hono/http-exception";
 import db from "../database";
 import { projectTable } from "../database/schema";
+import { canAccessProject } from "../utils/project-access";
 import { validateWorkspaceAccess } from "../utils/validate-workspace-access";
 
 // Route middleware runs before the validators, so c.req.valid() is unavailable.
@@ -36,6 +37,15 @@ export async function scopeToProjectFromBody(c: Context, next: Next) {
     c.get("apiKey")?.id,
   );
   c.set("workspaceId", project.workspaceId);
+
+  // Importing issues writes tasks into the project, so it is gated on the same
+  // membership rule as opening its board. `canAccessProject` resolves
+  // workspace permissions from the context, so the workspace goes on first.
+  if (!(await canAccessProject(c, projectId))) {
+    throw new HTTPException(403, {
+      message: "You don't have access to this project",
+    });
+  }
 
   return next();
 }

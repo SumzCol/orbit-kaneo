@@ -15,6 +15,9 @@ import getTask from "./get-task";
 export default async function getTaskByTicketId(
   ticketId: string,
   userId: string,
+  // Decided by the caller, which has the request: the check has to see the
+  // API key's scope, not only the user behind it.
+  canAccess: (projectId: string, workspaceId: string) => Promise<boolean>,
   workspaceId?: string,
   projectId?: string,
 ) {
@@ -41,7 +44,11 @@ export default async function getTaskByTicketId(
     .where(eq(workspaceUserTable.userId, userId));
 
   const matches = await db
-    .select({ id: taskTable.id })
+    .select({
+      id: taskTable.id,
+      projectId: taskTable.projectId,
+      workspaceId: projectTable.workspaceId,
+    })
     .from(taskTable)
     .innerJoin(projectTable, eq(taskTable.projectId, projectTable.id))
     .where(
@@ -54,14 +61,29 @@ export default async function getTaskByTicketId(
           ? undefined
           : inArray(projectTable.workspaceId, memberWorkspaces),
       ),
-    )
-    .limit(2);
+    );
+  // Deliberately unbounded. Any cap can truncate to a set of hidden matches
+  // and answer 404 while a visible one sits just past the limit, and the
+  // rows are already narrowed to one slug, one number and the workspaces
+  // this caller belongs to -- at most one task per project that shares the
+  // slug, which is what the 409 below exists to report.
 
-  const matchedTask = matches[0];
+  // This route resolves a task from a slug and a number rather than an id, so
+  // there is no project for the access middleware to check before the lookup.
+  // The rule is applied to the result instead: a project the caller is not on
+  // answers exactly like a ticket that does not exist.
+  const visible: typeof matches = [];
+  for (const candidate of matches) {
+    if (await canAccess(candidate.projectId, candidate.workspaceId)) {
+      visible.push(candidate);
+    }
+  }
+
+  const matchedTask = visible[0];
   if (!matchedTask) {
     throw new HTTPException(404, { message: "Task not found" });
   }
-  if (matches.length > 1) {
+  if (visible.length > 1) {
     throw new HTTPException(409, {
       message: "Task ticket ID matches multiple accessible tasks",
     });

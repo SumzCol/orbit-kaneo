@@ -44,6 +44,7 @@ import { syncWorkspaceSeats } from "./billing/controllers/sync-seats";
 import db, { schema } from "./database";
 import { authDatabaseAdapter } from "./database/auth-adapter";
 import { publishEvent } from "./events";
+import revokeWorkspaceProjectMemberships from "./project/controllers/revoke-workspace-project-memberships";
 import clearEmailVerificationOnAdminChange from "./user/controllers/clear-email-verification-on-admin-change";
 import deleteAccountData from "./user/controllers/delete-account-data";
 import prepareAdminUserRemoval from "./user/controllers/prepare-admin-user-removal";
@@ -502,6 +503,31 @@ export const auth = betterAuth({
         },
         afterRemoveMember: async ({ member }) => {
           if (member?.organizationId) {
+            // Awaited, unlike the seat sync: this is a revocation, and the
+            // project rows outlive the workspace membership that justified
+            // them.
+            //
+            // The failure below is logged rather than rethrown because it is
+            // not what enforces the revocation. Deleting the membership nulls
+            // each project row's link to it, and a null link never matches,
+            // so a row this misses grants nothing -- including after the user
+            // is re-added, which creates a new membership the old row does
+            // not point at. Rethrowing would fail the member removal itself
+            // over cleanup that has already stopped mattering.
+            if (member.userId) {
+              try {
+                await revokeWorkspaceProjectMemberships(
+                  member.organizationId,
+                  member.userId,
+                );
+              } catch (error) {
+                console.error(
+                  "Failed to revoke project memberships after member remove:",
+                  error,
+                );
+              }
+            }
+
             void syncWorkspaceSeats(member.organizationId).catch((error) => {
               console.error("Seat sync after member remove failed:", error);
             });
