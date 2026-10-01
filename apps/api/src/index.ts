@@ -430,7 +430,7 @@ export function createApp() {
       tags: ["Assets"],
       summary: "Download asset",
       description:
-        "Download an uploaded asset. Readable without signing in only when it belongs to a public project; otherwise only by the project's own members. Image types are served inline, everything else as an attachment.",
+        "Download an uploaded asset. Readable without signing in only when it belongs to a public project; otherwise only by the project's own members and by workspace and instance administrators, who reach every project. Image types are served inline, everything else as an attachment.",
       security: [],
       request: { params: z.object({ id: z.string() }) },
       responses: {

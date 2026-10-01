@@ -414,7 +414,7 @@ const listProjectMembersRoute = createRoute({
   tags: ["Projects"],
   summary: "List project members",
   description:
-    "List the workspace members who can see this project. Readable by the project's own members and by whoever administers the workspace.",
+    "List the project's explicit members: the people added to it, who reach it through membership. Workspace and instance administrators can also open the project without being listed here, so this is not a complete list of who can see it. Readable by the project's own members and by whoever administers the workspace.",
   middleware: [workspaceAccess.fromProject()] as const,
   request: { params: projectParam },
   responses: {

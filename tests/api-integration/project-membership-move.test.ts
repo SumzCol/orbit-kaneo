@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
 import moveProject from "../../apps/api/src/project/controllers/move-project";
@@ -137,5 +137,105 @@ describe("a move keeps a member", () => {
     // The surviving member is enough. Seeding the mover anyway would hand
     // them a standing membership they never asked for.
     expect(members.map((member) => member.userId)).toEqual([both.id]);
+  });
+});
+
+describe("a move and a stale membership", () => {
+  // Someone on the project who left the source workspace without the cleanup
+  // running, but who is also in the target workspace. Their row's link was
+  // nulled when they left, so it grants nothing.
+  async function staleMemberInBoth() {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    const departed = await addWorkspaceMember(source.workspace.id, "member");
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: departed.id,
+      role: "member",
+      joinedAt: new Date(),
+    });
+    // The mover belongs to both, as the move route requires.
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [departed.id],
+    });
+    await db
+      .delete(schema.workspaceUserTable)
+      .where(
+        and(
+          eq(schema.workspaceUserTable.workspaceId, source.workspace.id),
+          eq(schema.workspaceUserTable.userId, departed.id),
+        ),
+      );
+    expect(await isProjectMember(project.id, departed.id)).toBe(false);
+    return { source, target, departed, project };
+  }
+
+  it("does not revive it because the person is in the target", async () => {
+    const { source, target, departed, project } = await staleMemberInBoth();
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    // Re-pointing the stale row at their target membership would quietly
+    // give back access that leaving the source had taken away.
+    expect(await isProjectMember(project.id, departed.id)).toBe(false);
+  });
+
+  it("does not count it as a survivor, so the project still gets a keeper", async () => {
+    const { source, target, project } = await staleMemberInBoth();
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    // The stale row is the only one left. Counting it would skip the keeper
+    // and leave the project with nobody who can reach it.
+    expect(await isProjectMember(project.id, source.user.id)).toBe(true);
+  });
+
+  it("repairs a keeper who already held a stale row", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    // The mover's own row in the project is stale: they left the source and
+    // came back, without the cleanup running in between.
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id],
+    });
+    await db
+      .update(schema.projectMemberTable)
+      .set({ workspaceMemberId: null })
+      .where(eq(schema.projectMemberTable.projectId, project.id));
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    // Keeping the stale row on the insert conflict would look populated and
+    // grant nothing.
+    expect(await isProjectMember(project.id, source.user.id)).toBe(true);
   });
 });
