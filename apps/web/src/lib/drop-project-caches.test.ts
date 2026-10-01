@@ -55,4 +55,63 @@ describe("dropProjectCaches", () => {
 
     expect(useProjectStore.getState().project?.id).toBe("project-2");
   });
+
+  // An open task view renders from these, and none of them names the
+  // project, so they have to be found through the project's task ids.
+  it("removes the per-task caches of the project's tasks, and only those", () => {
+    const client = new QueryClient();
+    client.setQueryData(["tasks", "project-1"], {
+      columns: [{ tasks: [{ id: "task-1" }] }],
+      archivedTasks: [{ id: "task-2" }],
+      plannedTasks: [],
+    });
+    client.setQueryData(["tasks", "project-2"], {
+      columns: [{ tasks: [{ id: "task-9" }] }],
+      archivedTasks: [],
+      plannedTasks: [],
+    });
+    // Opened directly, never on a cached board.
+    client.setQueryData(["task", "task-3"], { projectId: "project-1" });
+    for (const prefix of [
+      "task",
+      "activities",
+      "comments",
+      "task-relations",
+      "external-links",
+      "labels",
+      "custom-field-values",
+      "time-entries",
+    ]) {
+      client.setQueryData([prefix, "task-1"], {});
+      client.setQueryData([prefix, "task-9"], {});
+    }
+    client.setQueryData(["comments", "task-2"], {});
+    client.setQueryData(["activities", "task-3"], {});
+    client.setQueryData(["task-relations", "project", "project-1"], []);
+    client.setQueryData(["labels", "workspace-1"], []);
+
+    dropProjectCaches(client, "project-1");
+
+    for (const prefix of [
+      "task",
+      "activities",
+      "comments",
+      "task-relations",
+      "external-links",
+      "labels",
+      "custom-field-values",
+      "time-entries",
+    ]) {
+      expect(client.getQueryData([prefix, "task-1"])).toBeUndefined();
+      expect(client.getQueryData([prefix, "task-9"])).toBeDefined();
+    }
+    expect(client.getQueryData(["comments", "task-2"])).toBeUndefined();
+    expect(client.getQueryData(["task", "task-3"])).toBeUndefined();
+    expect(client.getQueryData(["activities", "task-3"])).toBeUndefined();
+    expect(
+      client.getQueryData(["task-relations", "project", "project-1"]),
+    ).toBeUndefined();
+    // The workspace's labels are not a task's.
+    expect(client.getQueryData(["labels", "workspace-1"])).toBeDefined();
+  });
 });

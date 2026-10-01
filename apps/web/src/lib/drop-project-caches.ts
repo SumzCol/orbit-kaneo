@@ -1,5 +1,44 @@
 import type { QueryClient } from "@tanstack/react-query";
 import useProjectStore from "@/store/project";
+import type { ProjectWithTasks } from "@/types/project";
+
+// Per-task caches, each keyed `[prefix, taskId, ...]`. They carry the same
+// private project data as the board and do not name the project, so they are
+// found through the task ids.
+const TASK_SCOPED_PREFIXES = new Set([
+  "task",
+  "activities",
+  "comments",
+  "task-relations",
+  "external-links",
+  "labels",
+  "custom-field-values",
+  "time-entries",
+]);
+
+function projectTaskIds(queryClient: QueryClient, projectId: string) {
+  const ids = new Set<string>();
+  const board = queryClient.getQueryData<ProjectWithTasks>([
+    "tasks",
+    projectId,
+  ]);
+  for (const task of [
+    ...(board?.columns ?? []).flatMap((column) => column.tasks ?? []),
+    ...(board?.archivedTasks ?? []),
+    ...(board?.plannedTasks ?? []),
+  ]) {
+    if (task?.id) ids.add(task.id);
+  }
+  // A task opened on its own, by link or ticket id, may never have been on a
+  // cached board, but its detail names the project.
+  for (const [queryKey, data] of queryClient.getQueriesData<{
+    projectId?: string;
+  }>({ queryKey: ["task"] })) {
+    const id = queryKey[1];
+    if (typeof id === "string" && data?.projectId === projectId) ids.add(id);
+  }
+  return ids;
+}
 
 /**
  * Forgets what this client has cached about a project it can no longer open.
@@ -14,6 +53,20 @@ import useProjectStore from "@/store/project";
  * refreshed, not dropped, so the sidebar does not go blank.
  */
 export function dropProjectCaches(queryClient: QueryClient, projectId: string) {
+  // Read before the board is removed, since it is where most ids come from.
+  // An open task view mounts this project's socket too, so on a 4403 it would
+  // otherwise keep rendering the task, its comments and its activity.
+  const taskIds = projectTaskIds(queryClient, projectId);
+  if (taskIds.size > 0) {
+    queryClient.removeQueries({
+      predicate: (query) =>
+        TASK_SCOPED_PREFIXES.has(query.queryKey[0] as string) &&
+        taskIds.has(query.queryKey[1] as string),
+    });
+  }
+  queryClient.removeQueries({
+    queryKey: ["task-relations", "project", projectId],
+  });
   queryClient.removeQueries({ queryKey: ["tasks", projectId] });
   queryClient.removeQueries({
     predicate: (query) =>

@@ -11,7 +11,12 @@ import { onProjectAccessGranted } from "@/lib/project-access-grants";
 import { useUserWebSocket } from "./use-user-websocket";
 
 const { client, auth } = vi.hoisted(() => ({
-  client: { invalidateQueries: vi.fn(), removeQueries: vi.fn() },
+  client: {
+    invalidateQueries: vi.fn(),
+    removeQueries: vi.fn(),
+    getQueryData: vi.fn(),
+    getQueriesData: vi.fn(() => []),
+  },
   auth: { userId: "user-a" as string | null },
 }));
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => client }));
@@ -247,10 +252,11 @@ describe("project access changes on the user socket", () => {
 
   // Nothing replays a message sent while the socket was down, so a reconnect
   // refreshes what such a message would have fixed.
-  it("refreshes the project list and search on a reconnect, not the first connect", () => {
+  it("refreshes the project list and drops search on a reconnect, not the first connect", () => {
     renderHook(() => useUserWebSocket());
     act(() => TestSocket.instances[0].open());
     expect(client.invalidateQueries).not.toHaveBeenCalled();
+    expect(client.removeQueries).not.toHaveBeenCalled();
 
     act(() => {
       TestSocket.instances[0].onclose?.();
@@ -261,7 +267,7 @@ describe("project access changes on the user socket", () => {
     expect(client.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["projects"],
     });
-    expect(client.invalidateQueries).toHaveBeenCalledWith({
+    expect(client.removeQueries).toHaveBeenCalledWith({
       queryKey: ["search"],
     });
   });

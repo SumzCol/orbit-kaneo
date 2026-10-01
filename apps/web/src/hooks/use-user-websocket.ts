@@ -59,7 +59,10 @@ export function useUserWebSocket() {
         // to track who missed what.
         if (hasConnected) {
           void queryClient.invalidateQueries({ queryKey: ["projects"] });
-          void queryClient.invalidateQueries({ queryKey: ["search"] });
+          // Removed rather than invalidated, as on a direct access loss: an
+          // inactive search does not refetch when reopened, and its hits can
+          // quote a project the missed message would have taken away.
+          queryClient.removeQueries({ queryKey: ["search"] });
         }
         hasConnected = true;
         clearPing();
