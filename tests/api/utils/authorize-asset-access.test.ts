@@ -153,7 +153,12 @@ describe("authorizeAssetAccess", () => {
   it.each(["comment", "unknown"])(
     "keeps %s assets private even in a public project",
     async (surface) => {
-      const asset = { workspaceId: "workspace-1", isPublic: true, surface };
+      const asset = {
+        workspaceId: "workspace-1",
+        projectId: "project-1",
+        isPublic: true,
+        surface,
+      };
       expect(isPublicAsset(asset)).toBe(false);
       expect(await statusOf(authorizeAssetAccess(createContext(), asset))).toBe(
         401,
@@ -163,9 +168,16 @@ describe("authorizeAssetAccess", () => {
         403,
       );
       state.caller = "member";
+      state.projectChecks.length = 0;
       expect(await statusOf(authorizeAssetAccess(createContext(), asset))).toBe(
         200,
       );
+      // Asserted on the project the check ran against, not just the status:
+      // with the asset's projectId missing the mock is handed `undefined`,
+      // and a 200 proves nothing about which project was authorized.
+      expect(state.projectChecks).toEqual([
+        { userId: "user-member", projectId: "project-1" },
+      ]);
     },
   );
 });

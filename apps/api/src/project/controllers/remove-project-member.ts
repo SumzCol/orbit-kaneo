@@ -6,6 +6,7 @@ import {
   projectTable,
   workspaceUserTable,
 } from "../../database/schema";
+import { userCanAccessProject } from "../../utils/project-access";
 import { revokeProjectAccess } from "../../ws";
 
 async function removeProjectMember(
@@ -101,7 +102,15 @@ async function removeProjectMember(
 
   // The WebSocket upgrade checks access once, so an open board would keep
   // streaming this project's events to someone who can no longer open it.
-  revokeProjectAccess(projectId, userId);
+  //
+  // Asked again rather than assumed: whoever administers the workspace, and
+  // any instance admin, reaches every project without an explicit membership,
+  // so removing the row does not necessarily remove their access. Closing
+  // their board with 4403 would stop the client reconnecting and drop its
+  // caches while they are still entitled to both.
+  if (!(await userCanAccessProject(projectId, userId))) {
+    revokeProjectAccess(projectId, userId);
+  }
 
   return removed;
 }

@@ -717,7 +717,7 @@
 			"toastUpdated": "Visibilidad actualizada",
 			"toastUpdateError": "Error al actualizar espacio la visibilidad del proyecto",
 			"membersSectionTitle": "Miembros del proyecto",
-			"membersSectionSubtitle": "Solo estas personas pueden abrir este proyecto. Los administradores del espacio siempre pueden.",
+			"membersSectionSubtitle": "Solo estas personas pueden abrir este proyecto cuando inician sesión. Los administradores del espacio siempre pueden, y el acceso público de arriba permite que cualquiera con el enlace lo vea sin estar en esta lista.",
 			"membersEmpty": "Aún no hay miembros",
 			"membersAdd": "Añadir",
 			"membersAddPlaceholder": "Selecciona un miembro del espacio",

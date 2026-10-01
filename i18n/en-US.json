@@ -1135,7 +1135,7 @@
 			"toastUpdated": "Visibility updated",
 			"toastUpdateError": "Failed to update visibility",
 			"membersSectionTitle": "Project members",
-			"membersSectionSubtitle": "Only these people can open this project. Workspace administrators always can.",
+			"membersSectionSubtitle": "Only these people can open this project when signed in. Workspace administrators always can, and public access above lets anyone with the URL view it regardless of this list.",
 			"membersEmpty": "No members yet",
 			"membersAdd": "Add",
 			"membersAddPlaceholder": "Select a workspace member",

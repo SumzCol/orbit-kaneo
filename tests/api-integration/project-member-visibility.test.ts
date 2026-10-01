@@ -10,7 +10,10 @@ import { createApp } from "../../apps/api/src/index";
 import moveProject from "../../apps/api/src/project/controllers/move-project";
 import removeProjectMember from "../../apps/api/src/project/controllers/remove-project-member";
 import revokeWorkspaceProjectMemberships from "../../apps/api/src/project/controllers/revoke-workspace-project-memberships";
-import { isProjectMember } from "../../apps/api/src/utils/project-access";
+import {
+  isProjectMember,
+  userCanAccessProject,
+} from "../../apps/api/src/utils/project-access";
 import { mockAuthenticatedSession } from "./helpers/auth";
 import { resetTestDatabase } from "./helpers/database";
 import {
@@ -538,6 +541,41 @@ describe("read paths that do not resolve a project by id", () => {
     expect(names).not.toContain("secret-release");
     // Workspace-level labels are not project data and stay visible.
     expect(names).toContain("workspace-wide");
+  });
+});
+
+describe("revoking a board on removal", () => {
+  it("leaves an administrator connected, since they still reach the project", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const admin = await addWorkspaceMember(workspace.id, "admin");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, admin.id],
+    });
+
+    // An administrator reaches every project in the workspace without an
+    // explicit membership, so dropping the row changes nothing for them.
+    await removeProjectMember(project.id, admin.id, owner.id);
+
+    expect(await isProjectMember(project.id, admin.id)).toBe(false);
+    expect(await userCanAccessProject(project.id, admin.id)).toBe(true);
+  });
+
+  it("cuts off an ordinary member, who no longer reaches it", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const member = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, member.id],
+    });
+
+    await removeProjectMember(project.id, member.id, owner.id);
+
+    expect(await userCanAccessProject(project.id, member.id)).toBe(false);
   });
 });
 

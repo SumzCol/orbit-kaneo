@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import db from "../../database";
 import { projectMemberTable, projectTable } from "../../database/schema";
+import { userCanAccessProject } from "../../utils/project-access";
 import { revokeProjectAccess } from "../../ws";
 
 /**
@@ -32,7 +33,13 @@ async function revokeWorkspaceProjectMemberships(
     .returning({ projectId: projectMemberTable.projectId });
 
   for (const row of removed) {
-    revokeProjectAccess(row.projectId, userId);
+    // An instance administrator still reaches the project after losing the
+    // workspace membership, so the close would cost them realtime updates
+    // they are still entitled to. Only the ones who actually lost access are
+    // disconnected.
+    if (!(await userCanAccessProject(row.projectId, userId))) {
+      revokeProjectAccess(row.projectId, userId);
+    }
   }
 
   return removed.map((row) => row.projectId);
