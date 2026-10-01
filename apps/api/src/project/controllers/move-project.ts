@@ -413,10 +413,33 @@ async function moveProject(
   // The move has committed by now, so a failed lookup must not fail the
   // request. It is not evidence of revocation either: that user gets the
   // ordinary move close, and the sweep ends the session if access is gone.
+  //
+  // Everyone else whose sidebar the move changes is asked too: the members
+  // who came along, whose project now lists under another workspace, and the
+  // target's administrators, who gain it through their role. Each is told
+  // where they now stand; only actual losses get the permanent close.
+  const [survivors, targetAdministrators] = await Promise.all([
+    db
+      .select({ userId: projectMemberTable.userId })
+      .from(projectMemberTable)
+      .where(eq(projectMemberTable.projectId, id)),
+    workspaceWideProjectUserIds(targetWorkspaceId),
+  ]).catch((error) => {
+    console.error(`Failed to list who sees moved project ${id}:`, error);
+    return [[], []] as [{ userId: string }[], string[]];
+  });
+  const affected = new Set([
+    ...mayLoseAccess,
+    ...survivors.map((row) => row.userId),
+    ...targetAdministrators,
+  ]);
   const lostAccess: string[] = [];
-  for (const userId of mayLoseAccess) {
+  const stillHaveAccess: string[] = [];
+  for (const userId of affected) {
     try {
-      if (!(await userCanAccessProject(id, userId))) {
+      if (await userCanAccessProject(id, userId)) {
+        stillHaveAccess.push(userId);
+      } else {
         lostAccess.push(userId);
       }
     } catch (error) {
@@ -434,6 +457,9 @@ async function moveProject(
   await closeProjectConnections(id, lostAccess);
   for (const userId of lostAccess) {
     notifyProjectAccessChanged(userId, id, false);
+  }
+  for (const userId of stillHaveAccess) {
+    notifyProjectAccessChanged(userId, id, true);
   }
 
   if (unassignedTasks.length > 0) {

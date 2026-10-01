@@ -59,6 +59,14 @@ export function useUserWebSocket() {
         // to track who missed what.
         if (hasConnected) {
           void queryClient.invalidateQueries({ queryKey: ["projects"] });
+          // A project's detail is cached as ["projects", workspaceId, id].
+          // Invalidating does not stop an inactive one being shown again
+          // without a refetch, so these are reset instead: one on screen
+          // refetches, and the rest load afresh the next time they are used.
+          void queryClient.resetQueries({
+            predicate: (query) =>
+              query.queryKey[0] === "projects" && query.queryKey.length === 3,
+          });
           // Removed rather than invalidated, as on a direct access loss: an
           // inactive search does not refetch when reopened, and its hits can
           // quote a project the missed message would have taken away.

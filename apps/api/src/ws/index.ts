@@ -158,21 +158,7 @@ export async function initializeWebSocketAdapter() {
           // its caches on it, so a late message would cost a reconnected user
           // their board. Asked again before acting, failing open on a lookup
           // error the way the sweep does.
-          void userCanAccessProject(msg.projectId, revokedUserId)
-            .then((allowed) => {
-              if (!allowed) {
-                closeLocalProjectConnectionsForUser(
-                  msg.projectId,
-                  revokedUserId,
-                );
-              }
-            })
-            .catch((error) => {
-              console.error(
-                `Failed to revalidate a revocation for project ${msg.projectId}:`,
-                error,
-              );
-            });
+          closeIfStillRevoked(msg.projectId, revokedUserId);
         }
         return;
       }
@@ -431,8 +417,32 @@ function closeLocalProjectConnectionsForUser(
  * Drops a user's live connections to a project on every instance, for when
  * their access to it is taken away.
  */
+/**
+ * Closes a user's local connections to a project with 4403, but only if they
+ * still lack access when it runs.
+ *
+ * The caller decided on a revocation from a lookup made after its change
+ * committed, and an add can commit in between. A 4403 is permanent on the
+ * client, so acting on the stale answer would end a session the user is now
+ * entitled to. A failed lookup leaves the connection to the sweep.
+ */
+function closeIfStillRevoked(projectId: string, userId: string) {
+  void userCanAccessProject(projectId, userId)
+    .then((allowed) => {
+      if (!allowed) closeLocalProjectConnectionsForUser(projectId, userId);
+    })
+    .catch((error) => {
+      console.error(
+        `Failed to revalidate a revocation for project ${projectId}:`,
+        error,
+      );
+    });
+}
+
 export function revokeProjectAccess(projectId: string, userId: string) {
-  closeLocalProjectConnectionsForUser(projectId, userId);
+  // Asked again here as well as on every peer: the delay between the
+  // caller's lookup and this close is where a concurrent add lands.
+  closeIfStillRevoked(projectId, userId);
 
   if (!adapter) {
     return;

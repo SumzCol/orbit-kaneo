@@ -413,3 +413,48 @@ describe("a lookup that fails after the change has committed", () => {
     expect(move.revokedUserIds).toEqual([]);
   });
 });
+
+describe("everyone whose sidebar a move changes", () => {
+  // Their project now lists under another workspace, or appears for the first
+  // time, so tabs without the board open need telling as much as the losers.
+  it("tells the members who came along and the target's administrators", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const survivor = await addWorkspaceMember(source.workspace.id, "member");
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: survivor.id,
+      role: "member",
+      joinedAt: new Date(),
+    });
+    // Reaches the project only once it lands in their workspace.
+    const targetAdmin = await addWorkspaceMember(target.workspace.id, "admin");
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id, survivor.id],
+    });
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    for (const userId of [survivor.id, targetAdmin.id, source.user.id]) {
+      expect(notified).toContainEqual({
+        userId,
+        projectId: project.id,
+        hasAccess: true,
+      });
+    }
+    const [move] = closed.filter((entry) => entry.projectId === project.id);
+    expect(move.revokedUserIds).toEqual([]);
+  });
+});

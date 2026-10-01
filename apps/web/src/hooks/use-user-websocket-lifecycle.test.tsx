@@ -14,6 +14,7 @@ const { client, auth } = vi.hoisted(() => ({
   client: {
     invalidateQueries: vi.fn(),
     removeQueries: vi.fn(),
+    resetQueries: vi.fn(),
     getQueryData: vi.fn(),
     getQueriesData: vi.fn(() => []),
   },
@@ -148,6 +149,7 @@ describe("project access changes on the user socket", () => {
     auth.userId = "user-a";
     client.invalidateQueries.mockClear();
     client.removeQueries.mockClear();
+    client.resetQueries.mockClear();
   });
   afterEach(() => {
     cleanup();
@@ -257,6 +259,7 @@ describe("project access changes on the user socket", () => {
     act(() => TestSocket.instances[0].open());
     expect(client.invalidateQueries).not.toHaveBeenCalled();
     expect(client.removeQueries).not.toHaveBeenCalled();
+    expect(client.resetQueries).not.toHaveBeenCalled();
 
     act(() => {
       TestSocket.instances[0].onclose?.();
@@ -270,5 +273,14 @@ describe("project access changes on the user socket", () => {
     expect(client.removeQueries).toHaveBeenCalledWith({
       queryKey: ["search"],
     });
+    // Project details, which an invalidation alone would leave showable.
+    const [filters] = client.resetQueries.mock.calls.at(-1) ?? [];
+    const resets = (queryKey: unknown[]) =>
+      (
+        filters as { predicate: (q: { queryKey: unknown[] }) => boolean }
+      ).predicate({ queryKey });
+    expect(resets(["projects", "workspace-1", "project-1"])).toBe(true);
+    expect(resets(["projects", "workspace-1"])).toBe(false);
+    expect(resets(["tasks", "project-1"])).toBe(false);
   });
 });

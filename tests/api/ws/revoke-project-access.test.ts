@@ -99,11 +99,14 @@ describe("revokeProjectAccess", () => {
     const kept = connect("proj-1", "user-kept");
     const elsewhere = connect("proj-2", "user-removed");
 
+    access.allowed.clear();
     revokeProjectAccess("proj-1", "user-removed");
 
-    expect(removed.ws.close).toHaveBeenCalledWith(
-      4403,
-      "Project access revoked",
+    await vi.waitFor(() =>
+      expect(removed.ws.close).toHaveBeenCalledWith(
+        4403,
+        "Project access revoked",
+      ),
     );
     expect(secondWindow.ws.close).toHaveBeenCalledWith(
       4403,
@@ -120,7 +123,9 @@ describe("revokeProjectAccess", () => {
     const removed = connect("proj-1", "user-removed");
     const kept = connect("proj-1", "user-kept");
 
+    access.allowed.clear();
     revokeProjectAccess("proj-1", "user-removed");
+    await vi.waitFor(() => expect(removed.ws.close).toHaveBeenCalled());
 
     broadcastToProject("proj-1", {
       type: "TASK_UPDATED",
@@ -130,6 +135,23 @@ describe("revokeProjectAccess", () => {
     await vi.waitFor(() => expect(kept.ws.send).toHaveBeenCalled());
 
     expect(removed.ws.send).not.toHaveBeenCalled();
+  });
+
+  // The caller looked up access after its change committed, and an add can
+  // commit before the close runs. 4403 is permanent on the client, so the
+  // close asks again rather than acting on the caller's answer.
+  it("leaves a user who was added back before the close connected", async () => {
+    await initializeWebSocketAdapter();
+
+    const readded = connect("proj-1", "user-readded");
+    access.allowed.clear();
+    access.allowed.add("proj-1:user-readded");
+
+    revokeProjectAccess("proj-1", "user-readded");
+    // Both the local close and the looped-back control message have run.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(readded.ws.close).not.toHaveBeenCalled();
   });
 
   // The control message is best-effort: it is published once and a Redis
