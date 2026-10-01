@@ -9,11 +9,15 @@ vi.mock("../../../apps/api/src/events", () => ({
 
 // Delivery revalidates the project's workspace against the database before
 // sending, and drops any connection opened on a different one.
+// Changed by the move tests, to have the project already in its new one.
+const projectWorkspace = vi.hoisted(() => ({ id: "workspace" }));
 vi.mock("../../../apps/api/src/database", () => ({
   default: {
     select: () => ({
       from: () => ({
-        where: () => ({ limit: async () => [{ workspaceId: "workspace" }] }),
+        where: () => ({
+          limit: async () => [{ workspaceId: projectWorkspace.id }],
+        }),
       }),
     }),
   },
@@ -46,6 +50,7 @@ vi.mock("../../../apps/api/src/redis", () => ({
 import {
   addConnection,
   broadcastToProject,
+  closeProjectConnections,
   initializeWebSocketAdapter,
   removeConnection,
   revokeProjectAccess,
@@ -70,6 +75,7 @@ const tracked: Array<{
 }> = [];
 
 afterEach(async () => {
+  projectWorkspace.id = "workspace";
   for (const { projectId, conn } of tracked) {
     removeConnection(projectId, conn);
   }
@@ -281,6 +287,62 @@ describe("revokeProjectAccess", () => {
     });
     await vi.waitFor(() => expect(removed.ws.close).toHaveBeenCalled());
 
+    expect(removed.ws.close).toHaveBeenCalledWith(
+      4403,
+      "Project access revoked",
+    );
+  });
+
+  // The move's own instance acts on a list made before the move returned,
+  // and an add can land in between, so it asks again too.
+  it("gives a user added back since the move the ordinary close locally", async () => {
+    await initializeWebSocketAdapter();
+    const readded = connect("proj-1", "user-readded");
+    access.allowed.clear();
+    access.allowed.add("proj-1:user-readded");
+
+    await closeProjectConnections("proj-1", ["user-readded"]);
+
+    expect(readded.ws.close).toHaveBeenCalledWith(
+      1008,
+      "Project workspace changed",
+    );
+  });
+
+  // The move's revalidation is asynchronous, and the bulk unassignment
+  // publishes right behind it. Delivered first, that event would see the new
+  // workspace and close the revoked user's socket with the generic code.
+  it("keeps the revocation code when an event arrives during revalidation", async () => {
+    await initializeWebSocketAdapter();
+    const removed = connect("proj-1", "user-removed");
+    access.allowed.clear();
+    projectWorkspace.id = "workspace-2";
+
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    access.gate = () => held;
+    try {
+      broadcastToProject("proj-1", {
+        type: "PROJECT_MOVED",
+        projectId: "proj-1",
+        revokedUserIds: ["user-removed"],
+      });
+      broadcastToProject("proj-1", {
+        type: "TASK_UPDATED",
+        projectId: "proj-1",
+        taskId: "task-1",
+      });
+      // Long enough for the batched event to be delivered.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    } finally {
+      access.gate = undefined;
+      release();
+    }
+    await vi.waitFor(() => expect(removed.ws.close).toHaveBeenCalled());
+
+    expect(removed.ws.close).toHaveBeenCalledOnce();
     expect(removed.ws.close).toHaveBeenCalledWith(
       4403,
       "Project access revoked",

@@ -194,9 +194,6 @@ describe("project access changes on the user socket", () => {
     expect(client.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["projects"],
     });
-    expect(client.removeQueries).toHaveBeenCalledWith({
-      queryKey: ["tasks", "project-1"],
-    });
     // The detail is cached as ["projects", workspaceId, projectId], with a
     // workspace the message does not carry, so it is removed by predicate.
     // Checked against that real key rather than against the arguments alone.
@@ -208,6 +205,7 @@ describe("project access changes on the user socket", () => {
       );
     const removesKey = (queryKey: unknown[]) =>
       predicates.some((predicate) => predicate({ queryKey }));
+    expect(removesKey(["tasks", "project-1"])).toBe(true);
     expect(removesKey(["projects", "workspace-1", "project-1"])).toBe(true);
     expect(removesKey(["projects", "workspace-1"])).toBe(false);
     expect(removesKey(["projects", "workspace-1", "project-2"])).toBe(false);

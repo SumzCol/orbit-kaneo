@@ -217,7 +217,23 @@ export async function shutdownWebSocketAdapter() {
   adapter = null;
 }
 
-function closeLocalProjectConnections(
+/**
+ * Ends this instance's connections to a project that moved workspace.
+ *
+ * They are taken out of the delivery map before anything is awaited. The
+ * revalidation below is asynchronous, and an event published right after the
+ * move -- the bulk unassignment -- would otherwise reach them first, see the
+ * new workspace, and close them with the generic code, which is exactly the
+ * race the combined move message exists to prevent.
+ *
+ * `revokedUserIds` is the sender's answer at the time of the move. An add can
+ * commit after it, on this instance or any other, and the permanent code
+ * would then end a session the user is entitled to: the client stops
+ * reconnecting and drops the project. So each id is asked again here, and
+ * only the ones still without access get 4403. A lookup that fails is not
+ * evidence of revocation, so that user gets the ordinary close instead.
+ */
+async function closeMovedProjectConnections(
   projectId: string,
   revokedUserIds: string[] = [],
 ) {
@@ -225,14 +241,28 @@ function closeLocalProjectConnections(
   if (timeout) clearTimeout(timeout);
   projectBroadcastTimeouts.delete(projectId);
   projectBroadcastQueues.delete(projectId);
-  const connections = projectConnections.get(projectId);
+  const connections = [...(projectConnections.get(projectId) ?? [])];
   projectConnections.delete(projectId);
-  // Whoever lost access in this move needs the permanent code, and it has to
-  // be decided here rather than by a second message: the two would race, and
-  // on a peer the move close would usually win.
-  const revoked = new Set(revokedUserIds);
-  for (const conn of connections ?? []) {
-    const lostAccess = revoked.has(conn.userId);
+  if (connections.length === 0) return;
+
+  const connected = new Set(connections.map((conn) => conn.userId));
+  const stillRevoked = new Set<string>();
+  for (const userId of revokedUserIds) {
+    if (!connected.has(userId)) continue;
+    try {
+      if (!(await userCanAccessProject(projectId, userId))) {
+        stillRevoked.add(userId);
+      }
+    } catch (error) {
+      console.error(
+        `Failed to revalidate a moved project's revocation for ${projectId}:`,
+        error,
+      );
+    }
+  }
+
+  for (const conn of connections) {
+    const lostAccess = stillRevoked.has(conn.userId);
     if (!lostAccess) {
       try {
         conn.ws.send(JSON.stringify({ type: "PROJECT_MOVED", projectId }));
@@ -256,7 +286,7 @@ export async function closeProjectConnections(
   projectId: string,
   revokedUserIds: string[] = [],
 ) {
-  closeLocalProjectConnections(projectId, revokedUserIds);
+  await closeMovedProjectConnections(projectId, revokedUserIds);
   try {
     await adapter?.publish({
       projectId,
@@ -336,27 +366,7 @@ async function deliverToLocalConnections(
   excludeInitiatorId?: string,
 ) {
   if (message.type === "PROJECT_MOVED") {
-    // The list is the sender's answer at the time of the move. A peer can
-    // process the message after one of those users was added back, and the
-    // permanent code would then end a session they are entitled to: the
-    // client stops reconnecting and drops the project. So each id is asked
-    // again here, and only the ones still without access get 4403. A lookup
-    // that fails is not evidence of revocation, so that user gets the move's
-    // ordinary close instead.
-    const stillRevoked: string[] = [];
-    for (const userId of message.revokedUserIds ?? []) {
-      try {
-        if (!(await userCanAccessProject(projectId, userId))) {
-          stillRevoked.push(userId);
-        }
-      } catch (error) {
-        console.error(
-          `Failed to revalidate a moved project's revocation for ${projectId}:`,
-          error,
-        );
-      }
-    }
-    closeLocalProjectConnections(projectId, stillRevoked);
+    await closeMovedProjectConnections(projectId, message.revokedUserIds);
     return;
   }
   const connections = projectConnections.get(projectId);

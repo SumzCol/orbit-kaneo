@@ -25,6 +25,7 @@ import {
 } from "../../database/schema";
 import { publishEvent } from "../../events";
 import {
+  instanceAdministratorIds,
   userCanAccessProject,
   workspaceWideProjectUserIds,
 } from "../../utils/project-access";
@@ -415,23 +416,27 @@ async function moveProject(
   // ordinary move close, and the sweep ends the session if access is gone.
   //
   // Everyone else whose sidebar the move changes is asked too: the members
-  // who came along, whose project now lists under another workspace, and the
-  // target's administrators, who gain it through their role. Each is told
-  // where they now stand; only actual losses get the permanent close.
-  const [survivors, targetAdministrators] = await Promise.all([
-    db
-      .select({ userId: projectMemberTable.userId })
-      .from(projectMemberTable)
-      .where(eq(projectMemberTable.projectId, id)),
-    workspaceWideProjectUserIds(targetWorkspaceId),
-  ]).catch((error) => {
-    console.error(`Failed to list who sees moved project ${id}:`, error);
-    return [[], []] as [{ userId: string }[], string[]];
-  });
+  // who came along, whose project now lists under another workspace, the
+  // target's administrators, who gain it through their role, and instance
+  // administrators, whose lists change on both sides. Each is told where they
+  // now stand; only actual losses get the permanent close.
+  const [survivors, targetAdministrators, instanceAdministrators] =
+    await Promise.all([
+      db
+        .select({ userId: projectMemberTable.userId })
+        .from(projectMemberTable)
+        .where(eq(projectMemberTable.projectId, id)),
+      workspaceWideProjectUserIds(targetWorkspaceId),
+      instanceAdministratorIds(),
+    ]).catch((error) => {
+      console.error(`Failed to list who sees moved project ${id}:`, error);
+      return [[], [], []] as [{ userId: string }[], string[], string[]];
+    });
   const affected = new Set([
     ...mayLoseAccess,
     ...survivors.map((row) => row.userId),
     ...targetAdministrators,
+    ...instanceAdministrators,
   ]);
   const lostAccess: string[] = [];
   const stillHaveAccess: string[] = [];

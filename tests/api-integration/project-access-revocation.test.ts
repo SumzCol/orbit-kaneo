@@ -417,7 +417,7 @@ describe("a lookup that fails after the change has committed", () => {
 describe("everyone whose sidebar a move changes", () => {
   // Their project now lists under another workspace, or appears for the first
   // time, so tabs without the board open need telling as much as the losers.
-  it("tells the members who came along and the target's administrators", async () => {
+  it("tells the members who came along, and every administrator who sees it", async () => {
     const source = await createWorkspaceMember({ role: "owner" });
     const target = await createWorkspaceMember({ role: "owner" });
     await db.insert(schema.workspaceUserTable).values({
@@ -435,6 +435,17 @@ describe("everyone whose sidebar a move changes", () => {
     });
     // Reaches the project only once it lands in their workspace.
     const targetAdmin = await addWorkspaceMember(target.workspace.id, "admin");
+    // In neither workspace, reaching it from both through the instance role.
+    const [instanceAdmin] = await db
+      .insert(schema.userTable)
+      .values({
+        id: `user-${randomUUID()}`,
+        email: `admin-${randomUUID()}@example.com`,
+        emailVerified: true,
+        name: "Instance admin",
+        role: "admin",
+      })
+      .returning();
     const { project } = await createProjectFixture({
       workspaceId: source.workspace.id,
       members: [source.user.id, survivor.id],
@@ -447,7 +458,12 @@ describe("everyone whose sidebar a move changes", () => {
       source.user.id,
     );
 
-    for (const userId of [survivor.id, targetAdmin.id, source.user.id]) {
+    for (const userId of [
+      survivor.id,
+      targetAdmin.id,
+      source.user.id,
+      instanceAdmin.id,
+    ]) {
       expect(notified).toContainEqual({
         userId,
         projectId: project.id,

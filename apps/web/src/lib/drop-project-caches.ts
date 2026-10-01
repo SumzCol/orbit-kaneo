@@ -64,15 +64,14 @@ export function dropProjectCaches(queryClient: QueryClient, projectId: string) {
         taskIds.has(query.queryKey[1] as string),
     });
   }
+  // Everything keyed by the project itself: the board and its analytics, the
+  // detail (["projects", workspaceId, id]), columns, custom fields and their
+  // values, workflow rules, members, integrations, feeds. Matched on the id
+  // anywhere in the key rather than on a list of prefixes, which would fall
+  // behind as views are added. Project ids are unique, so nothing else
+  // carries one, and the workspace's project list, which does not, stays.
   queryClient.removeQueries({
-    queryKey: ["task-relations", "project", projectId],
-  });
-  queryClient.removeQueries({ queryKey: ["tasks", projectId] });
-  queryClient.removeQueries({
-    predicate: (query) =>
-      query.queryKey[0] === "projects" &&
-      query.queryKey.length === 3 &&
-      query.queryKey[2] === projectId,
+    predicate: (query) => query.queryKey.includes(projectId),
   });
   // The board renders from its own store copy of the tasks, and only writes
   // to it when query data arrives, so the removal above leaves an open board

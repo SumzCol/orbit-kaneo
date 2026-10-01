@@ -114,4 +114,31 @@ describe("dropProjectCaches", () => {
     // The workspace's labels are not a task's.
     expect(client.getQueryData(["labels", "workspace-1"])).toBeDefined();
   });
+
+  // Project-keyed views stay mounted on an open board or task, and would go
+  // on rendering their data after a 4403.
+  it("removes every cache keyed by the project, under the keys the hooks use", () => {
+    const client = new QueryClient();
+    const keys = [
+      ["columns", "project-1"],
+      ["custom-fields", "project-1"],
+      ["custom-field-values", "project-1"],
+      ["custom-field-filter-values", "project-1"],
+      ["workflow-rules", "project-1"],
+      ["project-members", "project-1"],
+      ["calendar-feeds", "project-1"],
+      ["github-integration", "project-1"],
+      ["tasks", "project-1", "analytics", "summary"],
+      ["public-task-description", "project-1", "task-1"],
+    ];
+    for (const key of keys) client.setQueryData(key, {});
+    client.setQueryData(["columns", "project-2"], {});
+
+    dropProjectCaches(client, "project-1");
+
+    for (const key of keys) {
+      expect(client.getQueryData(key), JSON.stringify(key)).toBeUndefined();
+    }
+    expect(client.getQueryData(["columns", "project-2"])).toBeDefined();
+  });
 });

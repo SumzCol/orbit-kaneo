@@ -2,7 +2,10 @@ import { and, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Context } from "hono";
 import db, { schema } from "../database";
-import { hasInstanceAdminRole } from "./instance-admin-role";
+import {
+  hasInstanceAdminRole,
+  instanceAdminRoleSql,
+} from "./instance-admin-role";
 import {
   builtInRoleStatements,
   customRoleStatements,
@@ -270,4 +273,17 @@ export async function workspaceWideProjectUserIds(
     if (allowed) userIds.push(member.userId);
   }
   return userIds;
+}
+
+/**
+ * Instance administrators, who reach every project in every workspace with
+ * neither a row nor a workspace role to show for it. A change that moves a
+ * project between workspaces changes what their sidebars list too.
+ */
+export async function instanceAdministratorIds(): Promise<string[]> {
+  const admins = await db
+    .select({ id: schema.userTable.id })
+    .from(schema.userTable)
+    .where(instanceAdminRoleSql(schema.userTable.role));
+  return admins.map((admin) => admin.id);
 }
