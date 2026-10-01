@@ -4,13 +4,16 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { APIError } from "better-auth/api";
 import { and, eq, sql } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import journal from "../../apps/api/drizzle/meta/_journal.json";
 import {
   pruneFeedsAfterRoleEdit,
   rememberRoleEditForFeeds,
 } from "../../apps/api/src/calendar-feed/prune-after-role-change";
-import { pruneWorkspaceCalendarFeeds } from "../../apps/api/src/calendar-feed/service";
+import {
+  pruneCalendarFeeds,
+  pruneWorkspaceCalendarFeeds,
+} from "../../apps/api/src/calendar-feed/service";
 import db, { schema } from "../../apps/api/src/database";
 import { calendarFeedTable } from "../../apps/api/src/database/schema";
 import { createApp } from "../../apps/api/src/index";
@@ -24,6 +27,27 @@ import {
   createProjectFixture,
   createWorkspaceMember,
 } from "./helpers/fixtures";
+
+// Lets a test act in the gap after the prune has asked an owner's access and
+// before it deletes, which is where a concurrent change lands. Inert unless
+// a test sets it.
+const accessCheck = vi.hoisted(() => ({
+  after: undefined as (() => Promise<void>) | undefined,
+}));
+vi.mock("../../apps/api/src/utils/project-access", async (original) => {
+  const actual =
+    await original<typeof import("../../apps/api/src/utils/project-access")>();
+  return {
+    ...actual,
+    userCanAccessProject: async (projectId: string, userId: string) => {
+      const allowed = await actual.userCanAccessProject(projectId, userId);
+      const after = accessCheck.after;
+      accessCheck.after = undefined;
+      if (after) await after();
+      return allowed;
+    },
+  };
+});
 
 beforeEach(resetTestDatabase);
 
@@ -466,5 +490,33 @@ describe("a feed that lost its access stays gone", () => {
     await pruneFeedsAfterRoleEdit(asHookContext(ctx));
 
     expect(await feedsOf(lead.id)).toHaveLength(1);
+  });
+});
+
+describe("a prune racing restored access", () => {
+  // The prune finds no access, then the owner is promoted and makes a new
+  // feed before the delete runs. Deleting by owner would take the new one.
+  it("deletes only the feeds that existed when it started", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const admin = await addWorkspaceMember(workspace.id, "admin");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+    await insertFeed(project.id, admin.id);
+    await setRole(workspace.id, admin.id, "member");
+
+    let replacement: { id: string; token: string } | undefined;
+    accessCheck.after = async () => {
+      await setRole(workspace.id, admin.id, "admin");
+      replacement = await insertFeed(project.id, admin.id);
+    };
+    await pruneCalendarFeeds(project.id, [admin.id]);
+
+    expect((await feedsOf(admin.id)).map((feed) => feed.id)).toEqual([
+      replacement?.id,
+    ]);
   });
 });

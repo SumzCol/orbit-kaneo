@@ -300,8 +300,12 @@ export async function pruneCalendarFeeds(
   userIds?: string[],
 ) {
   try {
-    const owners = await db
-      .selectDistinct({ userId: calendarFeedTable.userId })
+    // The feeds as they stand now, before anyone's access is asked. Only
+    // these rows are deleted: an owner whose access comes back while this
+    // runs can create a replacement feed, and a delete by owner would take
+    // that one too.
+    const feeds = await db
+      .select({ id: calendarFeedTable.id, userId: calendarFeedTable.userId })
       .from(calendarFeedTable)
       .where(
         and(
@@ -309,16 +313,15 @@ export async function pruneCalendarFeeds(
           userIds ? inArray(calendarFeedTable.userId, userIds) : undefined,
         ),
       );
-    for (const { userId } of owners) {
+    const byOwner = new Map<string, string[]>();
+    for (const feed of feeds) {
+      byOwner.set(feed.userId, [...(byOwner.get(feed.userId) ?? []), feed.id]);
+    }
+    for (const [userId, ids] of byOwner) {
       if (await userCanAccessProject(projectId, userId)) continue;
       await db
         .delete(calendarFeedTable)
-        .where(
-          and(
-            eq(calendarFeedTable.projectId, projectId),
-            eq(calendarFeedTable.userId, userId),
-          ),
-        );
+        .where(inArray(calendarFeedTable.id, ids));
     }
   } catch (error) {
     console.error(`Failed to prune calendar feeds for ${projectId}:`, error);
