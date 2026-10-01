@@ -292,3 +292,126 @@ export async function instanceAdministratorIds(): Promise<string[]> {
     .where(instanceAdminRoleSql(schema.userTable.role));
   return admins.map((admin) => admin.id);
 }
+
+export type ProjectUserPair = { projectId: string; userId: string };
+
+export function projectUserKey(pair: ProjectUserPair) {
+  return `${pair.projectId}\u0000${pair.userId}`;
+}
+
+/**
+ * `userCanAccessProject` for many pairs at once, as the set of keys
+ * (`projectUserKey`) that pass.
+ *
+ * The single check costs up to four queries a pair, which a sweep over every
+ * open board multiplies by the number of connections. This answers any number
+ * of pairs in three queries plus one per distinct workspace role, by the same
+ * rules: an explicit membership through the exact workspace membership, an
+ * instance administrator, or a workspace role that reaches every project.
+ */
+export async function accessibleProjectPairs(
+  pairs: ProjectUserPair[],
+): Promise<Set<string>> {
+  const allowed = new Set<string>();
+  if (pairs.length === 0) return allowed;
+
+  const projectIds = [...new Set(pairs.map((pair) => pair.projectId))];
+  const userIds = [...new Set(pairs.map((pair) => pair.userId))];
+  const wanted = new Set(pairs.map(projectUserKey));
+
+  const memberships = await db
+    .select({
+      projectId: schema.projectMemberTable.projectId,
+      userId: schema.projectMemberTable.userId,
+    })
+    .from(schema.projectMemberTable)
+    .innerJoin(
+      schema.projectTable,
+      eq(schema.projectTable.id, schema.projectMemberTable.projectId),
+    )
+    .innerJoin(
+      schema.workspaceUserTable,
+      and(
+        eq(
+          schema.workspaceUserTable.id,
+          schema.projectMemberTable.workspaceMemberId,
+        ),
+        eq(
+          schema.workspaceUserTable.workspaceId,
+          schema.projectTable.workspaceId,
+        ),
+        eq(schema.workspaceUserTable.userId, schema.projectMemberTable.userId),
+      ),
+    )
+    .where(
+      and(
+        inArray(schema.projectMemberTable.projectId, projectIds),
+        inArray(schema.projectMemberTable.userId, userIds),
+      ),
+    );
+  for (const row of memberships) {
+    const key = projectUserKey(row);
+    if (wanted.has(key)) allowed.add(key);
+  }
+
+  const admins = await db
+    .select({ id: schema.userTable.id })
+    .from(schema.userTable)
+    .where(
+      and(
+        inArray(schema.userTable.id, userIds),
+        instanceAdminRoleSql(schema.userTable.role),
+      ),
+    );
+  const adminIds = new Set(admins.map((admin) => admin.id));
+
+  const roles = await db
+    .select({
+      projectId: schema.projectTable.id,
+      workspaceId: schema.projectTable.workspaceId,
+      userId: schema.workspaceUserTable.userId,
+      role: schema.workspaceUserTable.role,
+    })
+    .from(schema.projectTable)
+    .innerJoin(
+      schema.workspaceUserTable,
+      eq(
+        schema.workspaceUserTable.workspaceId,
+        schema.projectTable.workspaceId,
+      ),
+    )
+    .where(
+      and(
+        inArray(schema.projectTable.id, projectIds),
+        inArray(schema.workspaceUserTable.userId, userIds),
+      ),
+    );
+  const seesAll = new Map<string, boolean>();
+  const roleByPair = new Map<string, { workspaceId: string; role: string }>();
+  for (const row of roles) {
+    if (row.role) roleByPair.set(projectUserKey(row), row);
+  }
+
+  for (const pair of pairs) {
+    const key = projectUserKey(pair);
+    if (allowed.has(key)) continue;
+    if (adminIds.has(pair.userId)) {
+      allowed.add(key);
+      continue;
+    }
+    const member = roleByPair.get(key);
+    if (!member) continue;
+    const roleKey = `${member.workspaceId}\u0000${member.role}`;
+    let allowedByRole = seesAll.get(roleKey);
+    if (allowedByRole === undefined) {
+      allowedByRole = await roleSeesAllProjects(
+        member.workspaceId,
+        member.role,
+      );
+      seesAll.set(roleKey, allowedByRole);
+    }
+    if (allowedByRole) allowed.add(key);
+  }
+
+  return allowed;
+}
