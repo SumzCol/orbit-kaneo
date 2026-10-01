@@ -89,7 +89,9 @@ const moveProjectRoute = createRoute({
     400: errorResponse("Invalid destination or same workspace"),
     401: errorResponse("Unauthorized"),
     402: errorResponse("Destination workspace plan has expired"),
-    403: errorResponse("Missing workspace access or permission"),
+    403: errorResponse(
+      "Missing workspace access or permission, or no access to the project",
+    ),
     404: errorResponse("Project not found in the source workspace"),
     409: errorResponse(
       "Project key conflict or cross-project task relationships",
@@ -213,7 +215,7 @@ const updateProjectRoute = createRoute({
     200: jsonResponse("The updated project", projectSchema),
     400: errorResponse("Invalid body, or unknown project"),
     403: errorResponse(
-      "No workspace access, missing project:update, or missing project:share when visibility changes",
+      "No workspace access, missing project:update, or missing project:share when visibility changes, or no access to the project",
     ),
   },
 });
@@ -237,7 +239,7 @@ const deleteProjectRoute = createRoute({
       "Unknown project, or its workspace could not be determined",
     ),
     403: errorResponse(
-      "No workspace access, or missing project:delete permission",
+      "No workspace access, or missing project:delete permission, or no access to the project",
     ),
   },
 });
@@ -261,7 +263,7 @@ const archiveProjectRoute = createRoute({
       "Unknown project, or its workspace could not be determined",
     ),
     403: errorResponse(
-      "No workspace access, or missing project:update permission",
+      "No workspace access, or missing project:update permission, or no access to the project",
     ),
   },
 });
@@ -284,7 +286,7 @@ const unarchiveProjectRoute = createRoute({
       "Unknown project, or its workspace could not be determined",
     ),
     403: errorResponse(
-      "No workspace access, or missing project:update permission",
+      "No workspace access, or missing project:update permission, or no access to the project",
     ),
   },
 });
@@ -342,7 +344,7 @@ const uploadProjectBackgroundRoute = createRoute({
     ),
     400: errorResponse("Invalid image upload request, or unknown project"),
     403: errorResponse(
-      "No workspace access, or missing project:update permission",
+      "No workspace access, or missing project:update permission, or no access to the project",
     ),
     404: errorResponse("Project not found"),
     503: errorResponse("Image uploads are not configured"),
@@ -377,7 +379,7 @@ const finalizeProjectBackgroundRoute = createRoute({
     ),
     400: errorResponse("Invalid image upload request, or unknown project"),
     403: errorResponse(
-      "No workspace access, or missing project:update permission",
+      "No workspace access, or missing project:update permission, or no access to the project",
     ),
     404: errorResponse("Project not found"),
     500: errorResponse("Failed to save the project background"),
@@ -402,7 +404,7 @@ const deleteProjectBackgroundRoute = createRoute({
       "Unknown project, or its workspace could not be determined",
     ),
     403: errorResponse(
-      "No workspace access, or missing project:update permission",
+      "No workspace access, or missing project:update permission, or no access to the project",
     ),
   },
 });
@@ -478,7 +480,9 @@ const removeProjectMemberRoute = createRoute({
     403: errorResponse(
       "No access to the project, or missing project:share permission",
     ),
-    404: errorResponse("The user is not a member of this project"),
+    404: errorResponse(
+      "The user is not a member of this project, or the project is no longer in this workspace",
+    ),
   },
 });
 
@@ -804,7 +808,7 @@ const project = apiRouter<BaseVariables & { workspaceId: string }>()
   })
   .openapi(listProjectMembersRoute, async (c) => {
     const { id } = c.req.valid("param");
-    return c.json(await getProjectMembersCtrl(id), 200);
+    return c.json(await getProjectMembersCtrl(id, c.get("workspaceId")), 200);
   })
   .openapi(addProjectMemberRoute, async (c) => {
     const { id } = c.req.valid("param");
@@ -815,7 +819,12 @@ const project = apiRouter<BaseVariables & { workspaceId: string }>()
   .openapi(removeProjectMemberRoute, async (c) => {
     const { id, userId } = c.req.valid("param");
     return c.json(
-      await removeProjectMemberCtrl(id, userId, c.get("userId")),
+      await removeProjectMemberCtrl(
+        id,
+        c.get("workspaceId"),
+        userId,
+        c.get("userId"),
+      ),
       200,
     );
   });

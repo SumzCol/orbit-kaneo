@@ -165,7 +165,9 @@ const getTaskRelationsRoute = createRoute({
     400: errorResponse(
       "Unknown task, or its workspace could not be determined",
     ),
-    403: errorResponse("No access to the task's workspace"),
+    403: errorResponse(
+      "No access to the task's workspace, or no access to the project",
+    ),
   },
 });
 
@@ -190,7 +192,9 @@ const getProjectTaskRelationsRoute = createRoute({
     400: errorResponse(
       "Unknown project, or its workspace could not be determined",
     ),
-    403: errorResponse("No workspace access, or missing task:read permission"),
+    403: errorResponse(
+      "No workspace access, or missing task:read permission, or no access to the project",
+    ),
   },
 });
 

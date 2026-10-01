@@ -13,8 +13,12 @@ import {
  * Joined the same way as isProjectMember. A row whose workspace membership is
  * gone grants nothing, and listing it anyway would hand the project's current
  * members the name and email of somebody who has left the workspace.
+ *
+ * Scoped to the workspace the request was authorized in, so a move landing
+ * between the access check and this query returns nothing rather than the
+ * destination workspace's members.
  */
-async function getProjectMembers(projectId: string) {
+async function getProjectMembers(projectId: string, workspaceId: string) {
   return db
     .select({
       id: projectMemberTable.id,
@@ -35,7 +39,12 @@ async function getProjectMembers(projectId: string) {
         eq(workspaceUserTable.userId, projectMemberTable.userId),
       ),
     )
-    .where(eq(projectMemberTable.projectId, projectId));
+    .where(
+      and(
+        eq(projectMemberTable.projectId, projectId),
+        eq(projectTable.workspaceId, workspaceId),
+      ),
+    );
 }
 
 export default getProjectMembers;

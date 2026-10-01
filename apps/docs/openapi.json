@@ -7176,7 +7176,7 @@
             }
           },
           "403": {
-            "description": "Missing workspace access or permission",
+            "description": "Missing workspace access or permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7479,7 +7479,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, missing project:update, or missing project:share when visibility changes",
+            "description": "No workspace access, missing project:update, or missing project:share when visibility changes, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7532,7 +7532,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:delete permission",
+            "description": "No workspace access, or missing project:delete permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7647,7 +7647,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7795,7 +7795,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7850,7 +7850,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7927,7 +7927,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8032,7 +8032,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8265,7 +8265,7 @@
             }
           },
           "404": {
-            "description": "The user is not a member of this project",
+            "description": "The user is not a member of this project, or the project is no longer in this workspace",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8580,7 +8580,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access",
+            "description": "No workspace access, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8684,7 +8684,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access",
+            "description": "No workspace access, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8944,7 +8944,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing the permission the operation needs",
+            "description": "No workspace access, or missing the permission the operation needs, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9099,7 +9099,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "Missing task:update permission",
+            "description": "Missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9240,7 +9240,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:create permission",
+            "description": "No workspace access, or missing task:create permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9317,7 +9317,7 @@
             }
           },
           "403": {
-            "description": "No workspace access, missing task:create, or missing task:update when copying parent links",
+            "description": "No workspace access, missing task:create, or missing task:update when copying parent links, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9504,7 +9504,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the task's workspace",
+            "description": "No access to the task's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9613,7 +9613,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update or task:assign permission",
+            "description": "No workspace access, or missing task:update or task:assign permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9666,7 +9666,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:delete permission",
+            "description": "No workspace access, or missing task:delete permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9930,7 +9930,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:create permission",
+            "description": "No workspace access, or missing task:create permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10003,7 +10003,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10083,7 +10083,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10160,7 +10160,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:assign permission",
+            "description": "No workspace access, or missing task:assign permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10240,7 +10240,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10313,7 +10313,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10403,7 +10403,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10518,7 +10518,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10601,7 +10601,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10739,7 +10739,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10841,7 +10841,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10926,7 +10926,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10979,7 +10979,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11047,7 +11047,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the task's workspace",
+            "description": "No access to the task's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11144,7 +11144,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11212,7 +11212,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11278,7 +11278,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "Not the author, or no access to the workspace",
+            "description": "Not the author, or no access to the workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11349,7 +11349,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "Not the author, or no access to the workspace",
+            "description": "Not the author, or no access to the workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11417,7 +11417,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the task's workspace",
+            "description": "No access to the task's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11504,7 +11504,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, missing task:update permission, or external attribution without workspace:manage_settings",
+            "description": "No workspace access, missing task:update permission, or external attribution without workspace:manage_settings, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11579,7 +11579,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "Not the author, or missing task:update permission",
+            "description": "Not the author, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11642,7 +11642,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "Not the author, or missing task:update permission",
+            "description": "Not the author, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11710,7 +11710,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the task's workspace",
+            "description": "No access to the task's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11765,7 +11765,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the entry's workspace",
+            "description": "No access to the entry's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11846,7 +11846,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11924,7 +11924,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11982,7 +11982,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the task's workspace",
+            "description": "No access to the task's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12189,7 +12189,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the label's workspace",
+            "description": "No access to the label's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12264,7 +12264,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing label:update permission",
+            "description": "No workspace access, or missing label:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12337,7 +12337,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing label:delete permission",
+            "description": "No workspace access, or missing label:delete permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12503,7 +12503,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing label:update permission",
+            "description": "No workspace access, or missing label:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16608,7 +16608,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:read permission",
+            "description": "No workspace access, or missing task:read permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16677,7 +16677,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:read permission",
+            "description": "No workspace access, or missing task:read permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16735,7 +16735,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:read permission",
+            "description": "No workspace access, or missing task:read permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16793,7 +16793,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the task's workspace",
+            "description": "No access to the task's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17030,7 +17030,7 @@
             }
           },
           "403": {
-            "description": "No permission to update the task",
+            "description": "No permission to update the task, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17086,7 +17086,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No access to the task's workspace",
+            "description": "No access to the task's workspace, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17156,7 +17156,7 @@
             }
           },
           "403": {
-            "description": "No permission to update the task",
+            "description": "No permission to update the task, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17303,7 +17303,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17358,7 +17358,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17537,7 +17537,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access or missing read permission",
+            "description": "No workspace access or missing read permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17595,7 +17595,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access or missing read permission",
+            "description": "No workspace access or missing read permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17653,7 +17653,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access or missing task:read permission",
+            "description": "No workspace access or missing task:read permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17711,7 +17711,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access or missing read permission",
+            "description": "No workspace access or missing read permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17803,7 +17803,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17891,7 +17891,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17962,7 +17962,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing task:update permission",
+            "description": "No workspace access, or missing task:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18017,7 +18017,7 @@
             "description": "Missing or invalid credentials"
           },
           "403": {
-            "description": "No workspace access, or missing project:update permission",
+            "description": "No workspace access, or missing project:update permission, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {

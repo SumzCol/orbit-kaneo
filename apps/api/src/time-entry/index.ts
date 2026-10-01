@@ -32,7 +32,9 @@ const getTaskTimeEntriesRoute = createRoute({
     400: errorResponse(
       "Unknown task, or its workspace could not be determined",
     ),
-    403: errorResponse("No access to the task's workspace"),
+    403: errorResponse(
+      "No access to the task's workspace, or no access to the project",
+    ),
   },
 });
 
@@ -50,7 +52,9 @@ const getTimeEntryRoute = createRoute({
     400: errorResponse(
       "Unknown entry, or its workspace could not be determined",
     ),
-    403: errorResponse("No access to the entry's workspace"),
+    403: errorResponse(
+      "No access to the entry's workspace, or no access to the project",
+    ),
   },
 });
 
@@ -76,7 +80,7 @@ const createTimeEntryRoute = createRoute({
     200: jsonResponse("The created time entry", timeEntrySchema),
     400: errorResponse("Invalid timestamps, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission",
+      "No workspace access, or missing task:update permission, or no access to the project",
     ),
   },
 });
@@ -104,7 +108,7 @@ const updateTimeEntryRoute = createRoute({
     200: jsonResponse("The updated time entry", timeEntrySchema),
     400: errorResponse("Invalid timestamps, or unknown entry"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission",
+      "No workspace access, or missing task:update permission, or no access to the project",
     ),
   },
 });

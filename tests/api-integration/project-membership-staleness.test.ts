@@ -160,7 +160,7 @@ describe("a stale membership after the user rejoins", () => {
 
     // The row grants nothing, so listing it would only disclose the name
     // and email of somebody who has left.
-    const listed = (await getProjectMembers(project.id)).map(
+    const listed = (await getProjectMembers(project.id, workspace.id)).map(
       (member) => member.userId,
     );
     expect(listed).not.toContain(departed.id);

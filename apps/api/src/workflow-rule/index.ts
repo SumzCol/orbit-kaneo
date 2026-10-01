@@ -58,7 +58,7 @@ const upsertWorkflowRuleRoute = createRoute({
     200: jsonResponse("The created or updated rule", workflowRuleRowSchema),
     400: errorResponse("Invalid body, or unknown project"),
     403: errorResponse(
-      "No workspace access, or missing project:update permission",
+      "No workspace access, or missing project:update permission, or no access to the project",
     ),
   },
 });
@@ -81,7 +81,7 @@ const deleteWorkflowRuleRoute = createRoute({
       "Unknown rule, or its workspace could not be determined",
     ),
     403: errorResponse(
-      "No workspace access, or missing project:update permission",
+      "No workspace access, or missing project:update permission, or no access to the project",
     ),
   },
 });

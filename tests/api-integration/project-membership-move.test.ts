@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { and, eq, sql } from "drizzle-orm";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
+import addProjectMember from "../../apps/api/src/project/controllers/add-project-member";
+import getProjectMembers from "../../apps/api/src/project/controllers/get-project-members";
 import moveProject from "../../apps/api/src/project/controllers/move-project";
+import removeProjectMember from "../../apps/api/src/project/controllers/remove-project-member";
 import { isProjectMember } from "../../apps/api/src/utils/project-access";
 import { resetTestDatabase } from "./helpers/database";
 import {
@@ -237,5 +240,140 @@ describe("a move and a stale membership", () => {
     // Keeping the stale row on the insert conflict would look populated and
     // grant nothing.
     expect(await isProjectMember(project.id, source.user.id)).toBe(true);
+  });
+});
+
+describe("a membership request authorized before a move", () => {
+  // The middleware authorized the request against the source workspace; the
+  // controller then runs after the project has left it. A survivor is in both
+  // workspaces, so they keep a live membership through the move.
+  async function movedWithSurvivor() {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    const survivor = await addWorkspaceMember(source.workspace.id, "member");
+    const [targetMembership] = await db
+      .insert(schema.workspaceUserTable)
+      .values({
+        workspaceId: target.workspace.id,
+        userId: survivor.id,
+        role: "member",
+        joinedAt: new Date(),
+      })
+      .returning();
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id, survivor.id],
+    });
+    return { source, target, survivor, targetMembership, project };
+  }
+
+  it("lists nobody from the workspace the project moved to", async () => {
+    const { source, target, project } = await movedWithSurvivor();
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    // Unscoped, this returns the target's members with names and emails to
+    // someone who was only ever authorized in the source.
+    expect(await getProjectMembers(project.id, source.workspace.id)).toEqual(
+      [],
+    );
+  });
+
+  it("removes nobody from the workspace the project moved to", async () => {
+    const { source, target, survivor, project } = await movedWithSurvivor();
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    await expect(
+      removeProjectMember(
+        project.id,
+        source.workspace.id,
+        survivor.id,
+        source.user.id,
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(await isProjectMember(project.id, survivor.id)).toBe(true);
+  });
+
+  it("does not write the source membership into a project mid-move", async () => {
+    const { source, target, survivor, targetMembership, project } =
+      await movedWithSurvivor();
+
+    // Stands in for a move that has locked the project and re-pointed the
+    // survivor's link, and has yet to commit.
+    let locked!: () => void;
+    let release!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const move = db.transaction(async (tx) => {
+      await tx
+        .select()
+        .from(schema.projectTable)
+        .where(eq(schema.projectTable.id, project.id))
+        .for("update");
+      await tx
+        .update(schema.projectTable)
+        .set({ workspaceId: target.workspace.id })
+        .where(eq(schema.projectTable.id, project.id));
+      await tx
+        .update(schema.projectMemberTable)
+        .set({ workspaceMemberId: targetMembership.id })
+        .where(
+          and(
+            eq(schema.projectMemberTable.projectId, project.id),
+            eq(schema.projectMemberTable.userId, survivor.id),
+          ),
+        );
+      locked();
+      await gate;
+    });
+    await ready;
+
+    const add = addProjectMember(
+      project.id,
+      source.workspace.id,
+      survivor.id,
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    try {
+      // Both versions of the add block on the open move: the fixed one on the
+      // project row, the unserialized one on the survivor's row in its upsert.
+      // Waiting for that proves the add read the project before the move
+      // committed, which is the interleaving the lock has to survive.
+      await vi.waitFor(async () => {
+        const waiting = await db.execute(
+          sql`SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+        );
+        expect(waiting.rows.length).toBeGreaterThan(0);
+      });
+    } finally {
+      release();
+    }
+    await move;
+
+    expect(await add).toMatchObject({ status: 404 });
+    // Overwriting the re-pointed link with the source membership would revoke
+    // a member the move had just kept.
+    expect(await isProjectMember(project.id, survivor.id)).toBe(true);
   });
 });

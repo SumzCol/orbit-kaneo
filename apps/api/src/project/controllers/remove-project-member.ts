@@ -9,6 +9,7 @@ import {
 
 async function removeProjectMember(
   projectId: string,
+  workspaceId: string,
   userId: string,
   actorId: string,
 ) {
@@ -24,11 +25,26 @@ async function removeProjectMember(
   // the last two members concurrently would otherwise each read two rows,
   // each delete a different one, and leave the project with none.
   const removed = await db.transaction(async (tx) => {
-    await tx
+    // The workspace is checked on the locked row, not only by the middleware:
+    // a request authorized in the source workspace can wait here behind a
+    // move, and must not then remove a member of the workspace it moved to.
+    const [project] = await tx
       .select({ id: projectTable.id })
       .from(projectTable)
-      .where(eq(projectTable.id, projectId))
+      .where(
+        and(
+          eq(projectTable.id, projectId),
+          eq(projectTable.workspaceId, workspaceId),
+        ),
+      )
       .for("update");
+
+    if (!project) {
+      throw new HTTPException(404, {
+        message:
+          "Project doesn't exist or doesn't belong to the specified workspace",
+      });
+    }
 
     // Rows whose workspace membership is gone grant no access, so they cannot
     // be what keeps a project populated either. Counting them would let the

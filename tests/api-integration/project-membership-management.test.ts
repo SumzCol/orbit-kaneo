@@ -268,7 +268,7 @@ describe("revoking a board on removal", () => {
 
     // An administrator reaches every project in the workspace without an
     // explicit membership, so dropping the row changes nothing for them.
-    await removeProjectMember(project.id, admin.id, owner.id);
+    await removeProjectMember(project.id, workspace.id, admin.id, owner.id);
 
     expect(await isProjectMember(project.id, admin.id)).toBe(false);
     expect(await userCanAccessProject(project.id, admin.id)).toBe(true);
@@ -284,7 +284,7 @@ describe("revoking a board on removal", () => {
       members: [owner.id, member.id],
     });
 
-    await removeProjectMember(project.id, member.id, owner.id);
+    await removeProjectMember(project.id, workspace.id, member.id, owner.id);
 
     expect(await userCanAccessProject(project.id, member.id)).toBe(false);
   });
@@ -314,13 +314,13 @@ describe("the last-member guard and stale rows", () => {
       );
 
     await expect(
-      removeProjectMember(project.id, owner.id, departed.id),
+      removeProjectMember(project.id, workspace.id, owner.id, departed.id),
     ).rejects.toMatchObject({ status: 400 });
 
     // The stale row itself can still be cleaned up: removing it empties
     // nothing, because it was already granting nothing.
     await expect(
-      removeProjectMember(project.id, departed.id, owner.id),
+      removeProjectMember(project.id, workspace.id, departed.id, owner.id),
     ).resolves.toMatchObject({ userId: departed.id });
   });
 });

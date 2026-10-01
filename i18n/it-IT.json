@@ -1064,7 +1064,7 @@
 			"membersAdd": "Add",
 			"membersAddPlaceholder": "Select a workspace member",
 			"membersEmpty": "No members yet",
-			"membersSectionSubtitle": "Only these people can open this project. Workspace administrators always can.",
+			"membersSectionSubtitle": "Only these people can open this project when signed in. Workspace administrators always can, and public access above lets anyone with the URL view it regardless of this list.",
 			"membersSectionTitle": "Project members",
 			"memberRemoveLabel": "Remove {{name}}",
 			"memberRemoveSelfHint": "You cannot remove yourself from a project",
