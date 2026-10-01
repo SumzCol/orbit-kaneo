@@ -59,36 +59,28 @@ async function addProjectMember(
       workspaceMemberId: membership.id,
       createdAt: new Date(),
     })
-    .onConflictDoNothing({
+    // On conflict the link is rewritten rather than kept. A row can survive
+    // with a null link after its workspace membership was deleted, and when
+    // the same person rejoins and is added again, keeping that row would
+    // report success while granting nothing. Pointing it at the current
+    // membership is the repair; for a row that was already valid it changes
+    // nothing.
+    .onConflictDoUpdate({
       target: [projectMemberTable.projectId, projectMemberTable.userId],
+      set: { workspaceMemberId: membership.id },
     })
     .returning();
 
-  if (added) {
-    notifyProjectAccessChanged(userId, projectId, true);
-    return added;
-  }
-
-  // Already a member. Adding twice is the same end state, so return the
-  // existing row rather than failing a retry.
-  const [existing] = await db
-    .select()
-    .from(projectMemberTable)
-    .where(
-      and(
-        eq(projectMemberTable.projectId, projectId),
-        eq(projectMemberTable.userId, userId),
-      ),
-    )
-    .limit(1);
-
-  if (!existing) {
+  // The upsert returns the row either way, so adding someone who is already a
+  // member is the same end state as adding them once.
+  if (!added) {
     throw new HTTPException(500, {
       message: "Failed to add the project member",
     });
   }
 
-  return existing;
+  notifyProjectAccessChanged(userId, projectId, true);
+  return added;
 }
 
 export default addProjectMember;
