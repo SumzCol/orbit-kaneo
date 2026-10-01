@@ -200,6 +200,30 @@ describe("revokeProjectAccess", () => {
     }
   });
 
+  // The move's close code is carried on the message, so it has to survive
+  // whatever the adapter does to it. The Valibot schema on the Redis path
+  // strips anything it does not name.
+  it("keeps the revoked users on a serialised project move", async () => {
+    const { broadcastMessageSchema } =
+      await import("../../../apps/api/src/ws/redis-broadcast-adapter");
+    const v = await import("valibot");
+    const parsed = v.parse(
+      broadcastMessageSchema,
+      JSON.parse(
+        JSON.stringify({
+          projectId: "proj-1",
+          message: {
+            type: "PROJECT_MOVED",
+            projectId: "proj-1",
+            revokedUserIds: ["user-removed"],
+          },
+        }),
+      ),
+    );
+
+    expect(parsed.message.revokedUserIds).toEqual(["user-removed"]);
+  });
+
   it("never sends the control message to a socket", async () => {
     await initializeWebSocketAdapter();
 

@@ -250,32 +250,43 @@ async function moveProject(
       .returning({ userId: projectMemberTable.userId });
     revoked = droppedMembers.map((member) => member.userId);
 
-    // A project keeps at least one member where it can, and the move may have
-    // removed them all. Whoever moved it is the natural choice but not a
+    // Only when the move removed them all. Seeding regardless would hand the
+    // mover a standing membership they never asked for, which outlives the
+    // administrative role that let them move it. Whoever moved it is the natural choice but not a
     // guaranteed one: an instance administrator reaches the target workspace
     // without a membership row, and a project_member row for somebody outside
     // the workspace grants nothing. Fall back to the longest-standing member
     // of the target, and if the workspace somehow has none, leave the project
     // to its administrators rather than inventing a member.
-    const [keeper] = await tx
-      .select({ userId: workspaceUserTable.userId })
-      .from(workspaceUserTable)
-      .where(
-        and(
-          eq(workspaceUserTable.workspaceId, targetWorkspaceId),
-          eq(workspaceUserTable.userId, currentUserId),
-        ),
-      )
+    const [survivor] = await tx
+      .select({ userId: projectMemberTable.userId })
+      .from(projectMemberTable)
+      .where(eq(projectMemberTable.projectId, id))
       .limit(1);
 
-    const [fallback] = keeper
-      ? [keeper]
+    const [keeper] = survivor
+      ? []
       : await tx
           .select({ userId: workspaceUserTable.userId })
           .from(workspaceUserTable)
-          .where(eq(workspaceUserTable.workspaceId, targetWorkspaceId))
-          .orderBy(workspaceUserTable.joinedAt)
+          .where(
+            and(
+              eq(workspaceUserTable.workspaceId, targetWorkspaceId),
+              eq(workspaceUserTable.userId, currentUserId),
+            ),
+          )
           .limit(1);
+
+    const [fallback] = survivor
+      ? []
+      : keeper
+        ? [keeper]
+        : await tx
+            .select({ userId: workspaceUserTable.userId })
+            .from(workspaceUserTable)
+            .where(eq(workspaceUserTable.workspaceId, targetWorkspaceId))
+            .orderBy(workspaceUserTable.joinedAt)
+            .limit(1);
 
     if (fallback) {
       await tx
