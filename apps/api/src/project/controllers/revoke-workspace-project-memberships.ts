@@ -1,13 +1,16 @@
 import { and, eq, inArray } from "drizzle-orm";
 import db from "../../database";
 import { projectMemberTable, projectTable } from "../../database/schema";
+import { userCanAccessProject } from "../../utils/project-access";
+import { notifyProjectAccessChanged, revokeProjectAccess } from "../../ws";
 
 /**
  * Drops every project membership a user holds inside one workspace.
  *
- * These rows already grant nothing once the workspace membership is gone --
- * deleting it nulls their link, and a null link never matches. This removes
- * them so they do not linger in the table or in the member list.
+ * Project membership is keyed on the user rather than on their workspace
+ * membership row, so leaving a workspace would otherwise leave these rows
+ * behind and silently restore the old project access if the user were ever
+ * re-added.
  */
 async function revokeWorkspaceProjectMemberships(
   workspaceId: string,
@@ -28,6 +31,18 @@ async function revokeWorkspaceProjectMemberships(
       ),
     )
     .returning({ projectId: projectMemberTable.projectId });
+
+  for (const row of removed) {
+    // An instance administrator still reaches the project after losing the
+    // workspace membership, so the close would cost them realtime updates
+    // they are still entitled to. Only the ones who actually lost access are
+    // disconnected.
+    const stillHasAccess = await userCanAccessProject(row.projectId, userId);
+    if (!stillHasAccess) {
+      revokeProjectAccess(row.projectId, userId);
+    }
+    notifyProjectAccessChanged(userId, row.projectId, stillHasAccess);
+  }
 
   return removed.map((row) => row.projectId);
 }
