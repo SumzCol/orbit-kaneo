@@ -281,6 +281,28 @@ describe("editing a role so it no longer reaches every project", () => {
   // A failed edit normally leaves the role as it was, which the reach check
   // alone would catch. The role is narrowed here regardless, as by a
   // concurrent edit, so only the failure guard keeps this response quiet.
+  // Better Auth uses the session's active workspace when none is named.
+  it("revokes them when the edit names no workspace", async () => {
+    const { workspace, lead, project, ctx } = await leadWithProject();
+    const unnamed = {
+      body: { roleName: "lead", data: ctx.body.data },
+      context: {
+        session: { session: { activeOrganizationId: workspace.id } },
+      } as Record<string, unknown>,
+    };
+
+    // biome-ignore lint/suspicious/noExplicitAny: the hooks read body and context only
+    await rememberRoleReach(unnamed as any);
+    await applyEdit(workspace.id);
+    unnamed.context.returned = { success: true };
+    // biome-ignore lint/suspicious/noExplicitAny: as above
+    await revalidateAfterRoleUpdate(unnamed as any);
+
+    expect(notified).toEqual([
+      { userId: lead.id, projectId: project.id, hasAccess: false },
+    ]);
+  });
+
   it("does nothing when the edit failed", async () => {
     const { workspace, ctx } = await leadWithProject();
 
