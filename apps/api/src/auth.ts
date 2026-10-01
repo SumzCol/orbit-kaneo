@@ -508,10 +508,12 @@ export const auth = betterAuth({
             // them.
             //
             // The failure below is logged rather than rethrown because it is
-            // no longer what enforces the revocation: `isProjectMember` joins
-            // the workspace, so a row this misses grants nothing, even if the
-            // user is later re-added. Rethrowing would fail the member removal
-            // itself over cleanup that has already stopped mattering.
+            // not what enforces the revocation. Deleting the membership nulls
+            // each project row's link to it, and a null link never matches,
+            // so a row this misses grants nothing -- including after the user
+            // is re-added, which creates a new membership the old row does
+            // not point at. Rethrowing would fail the member removal itself
+            // over cleanup that has already stopped mattering.
             if (member.userId) {
               try {
                 await revokeWorkspaceProjectMemberships(

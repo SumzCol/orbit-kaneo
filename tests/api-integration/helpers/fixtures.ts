@@ -78,16 +78,31 @@ export async function createProjectFixture({
   // workspace, which is also what the upgrade backfill does, so tests about
   // other subjects keep reading the project they just made.
   const workspaceMembers = await db
-    .select({ userId: schema.workspaceUserTable.userId })
+    .select({
+      id: schema.workspaceUserTable.id,
+      userId: schema.workspaceUserTable.userId,
+    })
     .from(schema.workspaceUserTable)
     .where(eq(schema.workspaceUserTable.workspaceId, workspaceId));
 
   const memberIds = members ?? workspaceMembers.map((row) => row.userId);
+  // Linked to their membership in this workspace, as real creation does. A
+  // listed user who is not in the workspace gets no link, which is how such a
+  // row behaves in production: it grants nothing.
+  const membershipOf = new Map(
+    workspaceMembers.map((row) => [row.userId, row.id]),
+  );
 
   if (memberIds.length > 0) {
     await db
       .insert(schema.projectMemberTable)
-      .values(memberIds.map((userId) => ({ projectId: project.id, userId })))
+      .values(
+        memberIds.map((userId) => ({
+          projectId: project.id,
+          userId,
+          workspaceMemberId: membershipOf.get(userId) ?? null,
+        })),
+      )
       .onConflictDoNothing();
   }
 

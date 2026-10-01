@@ -170,6 +170,9 @@ describe("project access changes on the user socket", () => {
     expect(client.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["projects"],
     });
+    expect(client.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["search"],
+    });
     expect(client.removeQueries).not.toHaveBeenCalled();
   });
 
@@ -188,6 +191,11 @@ describe("project access changes on the user socket", () => {
     });
     expect(client.removeQueries).toHaveBeenCalledWith({
       queryKey: ["project", "project-1"],
+    });
+    // Queries do not refetch on mount here, so cached search hits from the
+    // project would otherwise stay on screen.
+    expect(client.removeQueries).toHaveBeenCalledWith({
+      queryKey: ["search"],
     });
   });
 });

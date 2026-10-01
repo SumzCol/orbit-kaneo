@@ -53,7 +53,12 @@ async function addProjectMember(
 
   const [added] = await db
     .insert(projectMemberTable)
-    .values({ projectId, userId, createdAt: new Date() })
+    .values({
+      projectId,
+      userId,
+      workspaceMemberId: membership.id,
+      createdAt: new Date(),
+    })
     .onConflictDoNothing({
       target: [projectMemberTable.projectId, projectMemberTable.userId],
     })

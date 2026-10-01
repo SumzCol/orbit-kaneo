@@ -984,6 +984,99 @@ describe("revoking a board on removal", () => {
   });
 });
 
+describe("a stale membership after the user rejoins", () => {
+  it("stays dead when the same person is re-added to the workspace", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const departed = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, departed.id],
+    });
+
+    // Leave the workspace without the cleanup running, which leaves the
+    // project row behind.
+    await db
+      .delete(schema.workspaceUserTable)
+      .where(
+        and(
+          eq(schema.workspaceUserTable.workspaceId, workspace.id),
+          eq(schema.workspaceUserTable.userId, departed.id),
+        ),
+      );
+    expect(
+      await db
+        .select()
+        .from(schema.projectMemberTable)
+        .where(
+          and(
+            eq(schema.projectMemberTable.projectId, project.id),
+            eq(schema.projectMemberTable.userId, departed.id),
+          ),
+        ),
+    ).toHaveLength(1);
+
+    // Re-added to the workspace. Matching on workspace and user alone would
+    // let the old row grant the old project access again.
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: workspace.id,
+      userId: departed.id,
+      role: "member",
+      joinedAt: new Date(),
+    });
+
+    expect(await isProjectMember(project.id, departed.id)).toBe(false);
+    expect(await userCanAccessProject(project.id, departed.id)).toBe(false);
+  });
+
+  it("keeps a surviving member's access on the target after a move", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    const both = await addWorkspaceMember(source.workspace.id, "member");
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: both.id,
+      role: "member",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [both.id],
+    });
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+    expect(await isProjectMember(project.id, both.id)).toBe(true);
+
+    // The row was re-pointed at the target membership, so leaving the source
+    // workspace afterwards changes nothing, and leaving the target ends it.
+    await db
+      .delete(schema.workspaceUserTable)
+      .where(
+        and(
+          eq(schema.workspaceUserTable.workspaceId, source.workspace.id),
+          eq(schema.workspaceUserTable.userId, both.id),
+        ),
+      );
+    expect(await isProjectMember(project.id, both.id)).toBe(true);
+
+    await db
+      .delete(schema.workspaceUserTable)
+      .where(
+        and(
+          eq(schema.workspaceUserTable.workspaceId, target.workspace.id),
+          eq(schema.workspaceUserTable.userId, both.id),
+        ),
+      );
+    expect(await isProjectMember(project.id, both.id)).toBe(false);
+  });
+});
+
 describe("the last-member guard and stale rows", () => {
   it("counts only members who are still in the workspace", async () => {
     const { user: owner, workspace } = await createWorkspaceMember({

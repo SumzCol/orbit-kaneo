@@ -363,6 +363,20 @@ export const projectMemberTable = pgTable(
         onDelete: "cascade",
         onUpdate: "cascade",
       }),
+    // The workspace membership this project membership was granted under. A
+    // project membership is only ever a narrowing of one specific workspace
+    // membership, and has to die with it: matching on workspace and user
+    // alone let a stale row come back to life when the same person was
+    // re-added, because the new membership satisfied the match too.
+    //
+    // Set null rather than cascade on delete, so that `afterRemoveMember` still
+    // finds the rows to revoke and announce after Better Auth has deleted the
+    // membership. A null link never matches, so the row is inert from that
+    // moment whether or not the cleanup runs.
+    workspaceMemberId: text("workspace_member_id").references(
+      () => workspaceUserTable.id,
+      { onDelete: "set null", onUpdate: "cascade" },
+    ),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [
@@ -372,6 +386,7 @@ export const projectMemberTable = pgTable(
     ),
     index("project_member_projectId_idx").on(table.projectId),
     index("project_member_userId_idx").on(table.userId),
+    index("project_member_workspaceMemberId_idx").on(table.workspaceMemberId),
   ],
 );
 

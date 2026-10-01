@@ -60,7 +60,7 @@ async function createProject(
       // leaving a project that claims a creator it does not have. They reach
       // it by their role either way.
       const [creatorMembership] = await tx
-        .select({ userId: workspaceUserTable.userId })
+        .select({ id: workspaceUserTable.id })
         .from(workspaceUserTable)
         .where(
           and(
@@ -74,6 +74,7 @@ async function createProject(
         await tx.insert(projectMemberTable).values({
           projectId: createdProject.id,
           userId: creatorId,
+          workspaceMemberId: creatorMembership.id,
         });
       }
 

@@ -72,6 +72,14 @@ export function useUserWebSocket() {
             // Every session gets this, not only one with that board open, so
             // the sidebar is what it has to fix.
             void queryClient.invalidateQueries({ queryKey: ["projects"] });
+            if (message.hasAccess === false) {
+              // Search results carry project, task, comment and activity text,
+              // and they are cached across projects rather than per project,
+              // so there is no narrower key to drop.
+              queryClient.removeQueries({ queryKey: ["search"] });
+            } else {
+              void queryClient.invalidateQueries({ queryKey: ["search"] });
+            }
             if (message.projectId && message.hasAccess === false) {
               // Queries do not refetch on mount here, so a board cached from
               // earlier would open on its old tasks the next time it is

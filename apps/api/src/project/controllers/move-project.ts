@@ -250,6 +250,22 @@ async function moveProject(
       .returning({ userId: projectMemberTable.userId });
     revoked = droppedMembers.map((member) => member.userId);
 
+    // The members who survive are in the target workspace too, but their rows
+    // still point at the source membership. Left alone they would keep access
+    // through a workspace the project no longer belongs to, and leaving the
+    // target later would not touch them. Re-pointed to the target membership
+    // so the next removal from that workspace ends them as it should.
+    await tx
+      .update(projectMemberTable)
+      .set({
+        workspaceMemberId: sql`(
+          select ${workspaceUserTable.id} from ${workspaceUserTable}
+          where ${workspaceUserTable.workspaceId} = ${targetWorkspaceId}
+            and ${workspaceUserTable.userId} = ${projectMemberTable.userId}
+        )`,
+      })
+      .where(eq(projectMemberTable.projectId, id));
+
     // Only when the move removed them all. Seeding regardless would hand the
     // mover a standing membership they never asked for, which outlives the
     // administrative role that let them move it. Whoever moved it is the natural choice but not a
@@ -267,7 +283,10 @@ async function moveProject(
     const [keeper] = survivor
       ? []
       : await tx
-          .select({ userId: workspaceUserTable.userId })
+          .select({
+            id: workspaceUserTable.id,
+            userId: workspaceUserTable.userId,
+          })
           .from(workspaceUserTable)
           .where(
             and(
@@ -282,7 +301,10 @@ async function moveProject(
       : keeper
         ? [keeper]
         : await tx
-            .select({ userId: workspaceUserTable.userId })
+            .select({
+              id: workspaceUserTable.id,
+              userId: workspaceUserTable.userId,
+            })
             .from(workspaceUserTable)
             .where(eq(workspaceUserTable.workspaceId, targetWorkspaceId))
             .orderBy(workspaceUserTable.joinedAt)
@@ -291,7 +313,11 @@ async function moveProject(
     if (fallback) {
       await tx
         .insert(projectMemberTable)
-        .values({ projectId: id, userId: fallback.userId })
+        .values({
+          projectId: id,
+          userId: fallback.userId,
+          workspaceMemberId: fallback.id,
+        })
         .onConflictDoNothing({
           target: [projectMemberTable.projectId, projectMemberTable.userId],
         });

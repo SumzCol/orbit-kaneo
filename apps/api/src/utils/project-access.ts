@@ -11,12 +11,17 @@ import {
 } from "./require-workspace-permission";
 
 /**
- * Membership only counts while the user is still in the project's workspace.
+ * A project membership counts only through the workspace membership it was
+ * granted under, and only while that membership is in the project's
+ * workspace.
  *
- * The rows are cleaned up when someone leaves a workspace, but that cleanup is
- * a hook that can fail, and a row it misses would silently restore the old
- * project access if the user were ever re-added. Joining the workspace here
- * makes such a row inert instead of load-bearing.
+ * Matching on workspace and user alone was not enough: a row left behind by a
+ * cleanup that never ran would come back to life when the same person was
+ * re-added, because the new membership matched too. Leaving the workspace
+ * nulls the link (see the schema), and a re-added user gets a new membership
+ * id, so the old row can never match again. Requiring the membership to be in
+ * the project's own workspace keeps a link that a move failed to re-point
+ * from counting against the wrong one.
  */
 export async function isProjectMember(
   projectId: string,
@@ -32,6 +37,10 @@ export async function isProjectMember(
     .innerJoin(
       schema.workspaceUserTable,
       and(
+        eq(
+          schema.workspaceUserTable.id,
+          schema.projectMemberTable.workspaceMemberId,
+        ),
         eq(
           schema.workspaceUserTable.workspaceId,
           schema.projectTable.workspaceId,
@@ -109,8 +118,8 @@ export function visibleProjectCondition(userId: string, seesAll: boolean) {
     db
       .select({ projectId: schema.projectMemberTable.projectId })
       .from(schema.projectMemberTable)
-      // Same reason as isProjectMember: a membership row that outlived the
-      // workspace membership must not put the project back in the list.
+      // Same rule as isProjectMember: only through the exact membership the
+      // row was granted under, and only in the project's own workspace.
       .innerJoin(
         memberProject,
         eq(memberProject.id, schema.projectMemberTable.projectId),
@@ -118,6 +127,10 @@ export function visibleProjectCondition(userId: string, seesAll: boolean) {
       .innerJoin(
         schema.workspaceUserTable,
         and(
+          eq(
+            schema.workspaceUserTable.id,
+            schema.projectMemberTable.workspaceMemberId,
+          ),
           eq(schema.workspaceUserTable.workspaceId, memberProject.workspaceId),
           eq(
             schema.workspaceUserTable.userId,

@@ -45,6 +45,7 @@ async function removeProjectMember(
       .innerJoin(
         workspaceUserTable,
         and(
+          eq(workspaceUserTable.id, projectMemberTable.workspaceMemberId),
           eq(workspaceUserTable.workspaceId, projectTable.workspaceId),
           eq(workspaceUserTable.userId, projectMemberTable.userId),
         ),
