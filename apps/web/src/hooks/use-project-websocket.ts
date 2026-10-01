@@ -72,12 +72,21 @@ export function useProjectWebSocket(projectId: string) {
     // added back while the board stays open would otherwise leave it without
     // realtime updates until the route remounts.
     let revoked = false;
-    const stopListeningForGrant = onProjectAccessGranted(projectId, () => {
-      if (disposed || !revoked) return;
-      revoked = false;
-      retries = 0;
-      connect();
-    });
+    // A single attempt on a guess that access may be back. The upgrade is
+    // refused with a plain HTTP 403, which reaches the client as an ordinary
+    // close, so a refused probe must not fall through to the retries and the
+    // fallback poll, which would then run against a project it cannot read.
+    let probing = false;
+    const stopListeningForGrant = onProjectAccessGranted(
+      projectId,
+      (signal) => {
+        if (disposed || !revoked) return;
+        revoked = false;
+        probing = signal === "probe";
+        retries = 0;
+        connect();
+      },
+    );
 
     function invalidateDetails(message: {
       type: string;
@@ -164,6 +173,7 @@ export function useProjectWebSocket(projectId: string) {
 
       ws.onopen = () => {
         if (disposed || activeSocket !== ws) return;
+        probing = false;
         needsReconcile = true;
         flushPending();
         if (healthyTimeout !== null) clearTimeout(healthyTimeout);
@@ -479,6 +489,13 @@ export function useProjectWebSocket(projectId: string) {
         // project is taken away. Reconnecting would only be refused at the
         // upgrade, and the fallback poll would be refused too, so stop
         // entirely rather than falling through to either.
+        if (probing) {
+          probing = false;
+          revoked = true;
+          retries = MAX_RETRIES;
+          return;
+        }
+
         if (event?.code === ACCESS_REVOKED_CLOSE_CODE) {
           retries = MAX_RETRIES;
           revoked = true;

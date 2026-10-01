@@ -43,9 +43,12 @@ function projectTaskIds(queryClient: QueryClient, projectId: string) {
 /**
  * Forgets what this client has cached about a project it can no longer open.
  *
- * Removed rather than invalidated: queries do not refetch on mount here, so an
- * invalidated entry would still be shown the next time the project is
- * visited, and a refetch that fails keeps the old data anyway.
+ * Reset rather than invalidated or removed. Queries do not refetch on mount
+ * here, so an invalidated entry would still be shown the next time the
+ * project is visited, and a refetch that fails keeps the old data anyway. A
+ * removed one is gone from the cache but not from a view that has it
+ * mounted, which keeps rendering its last result. Resetting empties both;
+ * a mounted query then refetches and gets the 403.
  *
  * The detail is cached as `["projects", workspaceId, projectId]`, and none of
  * the callers know the workspace, so it is matched on the project id. The
@@ -53,12 +56,12 @@ function projectTaskIds(queryClient: QueryClient, projectId: string) {
  * refreshed, not dropped, so the sidebar does not go blank.
  */
 export function dropProjectCaches(queryClient: QueryClient, projectId: string) {
-  // Read before the board is removed, since it is where most ids come from.
+  // Read before the board is reset, since it is where most ids come from.
   // An open task view mounts this project's socket too, so on a 4403 it would
   // otherwise keep rendering the task, its comments and its activity.
   const taskIds = projectTaskIds(queryClient, projectId);
   if (taskIds.size > 0) {
-    queryClient.removeQueries({
+    void queryClient.resetQueries({
       predicate: (query) =>
         TASK_SCOPED_PREFIXES.has(query.queryKey[0] as string) &&
         taskIds.has(query.queryKey[1] as string),
@@ -70,7 +73,7 @@ export function dropProjectCaches(queryClient: QueryClient, projectId: string) {
   // anywhere in the key rather than on a list of prefixes, which would fall
   // behind as views are added. Project ids are unique, so nothing else
   // carries one, and the workspace's project list, which does not, stays.
-  queryClient.removeQueries({
+  void queryClient.resetQueries({
     predicate: (query) => query.queryKey.includes(projectId),
   });
   // The board renders from its own store copy of the tasks, and only writes

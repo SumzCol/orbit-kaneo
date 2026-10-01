@@ -1,12 +1,17 @@
 /**
- * Tells an open board that access to its project was given back.
+ * Tells an open board that access to its project may have been given back.
  *
  * A board whose socket was closed with 4403 stops reconnecting for good, and
- * the grant arrives on the user socket rather than on the board's own, so it
+ * a grant arrives on the user socket rather than on the board's own, so it
  * needs a way across. Local to this tab: every tab gets its own copy of the
  * user message.
+ *
+ * A "grant" is the server saying so. A "probe" is a guess, sent when the user
+ * socket reconnects and a grant may have been missed while it was down: the
+ * board tries once, and goes back to stopped if the upgrade is refused.
  */
-type Listener = () => void;
+export type AccessSignal = "grant" | "probe";
+type Listener = (signal: AccessSignal) => void;
 
 const listeners = new Map<string, Set<Listener>>();
 
@@ -29,6 +34,12 @@ export function onProjectAccessGranted(
 
 export function announceProjectAccessGranted(projectId: string) {
   for (const listener of [...(listeners.get(projectId) ?? [])]) {
-    listener();
+    listener("grant");
+  }
+}
+
+export function probeRevokedProjects() {
+  for (const forProject of [...listeners.values()]) {
+    for (const listener of [...forProject]) listener("probe");
   }
 }

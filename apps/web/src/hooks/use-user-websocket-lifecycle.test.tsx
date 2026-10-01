@@ -181,7 +181,7 @@ describe("project access changes on the user socket", () => {
     expect(client.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["search"],
     });
-    expect(client.removeQueries).not.toHaveBeenCalled();
+    expect(client.resetQueries).not.toHaveBeenCalled();
   });
 
   it("also drops the project's cached board when access ends", () => {
@@ -197,7 +197,7 @@ describe("project access changes on the user socket", () => {
     // The detail is cached as ["projects", workspaceId, projectId], with a
     // workspace the message does not carry, so it is removed by predicate.
     // Checked against that real key rather than against the arguments alone.
-    const predicates = client.removeQueries.mock.calls
+    const predicates = client.resetQueries.mock.calls
       .map(([filters]) => (filters as { predicate?: unknown })?.predicate)
       .filter(
         (predicate): predicate is (query: { queryKey: unknown[] }) => boolean =>
@@ -210,8 +210,9 @@ describe("project access changes on the user socket", () => {
     expect(removesKey(["projects", "workspace-1"])).toBe(false);
     expect(removesKey(["projects", "workspace-1", "project-2"])).toBe(false);
     // Queries do not refetch on mount here, so cached search hits from the
-    // project would otherwise stay on screen.
-    expect(client.removeQueries).toHaveBeenCalledWith({
+    // project would otherwise stay on screen; a mounted search keeps a
+    // removed query's results, so it is reset.
+    expect(client.resetQueries).toHaveBeenCalledWith({
       queryKey: ["search"],
     });
   });
@@ -268,11 +269,16 @@ describe("project access changes on the user socket", () => {
     expect(client.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["projects"],
     });
-    expect(client.removeQueries).toHaveBeenCalledWith({
+    expect(client.resetQueries).toHaveBeenCalledWith({
       queryKey: ["search"],
     });
     // Project details, which an invalidation alone would leave showable.
-    const [filters] = client.resetQueries.mock.calls.at(-1) ?? [];
+    const [filters] =
+      client.resetQueries.mock.calls.find(
+        ([candidate]) =>
+          typeof (candidate as { predicate?: unknown })?.predicate ===
+          "function",
+      ) ?? [];
     const resets = (queryKey: unknown[]) =>
       (
         filters as { predicate: (q: { queryKey: unknown[] }) => boolean }
@@ -280,5 +286,24 @@ describe("project access changes on the user socket", () => {
     expect(resets(["projects", "workspace-1", "project-1"])).toBe(true);
     expect(resets(["projects", "workspace-1"])).toBe(false);
     expect(resets(["tasks", "project-1"])).toBe(false);
+  });
+
+  // A grant missed while the socket was down would leave a board stopped by
+  // 4403 for good, so each one is asked to try once.
+  it("probes revoked boards on a reconnect, not the first connect", () => {
+    const signal = vi.fn();
+    const stop = onProjectAccessGranted("project-1", signal);
+    renderHook(() => useUserWebSocket());
+    act(() => TestSocket.instances[0].open());
+    expect(signal).not.toHaveBeenCalled();
+
+    act(() => {
+      TestSocket.instances[0].onclose?.();
+      vi.advanceTimersByTime(1000);
+    });
+    act(() => TestSocket.instances[1].open());
+    stop();
+
+    expect(signal).toHaveBeenCalledExactlyOnceWith("probe");
   });
 });

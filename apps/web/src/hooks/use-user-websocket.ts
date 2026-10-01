@@ -1,7 +1,10 @@
 import { windowId } from "@kaneo/libs";
 import { useQueryClient } from "@tanstack/react-query";
 import { dropProjectCaches } from "@/lib/drop-project-caches";
-import { announceProjectAccessGranted } from "@/lib/project-access-grants";
+import {
+  announceProjectAccessGranted,
+  probeRevokedProjects,
+} from "@/lib/project-access-grants";
 import { useEffect } from "react";
 import { getApiUrl } from "@/fetchers/get-api-url";
 import { authClient } from "@/lib/auth-client";
@@ -67,10 +70,14 @@ export function useUserWebSocket() {
             predicate: (query) =>
               query.queryKey[0] === "projects" && query.queryKey.length === 3,
           });
-          // Removed rather than invalidated, as on a direct access loss: an
-          // inactive search does not refetch when reopened, and its hits can
-          // quote a project the missed message would have taken away.
-          queryClient.removeQueries({ queryKey: ["search"] });
+          // Reset rather than invalidated, as on a direct access loss: an
+          // inactive search does not refetch when reopened, and a mounted one
+          // keeps rendering what it holds until its query is reset. Its hits
+          // can quote a project the missed message would have taken away.
+          void queryClient.resetQueries({ queryKey: ["search"] });
+          // A grant missed while down would leave a board stopped by 4403
+          // with no realtime updates. Each such board tries once.
+          probeRevokedProjects();
         }
         hasConnected = true;
         clearPing();
@@ -99,8 +106,9 @@ export function useUserWebSocket() {
             if (message.hasAccess === false) {
               // Search results carry project, task, comment and activity text,
               // and they are cached across projects rather than per project,
-              // so there is no narrower key to drop.
-              queryClient.removeQueries({ queryKey: ["search"] });
+              // so there is no narrower key to drop. Reset, not removed: a
+              // mounted search keeps rendering a removed query's results.
+              void queryClient.resetQueries({ queryKey: ["search"] });
             } else {
               void queryClient.invalidateQueries({ queryKey: ["search"] });
             }

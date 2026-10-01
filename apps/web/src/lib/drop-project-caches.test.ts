@@ -1,4 +1,4 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import { describe, expect, it } from "vite-plus/test";
 import useProjectStore from "@/store/project";
 import type { ProjectWithTasks } from "@/types/project";
@@ -140,5 +140,26 @@ describe("dropProjectCaches", () => {
       expect(client.getQueryData(key), JSON.stringify(key)).toBeUndefined();
     }
     expect(client.getQueryData(["columns", "project-2"])).toBeDefined();
+  });
+
+  // A view that has the query mounted keeps rendering a removed query's last
+  // result; only a reset empties what it shows.
+  it("clears what a mounted view is showing, not only the cache", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    client.setQueryData(["columns", "project-1"], [{ name: "Private" }]);
+    const observer = new QueryObserver(client, {
+      queryKey: ["columns", "project-1"],
+      queryFn: () => Promise.reject(new Error("403")),
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    expect(observer.getCurrentResult().data).toBeDefined();
+
+    dropProjectCaches(client, "project-1");
+
+    expect(observer.getCurrentResult().data).toBeUndefined();
+    unsubscribe();
   });
 });

@@ -25,7 +25,10 @@ import {
 } from "@tanstack/react-query";
 import { cleanup, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { announceProjectAccessGranted } from "@/lib/project-access-grants";
+import {
+  announceProjectAccessGranted,
+  probeRevokedProjects,
+} from "@/lib/project-access-grants";
 import { useProjectWebSocket } from "./use-project-websocket";
 
 type Socket = {
@@ -206,6 +209,32 @@ describe("useProjectWebSocket relation invalidation", () => {
     announceProjectAccessGranted("project-1");
 
     expect(constructor).toHaveBeenCalledTimes(2);
+  });
+
+  // A probe is a guess. The upgrade is refused with an HTTP 403, which
+  // reaches the client as an ordinary close, so a refused probe must stop
+  // there rather than retry and poll a project it cannot read.
+  it("goes back to stopped when a probe is refused", () => {
+    vi.useFakeTimers();
+    try {
+      const constructor = globalThis.WebSocket as unknown as ReturnType<
+        typeof vi.fn
+      >;
+      socket.onclose?.({ code: 4403 } as CloseEvent);
+
+      probeRevokedProjects();
+      expect(constructor).toHaveBeenCalledTimes(2);
+      // Refused before it opened.
+      socket.onclose?.({ code: 1006 } as CloseEvent);
+      vi.advanceTimersByTime(120_000);
+
+      expect(constructor).toHaveBeenCalledTimes(2);
+      expect(invalidatedKeys()).not.toContain(
+        JSON.stringify(["tasks", "project-1"]),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("ignores a grant while the board is still connected", () => {
