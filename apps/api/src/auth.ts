@@ -519,6 +519,7 @@ export const auth = betterAuth({
                 await revokeWorkspaceProjectMemberships(
                   member.organizationId,
                   member.userId,
+                  member.role,
                 );
               } catch (error) {
                 console.error(

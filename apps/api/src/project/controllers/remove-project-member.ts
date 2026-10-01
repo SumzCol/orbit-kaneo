@@ -133,7 +133,21 @@ async function removeProjectMember(
   // so removing the row does not necessarily remove their access. Closing
   // their board with 4403 would stop the client reconnecting and drop its
   // caches while they are still entitled to both.
-  const stillHasAccess = await userCanAccessProject(projectId, userId);
+  //
+  // The removal has committed by now, so a failed lookup must not turn it into
+  // a 500 that a retry then answers with 404. Nor is it evidence either way,
+  // so nobody is told anything: the sweep ends the board if access is gone,
+  // and the client refreshes its project list when its socket reconnects.
+  let stillHasAccess: boolean;
+  try {
+    stillHasAccess = await userCanAccessProject(projectId, userId);
+  } catch (error) {
+    console.error(
+      `Failed to revalidate access to project ${projectId} for ${userId}:`,
+      error,
+    );
+    return removed;
+  }
   if (!stillHasAccess) {
     revokeProjectAccess(projectId, userId);
   }

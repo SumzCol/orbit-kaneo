@@ -220,11 +220,54 @@ export async function userCanAccessProject(
     .limit(1);
   if (!member?.role) return false;
 
+  return roleSeesAllProjects(member.workspaceId, member.role);
+}
+
+/**
+ * Whether a workspace role reaches every project in the workspace, by the same
+ * `workspace:manage_settings` rule as `canSeeAllProjects`. Custom roles take
+ * precedence over the built-in role of the same name.
+ */
+export async function roleSeesAllProjects(
+  workspaceId: string,
+  role: string,
+): Promise<boolean> {
   const statements =
-    (await customRoleStatements(member.workspaceId, member.role)) ??
-    builtInRoleStatements(member.role);
+    (await customRoleStatements(workspaceId, role)) ??
+    builtInRoleStatements(role);
 
   return Boolean(
     statements && satisfies(statements, { workspace: ["manage_settings"] }),
   );
+}
+
+/**
+ * The workspace's members whose role reaches every project in it. They hold no
+ * project_member rows for that access, so anything working out who loses a
+ * project from the rows alone has to add them.
+ */
+export async function workspaceWideProjectUserIds(
+  workspaceId: string,
+): Promise<string[]> {
+  const members = await db
+    .select({
+      userId: schema.workspaceUserTable.userId,
+      role: schema.workspaceUserTable.role,
+    })
+    .from(schema.workspaceUserTable)
+    .where(eq(schema.workspaceUserTable.workspaceId, workspaceId));
+
+  // Few distinct roles per workspace, so each is resolved once.
+  const seesAll = new Map<string, boolean>();
+  const userIds: string[] = [];
+  for (const member of members) {
+    if (!member.role) continue;
+    let allowed = seesAll.get(member.role);
+    if (allowed === undefined) {
+      allowed = await roleSeesAllProjects(workspaceId, member.role);
+      seesAll.set(member.role, allowed);
+    }
+    if (allowed) userIds.push(member.userId);
+  }
+  return userIds;
 }

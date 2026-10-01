@@ -7,6 +7,7 @@ import {
   it,
   vi,
 } from "vite-plus/test";
+import { onProjectAccessGranted } from "@/lib/project-access-grants";
 import { useUserWebSocket } from "./use-user-websocket";
 
 const { client, auth } = vi.hoisted(() => ({
@@ -206,6 +207,61 @@ describe("project access changes on the user socket", () => {
     // Queries do not refetch on mount here, so cached search hits from the
     // project would otherwise stay on screen.
     expect(client.removeQueries).toHaveBeenCalledWith({
+      queryKey: ["search"],
+    });
+  });
+
+  // A board left open since its access was revoked has a socket that stopped
+  // retrying and a board query that failed. The project list refresh reaches
+  // neither, so both are woken directly.
+  it("wakes that project's board when access is granted", () => {
+    const granted = vi.fn();
+    const stop = onProjectAccessGranted("project-1", granted);
+
+    receive({
+      type: "PROJECT_ACCESS_CHANGED",
+      projectId: "project-1",
+      hasAccess: true,
+    });
+    stop();
+
+    expect(granted).toHaveBeenCalledOnce();
+    expect(client.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["tasks", "project-1"],
+    });
+  });
+
+  it("does not wake the board when access ends", () => {
+    const granted = vi.fn();
+    const stop = onProjectAccessGranted("project-1", granted);
+
+    receive({
+      type: "PROJECT_ACCESS_CHANGED",
+      projectId: "project-1",
+      hasAccess: false,
+    });
+    stop();
+
+    expect(granted).not.toHaveBeenCalled();
+  });
+
+  // Nothing replays a message sent while the socket was down, so a reconnect
+  // refreshes what such a message would have fixed.
+  it("refreshes the project list and search on a reconnect, not the first connect", () => {
+    renderHook(() => useUserWebSocket());
+    act(() => TestSocket.instances[0].open());
+    expect(client.invalidateQueries).not.toHaveBeenCalled();
+
+    act(() => {
+      TestSocket.instances[0].onclose?.();
+      vi.advanceTimersByTime(1000);
+    });
+    act(() => TestSocket.instances[1].open());
+
+    expect(client.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["projects"],
+    });
+    expect(client.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["search"],
     });
   });

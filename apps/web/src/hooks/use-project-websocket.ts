@@ -13,6 +13,7 @@ import getLabelsByTask from "@/fetchers/label/get-labels-by-task";
 import getExternalLinks from "@/fetchers/external-link/get-external-links";
 import { patchBoardTask } from "@/lib/patch-board-task";
 import { dropProjectCaches } from "@/lib/drop-project-caches";
+import { onProjectAccessGranted } from "@/lib/project-access-grants";
 import { isPerTaskRelationQuery } from "@/lib/relation-query-keys";
 import type { ProjectWithTasks } from "@/types/project";
 
@@ -67,6 +68,16 @@ export function useProjectWebSocket(projectId: string) {
     const parentCountVersions = new Map<string, number>();
     let pingInterval: ReturnType<typeof setInterval> | null = null;
     let fallbackInterval: ReturnType<typeof setInterval> | null = null;
+    // Set by a 4403 close, after which nothing reconnects on its own. Being
+    // added back while the board stays open would otherwise leave it without
+    // realtime updates until the route remounts.
+    let revoked = false;
+    const stopListeningForGrant = onProjectAccessGranted(projectId, () => {
+      if (disposed || !revoked) return;
+      revoked = false;
+      retries = 0;
+      connect();
+    });
 
     function invalidateDetails(message: {
       type: string;
@@ -470,6 +481,7 @@ export function useProjectWebSocket(projectId: string) {
         // entirely rather than falling through to either.
         if (event?.code === ACCESS_REVOKED_CLOSE_CODE) {
           retries = MAX_RETRIES;
+          revoked = true;
           // The socket closing is the only signal that arrives, so the caches
           // have to be dropped here. Otherwise the project keeps sitting in
           // the sidebar and the board keeps showing the tasks it had when
@@ -548,6 +560,7 @@ export function useProjectWebSocket(projectId: string) {
 
     return () => {
       unsubscribe();
+      stopListeningForGrant();
       if (healthyTimeout !== null) clearTimeout(healthyTimeout);
       pendingMessages.clear();
       if (burstReconcileTimer !== null) clearTimeout(burstReconcileTimer);

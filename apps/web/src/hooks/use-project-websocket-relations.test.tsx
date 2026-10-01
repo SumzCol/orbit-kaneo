@@ -23,8 +23,9 @@ import {
   QueryClientProvider,
   useQueryClient,
 } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
+import { cleanup, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
+import { announceProjectAccessGranted } from "@/lib/project-access-grants";
 import { useProjectWebSocket } from "./use-project-websocket";
 
 type Socket = {
@@ -105,6 +106,8 @@ describe("useProjectWebSocket relation invalidation", () => {
   });
 
   afterEach(() => {
+    // Unmounted so a hook from an earlier test cannot answer this one's grant.
+    cleanup();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
@@ -189,6 +192,30 @@ describe("useProjectWebSocket relation invalidation", () => {
       client.getQueryData(["projects", "workspace-1", "project-1"]),
     ).toBeUndefined();
     expect(invalidatedKeys()).toContain(JSON.stringify(["projects"]));
+  });
+
+  // A 4403 stops reconnects for good, so being added back while the board is
+  // still open has to restart them, or it stays without realtime updates.
+  it("reconnects when access is granted after a revocation", () => {
+    const constructor = globalThis.WebSocket as unknown as ReturnType<
+      typeof vi.fn
+    >;
+    socket.onclose?.({ code: 4403 } as CloseEvent);
+    expect(constructor).toHaveBeenCalledTimes(1);
+
+    announceProjectAccessGranted("project-1");
+
+    expect(constructor).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores a grant while the board is still connected", () => {
+    const constructor = globalThis.WebSocket as unknown as ReturnType<
+      typeof vi.fn
+    >;
+
+    announceProjectAccessGranted("project-1");
+
+    expect(constructor).toHaveBeenCalledTimes(1);
   });
 
   it("leaves them alone on an ordinary close", () => {

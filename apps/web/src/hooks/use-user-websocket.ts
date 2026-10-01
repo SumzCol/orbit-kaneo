@@ -1,6 +1,7 @@
 import { windowId } from "@kaneo/libs";
 import { useQueryClient } from "@tanstack/react-query";
 import { dropProjectCaches } from "@/lib/drop-project-caches";
+import { announceProjectAccessGranted } from "@/lib/project-access-grants";
 import { useEffect } from "react";
 import { getApiUrl } from "@/fetchers/get-api-url";
 import { authClient } from "@/lib/auth-client";
@@ -32,6 +33,7 @@ export function useUserWebSocket() {
     let retries = 0;
     let retryTimeout: ReturnType<typeof setTimeout> | null = null;
     let pingInterval: ReturnType<typeof setInterval> | null = null;
+    let hasConnected = false;
 
     function clearPing() {
       if (pingInterval !== null) {
@@ -50,6 +52,16 @@ export function useUserWebSocket() {
       ws.onopen = () => {
         if (disposed || activeSocket !== ws) return;
         retries = 0;
+        // Nothing replays what was sent while this socket was down, and
+        // queries do not refetch on mount here, so an access change missed in
+        // that gap would leave the sidebar and search stale indefinitely.
+        // Refreshing on every reconnect covers it without the server having
+        // to track who missed what.
+        if (hasConnected) {
+          void queryClient.invalidateQueries({ queryKey: ["projects"] });
+          void queryClient.invalidateQueries({ queryKey: ["search"] });
+        }
+        hasConnected = true;
         clearPing();
         pingInterval = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
@@ -83,6 +95,16 @@ export function useUserWebSocket() {
             }
             if (message.projectId && message.hasAccess === false) {
               dropProjectCaches(queryClient, message.projectId);
+            }
+            if (message.projectId && message.hasAccess === true) {
+              // A board left open since its access was revoked holds an
+              // errored or empty query and a socket that stopped retrying.
+              // Both have to be woken; the project list refresh above reaches
+              // neither.
+              void queryClient.invalidateQueries({
+                queryKey: ["tasks", message.projectId],
+              });
+              announceProjectAccessGranted(message.projectId);
             }
           }
         } catch {

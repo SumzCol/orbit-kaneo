@@ -24,7 +24,10 @@ import {
   projectMemberTable,
 } from "../../database/schema";
 import { publishEvent } from "../../events";
-import { userCanAccessProject } from "../../utils/project-access";
+import {
+  userCanAccessProject,
+  workspaceWideProjectUserIds,
+} from "../../utils/project-access";
 import { closeProjectConnections, notifyProjectAccessChanged } from "../../ws";
 
 async function moveProject(
@@ -39,7 +42,8 @@ async function moveProject(
     });
   }
 
-  let revoked: string[] = [];
+  // Everyone who reached the project before the move and might not after it.
+  let mayLoseAccess: string[] = [];
   const { movedProject, unassignedTasks } = await db.transaction(async (tx) => {
     // Use a stable order for both workspaces before locking the project row.
     // This also keeps source reorders from updating a project after it moves.
@@ -68,6 +72,13 @@ async function moveProject(
           "Project doesn't exist or doesn't belong to the specified workspace",
       });
     }
+
+    // Whoever administers the source workspace reaches the project through
+    // their role, with no row below to show for it, so dropping rows alone
+    // would never tell them their access ended. Read before the move, while
+    // the project still belongs to that workspace.
+    const sourceAdministrators =
+      await workspaceWideProjectUserIds(sourceWorkspaceId);
 
     // The key doubles as the ticket-id prefix (KAN-12), and short-id lookup
     // resolves it per workspace with a limit of 1. Two projects sharing a key
@@ -248,7 +259,12 @@ async function moveProject(
         ),
       )
       .returning({ userId: projectMemberTable.userId });
-    revoked = droppedMembers.map((member) => member.userId);
+    mayLoseAccess = [
+      ...new Set([
+        ...droppedMembers.map((member) => member.userId),
+        ...sourceAdministrators,
+      ]),
+    ];
 
     // The members who survive are in the target workspace too, but their rows
     // still point at the source membership. Left alone they would keep access
@@ -390,13 +406,24 @@ async function moveProject(
     return { movedProject, unassignedTasks: unassigned };
   });
 
-  // A deleted row does not always mean access is gone: an instance
-  // administrator reaches the project from either workspace without one. Asked
-  // again before anybody is told their access ended.
+  // Neither a deleted row nor a source role means access is gone: an instance
+  // administrator, or someone who also administers the target, still reaches
+  // the project. Asked again before anybody is told their access ended.
+  //
+  // The move has committed by now, so a failed lookup must not fail the
+  // request. It is not evidence of revocation either: that user gets the
+  // ordinary move close, and the sweep ends the session if access is gone.
   const lostAccess: string[] = [];
-  for (const userId of revoked) {
-    if (!(await userCanAccessProject(id, userId))) {
-      lostAccess.push(userId);
+  for (const userId of mayLoseAccess) {
+    try {
+      if (!(await userCanAccessProject(id, userId))) {
+        lostAccess.push(userId);
+      }
+    } catch (error) {
+      console.error(
+        `Failed to revalidate access to moved project ${id} for ${userId}:`,
+        error,
+      );
     }
   }
 

@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
+import useProjectStore from "@/store/project";
 
 /**
  * Forgets what this client has cached about a project it can no longer open.
@@ -20,4 +21,12 @@ export function dropProjectCaches(queryClient: QueryClient, projectId: string) {
       query.queryKey.length === 3 &&
       query.queryKey[2] === projectId,
   });
+  // The board renders from its own store copy of the tasks, and only writes
+  // to it when query data arrives, so the removal above leaves an open board
+  // showing everything it held. Cleared only when it holds this project, so
+  // another board's state is never touched.
+  const store = useProjectStore.getState();
+  if (store.project?.id === projectId) {
+    store.setProject(undefined);
+  }
 }
