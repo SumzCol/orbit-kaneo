@@ -16,31 +16,30 @@ function getLabelsByWorkspaceId(
   workspaceId: string,
   visibility: { userId: string; seesAllProjects: boolean },
 ) {
+  // Undefined when the caller sees every project, which drizzle drops from the
+  // `and(...)` below. Only this predicate is optional: the workspace the task
+  // actually belongs to is checked either way.
   const visible = visibleProjectCondition(
     visibility.userId,
     visibility.seesAllProjects,
   );
 
-  // The joins are what the filter reads, so they only go on when it applies.
-  // Same columns either way: the response schema is the label row.
-  const columns = getTableColumns(labelTable);
-
-  if (!visible) {
-    return db
-      .select(columns)
-      .from(labelTable)
-      .where(eq(labelTable.workspaceId, workspaceId));
-  }
-
   return db
-    .select(columns)
+    .select(getTableColumns(labelTable))
     .from(labelTable)
     .leftJoin(taskTable, eq(taskTable.id, labelTable.taskId))
     .leftJoin(projectTable, eq(projectTable.id, taskTable.projectId))
     .where(
       and(
         eq(labelTable.workspaceId, workspaceId),
-        or(isNull(labelTable.taskId), visible),
+        or(
+          isNull(labelTable.taskId),
+          // A task-backed row is trusted only when its task's project agrees
+          // with the label's own workspace. Older releases allowed the two to
+          // disagree, and `label.workspaceId` alone would hand an
+          // administrator of this workspace a label describing another one.
+          and(eq(projectTable.workspaceId, workspaceId), visible),
+        ),
       ),
     );
 }

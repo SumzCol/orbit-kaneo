@@ -544,6 +544,76 @@ describe("read paths that do not resolve a project by id", () => {
   });
 });
 
+describe("labels whose task belongs to another workspace", () => {
+  it.each([
+    ["an administrator", true],
+    ["an ordinary member", false],
+  ])("is not served to %s", async (_who, asOwner) => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const member = await addWorkspaceMember(workspace.id, "member");
+    const other = await createWorkspaceMember({ role: "owner" });
+    const { project: foreign } = await createProjectFixture({
+      workspaceId: other.workspace.id,
+    });
+    const [foreignTask] = await db
+      .insert(schema.taskTable)
+      .values({
+        projectId: foreign.id,
+        title: "Another workspace's work",
+        number: 1,
+        status: "to-do",
+      })
+      .returning();
+
+    // A legitimate task-backed label in this workspace, so the assertion
+    // below distinguishes "filtered correctly" from "filtered everything".
+    const { project: own } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, member.id],
+    });
+    const [ownTask] = await db
+      .insert(schema.taskTable)
+      .values({
+        projectId: own.id,
+        title: "Our work",
+        number: 1,
+        status: "to-do",
+      })
+      .returning();
+
+    // Older releases let these disagree, and the access middleware already
+    // refuses to authorize from such a row. The label claims this workspace
+    // while its task lives in another one.
+    await db.insert(schema.labelTable).values([
+      {
+        taskId: foreignTask.id,
+        workspaceId: workspace.id,
+        name: "leaked-from-elsewhere",
+        color: "red",
+      },
+      {
+        taskId: ownTask.id,
+        workspaceId: workspace.id,
+        name: "legitimately-ours",
+        color: "blue",
+      },
+    ]);
+
+    mockAuthenticatedSession(asOwner ? owner : member);
+    const { app } = createApp();
+    const response = await app.request(`/api/label/workspace/${workspace.id}`);
+    expect(response.status).toBe(200);
+    const names = ((await response.json()) as { name: string }[]).map(
+      (label) => label.name,
+    );
+
+    expect(names).not.toContain("leaked-from-elsewhere");
+    expect(names).toContain("legitimately-ours");
+  });
+});
+
 describe("revoking a board on removal", () => {
   it("leaves an administrator connected, since they still reach the project", async () => {
     const { user: owner, workspace } = await createWorkspaceMember({
