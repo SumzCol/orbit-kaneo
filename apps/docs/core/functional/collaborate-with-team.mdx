@@ -57,7 +57,7 @@ Two exceptions keep this workable:
 - Whoever administers the workspace sees every project in it.
 - Whoever creates a project is added to it automatically.
 
-Manage the list in **Settings → Projects → Visibility**. Changing who is on a project needs the same `project:share` permission as its public link, so workspace administrators and any custom role that carries it. Only people who are already in the workspace can be added, a project always keeps at least one member, and nobody can remove themselves.
+Manage the list in **Settings → Projects → Visibility**. Changing who is on a project needs the same `project:share` permission as its public link, so workspace administrators and any custom role that carries it. Only people who are already in the workspace can be added, removing a member here always leaves at least one behind, and nobody can remove themselves. Leaving the workspace is a different path: it drops that person from the workspace's projects without that check, so a project can end up with no members at all. Workspace administrators still see it and can add people back.
 
 Removing someone takes effect immediately: any board they have open on that project disconnects. Removing someone from the workspace removes them from its projects too.
 

@@ -133,11 +133,28 @@ export async function initializeWebSocketAdapter() {
   try {
     await nextAdapter.subscribe((msg: BroadcastMessage) => {
       if (msg.message.type === PROJECT_ACCESS_REVOKED) {
-        if (msg.message.userId) {
-          closeLocalProjectConnectionsForUser(
-            msg.projectId,
-            msg.message.userId,
-          );
+        const revokedUserId = msg.message.userId;
+        if (revokedUserId) {
+          // The publish is asynchronous, so this can arrive after the user has
+          // been added back. The client treats 4403 as permanent and purges
+          // its caches on it, so a late message would cost a reconnected user
+          // their board. Asked again before acting, failing open on a lookup
+          // error the way the sweep does.
+          void userCanAccessProject(msg.projectId, revokedUserId)
+            .then((allowed) => {
+              if (!allowed) {
+                closeLocalProjectConnectionsForUser(
+                  msg.projectId,
+                  revokedUserId,
+                );
+              }
+            })
+            .catch((error) => {
+              console.error(
+                `Failed to revalidate a revocation for project ${msg.projectId}:`,
+                error,
+              );
+            });
         }
         return;
       }

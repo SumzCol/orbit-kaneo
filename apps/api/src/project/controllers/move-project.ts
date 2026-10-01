@@ -24,7 +24,7 @@ import {
   projectMemberTable,
 } from "../../database/schema";
 import { publishEvent } from "../../events";
-import { closeProjectConnections } from "../../ws";
+import { closeProjectConnections, revokeProjectAccess } from "../../ws";
 
 async function moveProject(
   id: string,
@@ -38,6 +38,7 @@ async function moveProject(
     });
   }
 
+  let revoked: string[] = [];
   const { movedProject, unassignedTasks } = await db.transaction(async (tx) => {
     // Use a stable order for both workspaces before locking the project row.
     // This also keeps source reorders from updating a project after it moves.
@@ -231,7 +232,7 @@ async function moveProject(
     // names and email addresses to the destination. Dropped rather than
     // translated, the same way an assignee outside the target is unassigned
     // above.
-    await tx
+    const droppedMembers = await tx
       .delete(projectMemberTable)
       .where(
         and(
@@ -244,7 +245,9 @@ async function moveProject(
               .where(eq(workspaceUserTable.workspaceId, targetWorkspaceId)),
           ),
         ),
-      );
+      )
+      .returning({ userId: projectMemberTable.userId });
+    revoked = droppedMembers.map((member) => member.userId);
 
     // A project keeps at least one member, and the move may have removed them
     // all. Whoever moved it is in the target workspace by construction, so
@@ -292,6 +295,14 @@ async function moveProject(
 
     return { movedProject, unassignedTasks: unassigned };
   });
+
+  // The members left behind need the revocation code, not the move's generic
+  // close: the client only drops the project's caches and stops retrying on
+  // 4403, so a 1008 would leave them retrying a connection they can no longer
+  // make, with the board and the sidebar entry still in place.
+  for (const userId of revoked) {
+    revokeProjectAccess(id, userId);
+  }
 
   await closeProjectConnections(id);
 

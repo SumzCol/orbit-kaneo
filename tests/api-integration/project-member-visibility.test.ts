@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
+
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { and, eq, sql } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
 import journal from "../../apps/api/drizzle/meta/_journal.json";
 import { createApp } from "../../apps/api/src/index";
@@ -20,6 +21,17 @@ import {
   createProjectFixture,
   createWorkspaceMember,
 } from "./helpers/fixtures";
+
+// The revocation only closes sockets, which an integration test has none of,
+// so the calls themselves are what gets asserted. The rest of the module is
+// left alone.
+const revoked: { projectId: string; userId: string }[] = vi.hoisted(() => []);
+vi.mock("../../apps/api/src/ws", async (original) => ({
+  ...(await original<typeof import("../../apps/api/src/ws")>()),
+  revokeProjectAccess: (projectId: string, userId: string) => {
+    revoked.push({ projectId, userId });
+  },
+}));
 
 beforeEach(async () => {
   await resetTestDatabase();
@@ -541,6 +553,43 @@ describe("read paths that do not resolve a project by id", () => {
     expect(names).not.toContain("secret-release");
     // Workspace-level labels are not project data and stay visible.
     expect(names).toContain("workspace-wide");
+  });
+});
+
+describe("a move that leaves members behind", () => {
+  it("revokes them rather than closing with the generic move code", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const sourceOnly = await addWorkspaceMember(source.workspace.id, "member");
+    const target = await createWorkspaceMember({ role: "owner" });
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id, sourceOnly.id],
+    });
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    // The client only drops its caches and stops retrying on the revocation
+    // code, so the members left behind have to get that one, not the move's
+    // generic close.
+    expect(revoked).toContainEqual({
+      projectId: project.id,
+      userId: sourceOnly.id,
+    });
+    expect(revoked).not.toContainEqual({
+      projectId: project.id,
+      userId: source.user.id,
+    });
   });
 });
 

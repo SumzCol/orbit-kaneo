@@ -143,7 +143,10 @@ async function globalSearch(params: SearchParams): Promise<{
     .map((w) => w.workspaceId)
     .filter(Boolean);
 
-  if (accessibleWorkspaceIds.length === 0) {
+  // An instance administrator reaches every project without belonging to any
+  // workspace, so an empty membership list is not an empty result for them.
+  // The workspace filter below still scopes the search to the one asked for.
+  if (accessibleWorkspaceIds.length === 0 && !seesAllProjects) {
     return { results: [], totalCount: 0, searchQuery: query };
   }
 
