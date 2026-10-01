@@ -25,11 +25,16 @@ import {
 // The revocation only closes sockets, which an integration test has none of,
 // so the calls themselves are what gets asserted. The rest of the module is
 // left alone.
-const revoked: { projectId: string; userId: string }[] = vi.hoisted(() => []);
+const closed: { projectId: string; revokedUserIds: string[] }[] = vi.hoisted(
+  () => [],
+);
 vi.mock("../../apps/api/src/ws", async (original) => ({
   ...(await original<typeof import("../../apps/api/src/ws")>()),
-  revokeProjectAccess: (projectId: string, userId: string) => {
-    revoked.push({ projectId, userId });
+  closeProjectConnections: async (
+    projectId: string,
+    revokedUserIds: string[] = [],
+  ) => {
+    closed.push({ projectId, revokedUserIds });
   },
 }));
 
@@ -579,17 +584,101 @@ describe("a move that leaves members behind", () => {
       source.user.id,
     );
 
-    // The client only drops its caches and stops retrying on the revocation
-    // code, so the members left behind have to get that one, not the move's
-    // generic close.
-    expect(revoked).toContainEqual({
+    // One message carries both: the members left behind get the revocation
+    // code, everyone else the move's. A second message would race this one.
+    expect(closed).toContainEqual({
       projectId: project.id,
-      userId: sourceOnly.id,
+      revokedUserIds: [sourceOnly.id],
     });
-    expect(revoked).not.toContainEqual({
-      projectId: project.id,
+  });
+});
+
+describe("a dropped member who still reaches the project", () => {
+  it("is not told their access ended", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
       userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
     });
+
+    // An instance administrator who was also an explicit member of the
+    // project. The move drops the row, because they are not in the target
+    // workspace, but they still open the project from either side.
+    const [instanceAdmin] = await db
+      .insert(schema.userTable)
+      .values({
+        id: `user-${randomUUID()}`,
+        email: `admin-${randomUUID()}@example.com`,
+        emailVerified: true,
+        name: "Instance admin",
+        role: "admin",
+      })
+      .returning();
+
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id, instanceAdmin.id],
+    });
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    expect(await userCanAccessProject(project.id, instanceAdmin.id)).toBe(true);
+    // A deleted row is not the same as lost access: a 4403 would make their
+    // client purge the project and stop reconnecting.
+    const [move] = closed.filter((entry) => entry.projectId === project.id);
+    expect(move.revokedUserIds).not.toContain(instanceAdmin.id);
+  });
+});
+
+describe("a move performed by someone outside the target workspace", () => {
+  it("leaves the project with a member who actually counts", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const sourceOnly = await addWorkspaceMember(source.workspace.id, "member");
+    const target = await createWorkspaceMember({ role: "owner" });
+
+    // An instance administrator reaches both workspaces without a membership
+    // row in either, so a project_member row for them would grant nothing.
+    const [instanceAdmin] = await db
+      .insert(schema.userTable)
+      .values({
+        id: `user-${randomUUID()}`,
+        email: `admin-${randomUUID()}@example.com`,
+        emailVerified: true,
+        name: "Instance admin",
+        role: "admin",
+      })
+      .returning();
+
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [sourceOnly.id],
+    });
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      instanceAdmin.id,
+    );
+
+    const members = await db
+      .select({ userId: schema.projectMemberTable.userId })
+      .from(schema.projectMemberTable)
+      .where(eq(schema.projectMemberTable.projectId, project.id));
+
+    // Adding the mover would have left a row that counts for nothing.
+    expect(members.map((member) => member.userId)).not.toContain(
+      instanceAdmin.id,
+    );
+    expect(await isProjectMember(project.id, target.user.id)).toBe(true);
   });
 });
 

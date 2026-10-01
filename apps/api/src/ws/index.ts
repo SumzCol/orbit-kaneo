@@ -213,33 +213,50 @@ export async function shutdownWebSocketAdapter() {
   adapter = null;
 }
 
-function closeLocalProjectConnections(projectId: string) {
+function closeLocalProjectConnections(
+  projectId: string,
+  revokedUserIds: string[] = [],
+) {
   const timeout = projectBroadcastTimeouts.get(projectId);
   if (timeout) clearTimeout(timeout);
   projectBroadcastTimeouts.delete(projectId);
   projectBroadcastQueues.delete(projectId);
   const connections = projectConnections.get(projectId);
   projectConnections.delete(projectId);
+  // Whoever lost access in this move needs the permanent code, and it has to
+  // be decided here rather than by a second message: the two would race, and
+  // on a peer the move close would usually win.
+  const revoked = new Set(revokedUserIds);
   for (const conn of connections ?? []) {
-    try {
-      conn.ws.send(JSON.stringify({ type: "PROJECT_MOVED", projectId }));
-    } catch {
-      /* The socket may already be closed. */
+    const lostAccess = revoked.has(conn.userId);
+    if (!lostAccess) {
+      try {
+        conn.ws.send(JSON.stringify({ type: "PROJECT_MOVED", projectId }));
+      } catch {
+        /* The socket may already be closed. */
+      }
     }
     try {
-      conn.ws.close(1008, "Project workspace changed");
+      if (lostAccess) {
+        conn.ws.close(ACCESS_REVOKED_CLOSE_CODE, "Project access revoked");
+      } else {
+        conn.ws.close(1008, "Project workspace changed");
+      }
     } catch {
       /* Already closed. */
     }
   }
 }
 
-export async function closeProjectConnections(projectId: string) {
-  closeLocalProjectConnections(projectId);
+export async function closeProjectConnections(
+  projectId: string,
+  revokedUserIds: string[] = [],
+) {
+  closeLocalProjectConnections(projectId, revokedUserIds);
   try {
     await adapter?.publish({
       projectId,
-      message: { type: "PROJECT_MOVED", projectId },
+      message: { type: "PROJECT_MOVED", projectId, revokedUserIds },
     });
   } catch (error) {
     // Delivery also checks the workspace, so missed Redis notifications cannot
@@ -315,7 +332,7 @@ async function deliverToLocalConnections(
   excludeInitiatorId?: string,
 ) {
   if (message.type === "PROJECT_MOVED") {
-    closeLocalProjectConnections(projectId);
+    closeLocalProjectConnections(projectId, message.revokedUserIds ?? []);
     return;
   }
   const connections = projectConnections.get(projectId);

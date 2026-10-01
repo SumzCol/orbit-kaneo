@@ -24,7 +24,8 @@ import {
   projectMemberTable,
 } from "../../database/schema";
 import { publishEvent } from "../../events";
-import { closeProjectConnections, revokeProjectAccess } from "../../ws";
+import { userCanAccessProject } from "../../utils/project-access";
+import { closeProjectConnections } from "../../ws";
 
 async function moveProject(
   id: string,
@@ -249,16 +250,41 @@ async function moveProject(
       .returning({ userId: projectMemberTable.userId });
     revoked = droppedMembers.map((member) => member.userId);
 
-    // A project keeps at least one member, and the move may have removed them
-    // all. Whoever moved it is in the target workspace by construction, so
-    // they take the project with them rather than leaving it reachable only by
-    // an administrator.
-    await tx
-      .insert(projectMemberTable)
-      .values({ projectId: id, userId: currentUserId })
-      .onConflictDoNothing({
-        target: [projectMemberTable.projectId, projectMemberTable.userId],
-      });
+    // A project keeps at least one member where it can, and the move may have
+    // removed them all. Whoever moved it is the natural choice but not a
+    // guaranteed one: an instance administrator reaches the target workspace
+    // without a membership row, and a project_member row for somebody outside
+    // the workspace grants nothing. Fall back to the longest-standing member
+    // of the target, and if the workspace somehow has none, leave the project
+    // to its administrators rather than inventing a member.
+    const [keeper] = await tx
+      .select({ userId: workspaceUserTable.userId })
+      .from(workspaceUserTable)
+      .where(
+        and(
+          eq(workspaceUserTable.workspaceId, targetWorkspaceId),
+          eq(workspaceUserTable.userId, currentUserId),
+        ),
+      )
+      .limit(1);
+
+    const [fallback] = keeper
+      ? [keeper]
+      : await tx
+          .select({ userId: workspaceUserTable.userId })
+          .from(workspaceUserTable)
+          .where(eq(workspaceUserTable.workspaceId, targetWorkspaceId))
+          .orderBy(workspaceUserTable.joinedAt)
+          .limit(1);
+
+    if (fallback) {
+      await tx
+        .insert(projectMemberTable)
+        .values({ projectId: id, userId: fallback.userId })
+        .onConflictDoNothing({
+          target: [projectMemberTable.projectId, projectMemberTable.userId],
+        });
+    }
 
     // Assets and task labels denormalize the project's workspace.
     await tx
@@ -296,15 +322,21 @@ async function moveProject(
     return { movedProject, unassignedTasks: unassigned };
   });
 
-  // The members left behind need the revocation code, not the move's generic
-  // close: the client only drops the project's caches and stops retrying on
-  // 4403, so a 1008 would leave them retrying a connection they can no longer
-  // make, with the board and the sidebar entry still in place.
+  // A deleted row does not always mean access is gone: an instance
+  // administrator reaches the project from either workspace without one. Asked
+  // again before anybody is told their access ended.
+  const lostAccess: string[] = [];
   for (const userId of revoked) {
-    revokeProjectAccess(id, userId);
+    if (!(await userCanAccessProject(id, userId))) {
+      lostAccess.push(userId);
+    }
   }
 
-  await closeProjectConnections(id);
+  // Carried on the move message rather than sent separately. The client only
+  // drops the project's caches and stops retrying on 4403, and a second
+  // message would race this one -- on a peer the move close would usually win,
+  // leaving a removed member retrying a connection they can no longer make.
+  await closeProjectConnections(id, lostAccess);
 
   if (unassignedTasks.length > 0) {
     await publishEvent("task.bulk_unassigned", {
