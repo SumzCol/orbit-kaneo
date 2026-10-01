@@ -6,7 +6,10 @@ import { APIError } from "better-auth/api";
 import { and, eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import journal from "../../apps/api/drizzle/meta/_journal.json";
-import { pruneFeedsAfterRoleEdit } from "../../apps/api/src/calendar-feed/prune-after-role-change";
+import {
+  pruneFeedsAfterRoleEdit,
+  rememberRoleEditForFeeds,
+} from "../../apps/api/src/calendar-feed/prune-after-role-change";
 import { pruneWorkspaceCalendarFeeds } from "../../apps/api/src/calendar-feed/service";
 import db, { schema } from "../../apps/api/src/database";
 import { calendarFeedTable } from "../../apps/api/src/database/schema";
@@ -369,46 +372,98 @@ describe("a feed that lost its access stays gone", () => {
       role: "owner",
     });
     const lead = await addWorkspaceMember(workspace.id, "lead");
-    await db.insert(schema.workspaceRoleTable).values({
-      workspaceId: workspace.id,
-      role: "lead",
-      permission: JSON.stringify({ workspace: ["manage_settings"] }),
-    });
+    const [role] = await db
+      .insert(schema.workspaceRoleTable)
+      .values({
+        workspaceId: workspace.id,
+        role: "lead",
+        permission: JSON.stringify({ workspace: ["manage_settings"] }),
+      })
+      .returning();
     const { project } = await createProjectFixture({
       workspaceId: workspace.id,
       members: [owner.id],
     });
     const feed = await insertFeed(project.id, lead.id);
-    await db
-      .update(schema.workspaceRoleTable)
-      .set({ permission: JSON.stringify({ task: ["read"] }) })
-      .where(eq(schema.workspaceRoleTable.workspaceId, workspace.id));
-    // The request as Kaneo's roles page sends it, after the edit landed.
+    // What Better Auth's handler does between the two hooks. A rename
+    // changes only the role row; members keep the name they had.
+    const applyEdit = (rename?: string) =>
+      db
+        .update(schema.workspaceRoleTable)
+        .set({
+          permission: JSON.stringify({ task: ["read"] }),
+          ...(rename ? { role: rename } : {}),
+        })
+        .where(eq(schema.workspaceRoleTable.id, role.id));
+    // The request as Kaneo's roles page sends it.
     const ctx = {
       body: {
         organizationId: workspace.id,
         roleName: "lead",
         data: { permission: { task: ["read"] } },
-      },
+      } as Record<string, unknown>,
       context: {} as Record<string, unknown>,
     };
-    return { lead, feed, ctx };
+    return { workspace, lead, role, feed, ctx, applyEdit };
   }
 
-  it("is deleted when its owner's role is edited so it no longer reaches the project", async () => {
-    const { lead, ctx } = await leadWithFeed();
-    ctx.context.returned = { success: true };
+  // biome-ignore lint/suspicious/noExplicitAny: the hooks read body and context only
+  const asHookContext = (ctx: unknown) => ctx as any;
 
-    await pruneFeedsAfterRoleEdit(ctx);
+  it("is deleted when its owner's role is edited so it no longer reaches the project", async () => {
+    const { lead, ctx, applyEdit } = await leadWithFeed();
+
+    await rememberRoleEditForFeeds(asHookContext(ctx));
+    await applyEdit();
+    ctx.context.returned = { success: true };
+    await pruneFeedsAfterRoleEdit(asHookContext(ctx));
+
+    expect(await feedsOf(lead.id)).toEqual([]);
+  });
+
+  // Afterwards the role row has only the new name, while its members still
+  // hold the old one, so the old name has to be read before the edit.
+  it("is deleted when the role is renamed by id in the same edit", async () => {
+    const { workspace, lead, role, ctx, applyEdit } = await leadWithFeed();
+    ctx.body = {
+      organizationId: workspace.id,
+      roleId: role.id,
+      data: { roleName: "senior", permission: { task: ["read"] } },
+    };
+
+    await rememberRoleEditForFeeds(asHookContext(ctx));
+    await applyEdit("senior");
+    ctx.context.returned = { success: true };
+    await pruneFeedsAfterRoleEdit(asHookContext(ctx));
+
+    expect(await feedsOf(lead.id)).toEqual([]);
+  });
+
+  // Better Auth uses the session's active workspace when none is named.
+  it("is deleted when the edit names no workspace", async () => {
+    const { workspace, lead, ctx, applyEdit } = await leadWithFeed();
+    ctx.body = { roleName: "lead", data: { permission: { task: ["read"] } } };
+    ctx.context.session = {
+      session: { activeOrganizationId: workspace.id },
+    };
+
+    await rememberRoleEditForFeeds(asHookContext(ctx));
+    await applyEdit();
+    ctx.context.returned = { success: true };
+    await pruneFeedsAfterRoleEdit(asHookContext(ctx));
 
     expect(await feedsOf(lead.id)).toEqual([]);
   });
 
   it("is left alone when the role edit failed", async () => {
-    const { lead, ctx } = await leadWithFeed();
-    ctx.context.returned = new APIError("FORBIDDEN");
+    const { lead, ctx, applyEdit } = await leadWithFeed();
 
-    await pruneFeedsAfterRoleEdit(ctx);
+    await rememberRoleEditForFeeds(asHookContext(ctx));
+    // Narrowed regardless, as by a concurrent edit, so only the failure
+    // guard keeps this response from pruning.
+    await applyEdit();
+    ctx.context.returned = new APIError("FORBIDDEN");
+    await pruneFeedsAfterRoleEdit(asHookContext(ctx));
 
     expect(await feedsOf(lead.id)).toHaveLength(1);
   });

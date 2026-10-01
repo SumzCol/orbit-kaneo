@@ -41,7 +41,10 @@ import {
   formatBillableWorkspacesMessage,
 } from "./billing/controllers/find-billable-workspaces";
 import { syncWorkspaceSeats } from "./billing/controllers/sync-seats";
-import { pruneFeedsAfterRoleEdit } from "./calendar-feed/prune-after-role-change";
+import {
+  pruneFeedsAfterRoleEdit,
+  rememberRoleEditForFeeds,
+} from "./calendar-feed/prune-after-role-change";
 import { pruneWorkspaceCalendarFeeds } from "./calendar-feed/service";
 import db, { schema } from "./database";
 import { authDatabaseAdapter } from "./database/auth-adapter";
@@ -688,6 +691,10 @@ export const auth = betterAuth({
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path === "/admin/remove-user") {
         await prepareAdminUserRemoval(ctx);
+      }
+
+      if (ctx.path === "/organization/update-role") {
+        await rememberRoleEditForFeeds(ctx);
       }
 
       if (ctx.path === "/organization/invite-member") {
