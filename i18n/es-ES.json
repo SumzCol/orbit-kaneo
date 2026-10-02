@@ -1766,12 +1766,12 @@
 			"selectLabels": "Search and select labels…",
 			"noLabels": "No labels found.",
 			"timeZoneHint": "All-day dates use {{timeZone}}.",
-			"accessHint": "Anyone with a feed link can read the matching task titles, descriptions, and dates. Revoke a link to stop future access.",
+			"accessHint": "Cualquiera con uno de tus enlaces de feed puede leer los títulos, descripciones y fechas de las tareas que coincidan. Un enlace deja de funcionar si pierdes el acceso a este proyecto; revócalo para cortar el acceso antes.",
 			"create": "Create feed",
 			"creating": "Creating…",
 			"created": "Calendar feed created.",
 			"createError": "Could not create the calendar feed.",
-			"activeFeeds": "Active feeds",
+			"activeFeeds": "Tus feeds",
 			"subscribeHint": "Copy a link and add it as a calendar subscription. Updates appear when your calendar app refreshes the feed.",
 			"empty": "No calendar feeds yet.",
 			"feedUrl": "Calendar feed URL",
@@ -1783,7 +1783,7 @@
 			"revokeError": "Could not revoke the calendar feed.",
 			"loadError": "Could not load calendar feeds or labels. Please try again.",
 			"deletedLabel": "Deleted label",
-			"permissionRequired": "You need project-sharing permission to manage calendar feeds."
+			"permissionRequired": "Necesitas permiso para compartir proyectos para crear feeds de calendario. Aún puedes revocar los tuyos."
 		},
 		"invitationEmailFailed": "Invitation saved, but email delivery failed. Check SMTP settings and resend the invitation.",
 		"billing": {

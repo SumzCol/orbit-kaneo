@@ -41,6 +41,14 @@ import {
   formatBillableWorkspacesMessage,
 } from "./billing/controllers/find-billable-workspaces";
 import { syncWorkspaceSeats } from "./billing/controllers/sync-seats";
+import {
+  pruneFeedsAfterRoleEdit,
+  rememberRoleEditForFeeds,
+} from "./calendar-feed/prune-after-role-change";
+import {
+  pruneUserCalendarFeeds,
+  pruneWorkspaceCalendarFeeds,
+} from "./calendar-feed/service";
 import db, { schema } from "./database";
 import { authDatabaseAdapter } from "./database/auth-adapter";
 import { publishEvent } from "./events";
@@ -501,6 +509,14 @@ export const auth = betterAuth({
             });
           }
         },
+        // A calendar feed reads as its owner, and a narrower role can end
+        // access they had through the old one. Deleted rather than left to
+        // the fetch check, which would let the old role revive the link.
+        afterUpdateMemberRole: async ({ member, organization }) => {
+          if (member?.userId && organization?.id) {
+            await pruneWorkspaceCalendarFeeds(organization.id, [member.userId]);
+          }
+        },
         afterRemoveMember: async ({ member }) => {
           if (member?.organizationId) {
             // Awaited, unlike the seat sync: this is a revocation, and the
@@ -644,6 +660,19 @@ export const auth = betterAuth({
           }
           return clearEmailVerificationOnAdminChange(user, ctx);
         },
+        // An instance administrator reaches every project, including ones in
+        // workspaces they never joined, and their calendar feeds read with
+        // that. Losing the role ends it, and the feeds are deleted rather than
+        // left to the fetch check, which would let the role revive them.
+        after: async (user, ctx) => {
+          if (
+            (ctx?.path === "/admin/set-role" ||
+              ctx?.path === "/admin/update-user") &&
+            !hasInstanceAdminRole(user.role ?? null)
+          ) {
+            await pruneUserCalendarFeeds(user.id);
+          }
+        },
       },
       create: {
         before: async (user, ctx) => {
@@ -678,6 +707,10 @@ export const auth = betterAuth({
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path === "/admin/remove-user") {
         await prepareAdminUserRemoval(ctx);
+      }
+
+      if (ctx.path === "/organization/update-role") {
+        await rememberRoleEditForFeeds(ctx);
       }
 
       if (ctx.path === "/organization/invite-member") {
@@ -805,6 +838,23 @@ export const auth = betterAuth({
       }
     }),
     after: createAuthMiddleware(async (ctx) => {
+      // Role edits run through Better Auth with no lifecycle hook of their
+      // own, and can narrow what every member holding the role reaches.
+      if (ctx.path === "/organization/update-role") {
+        await pruneFeedsAfterRoleEdit(ctx);
+      }
+
+      // A ban revokes sessions and API keys, but a feed link carries neither.
+      // The fetch refuses a banned owner's feeds; deleting them keeps an unban
+      // from reviving links that may have been passed on.
+      if (
+        ctx.path === "/admin/ban-user" &&
+        !(ctx.context.returned instanceof APIError) &&
+        typeof ctx.body?.userId === "string"
+      ) {
+        await pruneUserCalendarFeeds(ctx.body.userId);
+      }
+
       if (ctx.path.startsWith("/sign-up") || ctx.path.startsWith("/sign-in")) {
         const newSession = ctx.context.newSession;
         if (newSession) {
