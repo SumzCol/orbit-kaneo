@@ -43,6 +43,7 @@ vi.mock("../../apps/api/src/ws", async (original) => ({
 // mutation committed neither fails the request nor stops the others.
 const failingLookups: Set<string> = vi.hoisted(() => new Set());
 const failInstanceAdminLookup = vi.hoisted(() => ({ on: false }));
+const batches: number[] = vi.hoisted(() => []);
 vi.mock("../../apps/api/src/utils/project-access", async (original) => {
   const actual =
     await original<typeof import("../../apps/api/src/utils/project-access")>();
@@ -53,6 +54,16 @@ vi.mock("../../apps/api/src/utils/project-access", async (original) => {
         throw new Error("lookup failed");
       }
       return actual.userCanAccessProject(projectId, userId);
+    },
+    // A failed batch leaves its pairs out of the answer, which is what the
+    // callers see; projects set to fail are left out the same way.
+    resolveProjectAccess: async (
+      pairs: { projectId: string; userId: string }[],
+    ) => {
+      batches.push(pairs.length);
+      return actual.resolveProjectAccess(
+        pairs.filter((pair) => !failingLookups.has(pair.projectId)),
+      );
     },
     instanceAdministratorIds: async () => {
       if (failInstanceAdminLookup.on) throw new Error("lookup failed");
@@ -67,6 +78,7 @@ beforeEach(async () => {
   notified.length = 0;
   failingLookups.clear();
   failInstanceAdminLookup.on = false;
+  batches.length = 0;
 });
 
 async function leaveWorkspace(workspaceId: string, userId: string) {
@@ -571,4 +583,53 @@ describe("moves running at once", () => {
       );
     },
   );
+});
+
+describe("how many lookups a revocation costs", () => {
+  // One check per affected user or project, in sequence, turned a widely
+  // shared move or an administrator's departure into hundreds of round trips.
+  it("asks about everyone a move affects in one batched lookup", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const left = await addWorkspaceMember(source.workspace.id, "member");
+    await addWorkspaceMember(target.workspace.id, "admin");
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id, left.id],
+    });
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    expect(batches).toHaveLength(1);
+    expect(batches[0]).toBeGreaterThanOrEqual(3);
+  });
+
+  it("asks about every project an administrator leaves in one batched lookup", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const admin = await addWorkspaceMember(workspace.id, "admin");
+    for (let i = 0; i < 3; i++) {
+      await createProjectFixture({
+        workspaceId: workspace.id,
+        members: [owner.id],
+      });
+    }
+
+    await leaveWorkspace(workspace.id, admin.id);
+    await revokeWorkspaceProjectMemberships(workspace.id, admin.id, "admin");
+
+    expect(batches).toEqual([3]);
+  });
 });

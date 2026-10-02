@@ -415,3 +415,31 @@ export async function accessibleProjectPairs(
 
   return allowed;
 }
+
+/**
+ * `accessibleProjectPairs` over any number of pairs, in bounded batches, as a
+ * map from `projectUserKey` to whether that pair has access. A pair whose
+ * batch failed is absent: a failed lookup is not evidence either way, so the
+ * caller leaves it to the sweep rather than guessing.
+ */
+export async function resolveProjectAccess(
+  pairs: ProjectUserPair[],
+  batchSize = 500,
+): Promise<Map<string, boolean>> {
+  const answers = new Map<string, boolean>();
+  for (let start = 0; start < pairs.length; start += batchSize) {
+    const batch = pairs.slice(start, start + batchSize);
+    let allowed: Set<string>;
+    try {
+      allowed = await accessibleProjectPairs(batch);
+    } catch (error) {
+      console.error("Failed to resolve project access:", error);
+      continue;
+    }
+    for (const pair of batch) {
+      const key = projectUserKey(pair);
+      answers.set(key, allowed.has(key));
+    }
+  }
+  return answers;
+}

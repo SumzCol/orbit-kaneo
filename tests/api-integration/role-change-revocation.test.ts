@@ -11,6 +11,7 @@ import {
 import {
   accessibleProjectPairs,
   projectUserKey,
+  resolveProjectAccess,
   userCanAccessProject,
 } from "../../apps/api/src/utils/project-access";
 import { resetTestDatabase } from "./helpers/database";
@@ -166,6 +167,14 @@ describe("the batched access check", () => {
     // Not vacuous: both answers occur.
     expect(allowed.size).toBeGreaterThan(0);
     expect(allowed.size).toBeLessThan(pairs.length);
+
+    // Split across batches, the answers are the same.
+    const resolved = await resolveProjectAccess(pairs, 4);
+    for (const pair of pairs) {
+      expect(resolved.get(projectUserKey(pair))).toBe(
+        allowed.has(projectUserKey(pair)),
+      );
+    }
   });
 });
 
