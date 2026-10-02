@@ -178,10 +178,34 @@ describe("project access changes on the user socket", () => {
     expect(client.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["projects"],
     });
-    expect(client.invalidateQueries).toHaveBeenCalledWith({
+    // An inactive search only marked stale would reopen without the project.
+    expect(client.resetQueries).toHaveBeenCalledWith({
       queryKey: ["search"],
     });
-    expect(client.resetQueries).not.toHaveBeenCalled();
+  });
+
+  // Queries do not refetch on mount here, so another workspace's list that
+  // was only marked stale would be shown as it was on the next switch.
+  it("refetches project lists nothing is showing", () => {
+    receive({
+      type: "PROJECT_ACCESS_CHANGED",
+      projectId: "project-1",
+      hasAccess: false,
+    });
+
+    const call = client.invalidateQueries.mock.calls.find(
+      ([filters]) =>
+        (filters as { refetchType?: string })?.refetchType === "all",
+    );
+    expect(call).toBeDefined();
+    const { predicate } = (call as unknown[])[0] as {
+      predicate: (query: { queryKey: unknown[] }) => boolean;
+    };
+    expect(predicate({ queryKey: ["projects", "workspace-2"] })).toBe(true);
+    // Not the details, which would refetch every project ever opened.
+    expect(
+      predicate({ queryKey: ["projects", "workspace-2", "project-1"] }),
+    ).toBe(false);
   });
 
   it("also drops the project's cached board when access ends", () => {

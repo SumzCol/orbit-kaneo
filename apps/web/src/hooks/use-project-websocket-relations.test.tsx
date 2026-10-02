@@ -237,6 +237,47 @@ describe("useProjectWebSocket relation invalidation", () => {
     }
   });
 
+  // A grant can be stale by the time the upgrade runs, if the user was
+  // removed again in between, so it is held to one attempt as a probe is.
+  it("goes back to stopped when a grant's upgrade is refused", () => {
+    vi.useFakeTimers();
+    try {
+      const constructor = globalThis.WebSocket as unknown as ReturnType<
+        typeof vi.fn
+      >;
+      socket.onclose?.({ code: 4403 } as CloseEvent);
+
+      announceProjectAccessGranted("project-1");
+      expect(constructor).toHaveBeenCalledTimes(2);
+      socket.onclose?.({ code: 1006 } as CloseEvent);
+      vi.advanceTimersByTime(120_000);
+
+      expect(constructor).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Once open, the attempt is an ordinary connection again: a later drop
+  // retries as usual.
+  it("retries as usual after a granted reconnect opened", () => {
+    vi.useFakeTimers();
+    try {
+      const constructor = globalThis.WebSocket as unknown as ReturnType<
+        typeof vi.fn
+      >;
+      socket.onclose?.({ code: 4403 } as CloseEvent);
+      announceProjectAccessGranted("project-1");
+      socket.onopen?.();
+      socket.onclose?.({ code: 1006 } as CloseEvent);
+      vi.advanceTimersByTime(2_000);
+
+      expect(constructor).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("ignores a grant while the board is still connected", () => {
     const constructor = globalThis.WebSocket as unknown as ReturnType<
       typeof vi.fn

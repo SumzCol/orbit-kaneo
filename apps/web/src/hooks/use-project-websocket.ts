@@ -13,6 +13,7 @@ import getLabelsByTask from "@/fetchers/label/get-labels-by-task";
 import getExternalLinks from "@/fetchers/external-link/get-external-links";
 import { patchBoardTask } from "@/lib/patch-board-task";
 import { dropProjectCaches } from "@/lib/drop-project-caches";
+import { refreshProjectLists } from "@/lib/refresh-project-lists";
 import { onProjectAccessGranted } from "@/lib/project-access-grants";
 import { isPerTaskRelationQuery } from "@/lib/relation-query-keys";
 import type { ProjectWithTasks } from "@/types/project";
@@ -72,21 +73,20 @@ export function useProjectWebSocket(projectId: string) {
     // added back while the board stays open would otherwise leave it without
     // realtime updates until the route remounts.
     let revoked = false;
-    // A single attempt on a guess that access may be back. The upgrade is
-    // refused with a plain HTTP 403, which reaches the client as an ordinary
-    // close, so a refused probe must not fall through to the retries and the
-    // fallback poll, which would then run against a project it cannot read.
+    // Every attempt after a 4403 is a single one until the socket opens,
+    // whether a grant or a reconnect's guess started it: a grant can be stale
+    // by the time the upgrade runs, if the user was removed again. The
+    // upgrade is refused with a plain HTTP 403, which reaches the client as
+    // an ordinary close, so a refused attempt must not fall through to the
+    // retries and the fallback poll against a project it cannot read.
     let probing = false;
-    const stopListeningForGrant = onProjectAccessGranted(
-      projectId,
-      (signal) => {
-        if (disposed || !revoked) return;
-        revoked = false;
-        probing = signal === "probe";
-        retries = 0;
-        connect();
-      },
-    );
+    const stopListeningForGrant = onProjectAccessGranted(projectId, () => {
+      if (disposed || !revoked) return;
+      revoked = false;
+      probing = true;
+      retries = 0;
+      connect();
+    });
 
     function invalidateDetails(message: {
       type: string;
@@ -504,7 +504,7 @@ export function useProjectWebSocket(projectId: string) {
           // the sidebar and the board keeps showing the tasks it had when
           // access ended, until something unrelated happens to refetch.
           dropProjectCaches(queryClient, projectId);
-          void queryClient.invalidateQueries({ queryKey: ["projects"] });
+          refreshProjectLists(queryClient);
           return;
         }
 

@@ -1,6 +1,7 @@
 import { windowId } from "@kaneo/libs";
 import { useQueryClient } from "@tanstack/react-query";
 import { dropProjectCaches } from "@/lib/drop-project-caches";
+import { refreshProjectLists } from "@/lib/refresh-project-lists";
 import {
   announceProjectAccessGranted,
   probeRevokedProjects,
@@ -61,7 +62,7 @@ export function useUserWebSocket() {
         // Refreshing on every reconnect covers it without the server having
         // to track who missed what.
         if (hasConnected) {
-          void queryClient.invalidateQueries({ queryKey: ["projects"] });
+          refreshProjectLists(queryClient);
           // A project's detail is cached as ["projects", workspaceId, id].
           // Invalidating does not stop an inactive one being shown again
           // without a refetch, so these are reset instead: one on screen
@@ -102,16 +103,14 @@ export function useUserWebSocket() {
           if (message.type === "PROJECT_ACCESS_CHANGED") {
             // Every session gets this, not only one with that board open, so
             // the sidebar is what it has to fix.
-            void queryClient.invalidateQueries({ queryKey: ["projects"] });
-            if (message.hasAccess === false) {
-              // Search results carry project, task, comment and activity text,
-              // and they are cached across projects rather than per project,
-              // so there is no narrower key to drop. Reset, not removed: a
-              // mounted search keeps rendering a removed query's results.
-              void queryClient.resetQueries({ queryKey: ["search"] });
-            } else {
-              void queryClient.invalidateQueries({ queryKey: ["search"] });
-            }
+            refreshProjectLists(queryClient);
+            // Search results carry project, task, comment and activity text,
+            // and they are cached across projects rather than per project, so
+            // there is no narrower key. Reset either way: a mounted search
+            // keeps rendering a removed query's results, and an inactive one
+            // only marked stale would be shown as it was when reopened --
+            // with hits from a revoked project, or without a granted one.
+            void queryClient.resetQueries({ queryKey: ["search"] });
             if (message.projectId && message.hasAccess === false) {
               dropProjectCaches(queryClient, message.projectId);
             }
