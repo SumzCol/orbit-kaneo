@@ -76,6 +76,11 @@ export function dropProjectCaches(queryClient: QueryClient, projectId: string) {
   void queryClient.resetQueries({
     predicate: (query) => query.queryKey.includes(projectId),
   });
+  // A relation cached under a task in another project embeds the title of its
+  // other end, which may be in this one, and none of its key names this
+  // project. The API filters those ends by visibility, so every relation
+  // query is reset and refetched under the new access.
+  void queryClient.resetQueries({ queryKey: ["task-relations"] });
   // The board renders from its own store copy of the tasks, and only writes
   // to it when query data arrives, so the removal above leaves an open board
   // showing everything it held. Cleared only when it holds this project, so

@@ -222,6 +222,17 @@ describe("project access changes on the user socket", () => {
     });
   });
 
+  // Workspace labels are filtered by visibility, so they change with access.
+  it("resets workspace labels when access changes", () => {
+    receive({
+      type: "PROJECT_ACCESS_CHANGED",
+      projectId: "project-1",
+      hasAccess: false,
+    });
+
+    expect(client.resetQueries).toHaveBeenCalledWith({ queryKey: ["labels"] });
+  });
+
   // Queries do not refetch on mount here, so another workspace's list that
   // was only marked stale would be shown as it was on the next switch.
   it("refetches project lists nothing is showing", () => {

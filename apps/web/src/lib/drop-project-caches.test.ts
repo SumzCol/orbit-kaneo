@@ -103,7 +103,10 @@ describe("dropProjectCaches", () => {
       "time-entries",
     ]) {
       expect(client.getQueryData([prefix, "task-1"])).toBeUndefined();
-      expect(client.getQueryData([prefix, "task-9"])).toBeDefined();
+      // Relations are reset everywhere: their other end may be in the project.
+      if (prefix !== "task-relations") {
+        expect(client.getQueryData([prefix, "task-9"])).toBeDefined();
+      }
     }
     expect(client.getQueryData(["comments", "task-2"])).toBeUndefined();
     expect(client.getQueryData(["task", "task-3"])).toBeUndefined();
@@ -161,5 +164,18 @@ describe("dropProjectCaches", () => {
 
     expect(observer.getCurrentResult().data).toBeUndefined();
     unsubscribe();
+  });
+
+  // Cached under a task the caller can still see, its other end may be in the
+  // revoked project, and nothing in its key says so.
+  it("resets every relation query, wherever it is keyed", () => {
+    const client = new QueryClient();
+    client.setQueryData(["task-relations", "task-elsewhere"], [{}]);
+
+    dropProjectCaches(client, "project-1");
+
+    expect(
+      client.getQueryData(["task-relations", "task-elsewhere"]),
+    ).toBeUndefined();
   });
 });

@@ -9,7 +9,7 @@ import type { QueryClient } from "@tanstack/react-query";
  * for another workspace that was only marked stale would be shown as it was
  * on the next switch -- still listing a revoked project, or missing a granted
  * one. Project details on screen are refetched too; inactive ones are left to
- * the callers, which reset or drop them.
+ * the callers, which reset or drop them. Workspace labels are reset.
  */
 export function refreshProjectLists(queryClient: QueryClient) {
   void queryClient.invalidateQueries({
@@ -18,4 +18,9 @@ export function refreshProjectLists(queryClient: QueryClient) {
     refetchType: "all",
   });
   void queryClient.invalidateQueries({ queryKey: ["projects"] });
+  // Workspace labels are filtered by which projects' tasks the caller can
+  // see, so another board in the workspace would go on listing a revoked
+  // project's labels, or miss a granted one's. Reset so an active view
+  // refetches and an inactive one cannot be reused as it was.
+  void queryClient.resetQueries({ queryKey: ["labels"] });
 }
