@@ -26,7 +26,8 @@ import {
 import { publishEvent } from "../../events";
 import {
   instanceAdministratorIds,
-  userCanAccessProject,
+  projectUserKey,
+  resolveProjectAccess,
   workspaceWideProjectUserIds,
 } from "../../utils/project-access";
 import { closeProjectConnections, notifyProjectAccessChanged } from "../../ws";
@@ -454,23 +455,20 @@ async function moveProject(
     ...targetAdministrators,
     ...instanceAdministrators,
   ]);
+  // Batched: a widely shared project can have hundreds of these, and the
+  // move does not return until they are answered.
+  const answers = await resolveProjectAccess(
+    [...affected].map((userId) => ({ projectId: id, userId })),
+  );
   const lostAccess: string[] = [];
   const stillHaveAccess: string[] = [];
   const uncertain: string[] = [];
   for (const userId of affected) {
-    try {
-      if (await userCanAccessProject(id, userId)) {
-        stillHaveAccess.push(userId);
-      } else {
-        lostAccess.push(userId);
-      }
-    } catch (error) {
-      if (mayLoseAccess.includes(userId)) uncertain.push(userId);
-      console.error(
-        `Failed to revalidate access to moved project ${id} for ${userId}:`,
-        error,
-      );
-    }
+    const allowed = answers.get(projectUserKey({ projectId: id, userId }));
+    if (allowed === true) stillHaveAccess.push(userId);
+    else if (allowed === false) lostAccess.push(userId);
+    // Its batch failed.
+    else if (mayLoseAccess.includes(userId)) uncertain.push(userId);
   }
 
   // Carried on the move message rather than sent separately. The client only
