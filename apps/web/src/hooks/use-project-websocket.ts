@@ -12,6 +12,9 @@ import getTask from "@/fetchers/task/get-task";
 import getLabelsByTask from "@/fetchers/label/get-labels-by-task";
 import getExternalLinks from "@/fetchers/external-link/get-external-links";
 import { patchBoardTask } from "@/lib/patch-board-task";
+import { dropProjectCaches } from "@/lib/drop-project-caches";
+import { refreshProjectLists } from "@/lib/refresh-project-lists";
+import { onProjectAccessGranted } from "@/lib/project-access-grants";
 import { isPerTaskRelationQuery } from "@/lib/relation-query-keys";
 import type { ProjectWithTasks } from "@/types/project";
 
@@ -23,6 +26,10 @@ export function getWsUrl(projectId: string) {
 
 const MAX_RETRIES = 5;
 const BASE_DELAY = 1000; // 1 second
+
+// Sent by the API when the user is removed from the project; mirrors the 403
+// their next upgrade attempt would get.
+const ACCESS_REVOKED_CLOSE_CODE = 4403;
 
 // Cloudflare closes idle WebSocket connections after 100 seconds of no traffic.
 // We send a lightweight ping every 30 seconds to keep the connection alive.
@@ -62,6 +69,24 @@ export function useProjectWebSocket(projectId: string) {
     const parentCountVersions = new Map<string, number>();
     let pingInterval: ReturnType<typeof setInterval> | null = null;
     let fallbackInterval: ReturnType<typeof setInterval> | null = null;
+    // Set by a 4403 close, after which nothing reconnects on its own. Being
+    // added back while the board stays open would otherwise leave it without
+    // realtime updates until the route remounts.
+    let revoked = false;
+    // Every attempt after a 4403 is a single one until the socket opens,
+    // whether a grant or a reconnect's guess started it: a grant can be stale
+    // by the time the upgrade runs, if the user was removed again. The
+    // upgrade is refused with a plain HTTP 403, which reaches the client as
+    // an ordinary close, so a refused attempt must not fall through to the
+    // retries and the fallback poll against a project it cannot read.
+    let probing = false;
+    const stopListeningForGrant = onProjectAccessGranted(projectId, () => {
+      if (disposed || !revoked) return;
+      revoked = false;
+      probing = true;
+      retries = 0;
+      connect();
+    });
 
     function invalidateDetails(message: {
       type: string;
@@ -148,6 +173,7 @@ export function useProjectWebSocket(projectId: string) {
 
       ws.onopen = () => {
         if (disposed || activeSocket !== ws) return;
+        probing = false;
         needsReconcile = true;
         flushPending();
         if (healthyTimeout !== null) clearTimeout(healthyTimeout);
@@ -450,7 +476,7 @@ export function useProjectWebSocket(projectId: string) {
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         if (disposed || activeSocket !== ws) return;
         clearPing();
         if (healthyTimeout !== null) {
@@ -458,6 +484,29 @@ export function useProjectWebSocket(projectId: string) {
           healthyTimeout = null;
         }
         activeSocket = null;
+
+        // The server closes with this code when the user's access to the
+        // project is taken away. Reconnecting would only be refused at the
+        // upgrade, and the fallback poll would be refused too, so stop
+        // entirely rather than falling through to either.
+        if (probing) {
+          probing = false;
+          revoked = true;
+          retries = MAX_RETRIES;
+          return;
+        }
+
+        if (event?.code === ACCESS_REVOKED_CLOSE_CODE) {
+          retries = MAX_RETRIES;
+          revoked = true;
+          // The socket closing is the only signal that arrives, so the caches
+          // have to be dropped here. Otherwise the project keeps sitting in
+          // the sidebar and the board keeps showing the tasks it had when
+          // access ended, until something unrelated happens to refetch.
+          dropProjectCaches(queryClient, projectId);
+          refreshProjectLists(queryClient);
+          return;
+        }
 
         if (retries < MAX_RETRIES) {
           const delay = BASE_DELAY * 2 ** retries; // 1s, 2s, 4s, 8s, 16s
@@ -528,6 +577,7 @@ export function useProjectWebSocket(projectId: string) {
 
     return () => {
       unsubscribe();
+      stopListeningForGrant();
       if (healthyTimeout !== null) clearTimeout(healthyTimeout);
       pendingMessages.clear();
       if (burstReconcileTimer !== null) clearTimeout(burstReconcileTimer);

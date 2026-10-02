@@ -23,14 +23,18 @@ import {
   QueryClientProvider,
   useQueryClient,
 } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
+import { cleanup, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
+import {
+  announceProjectAccessGranted,
+  probeRevokedProjects,
+} from "@/lib/project-access-grants";
 import { useProjectWebSocket } from "./use-project-websocket";
 
 type Socket = {
   onopen: (() => void) | null;
   onmessage: ((event: { data: string }) => void) | null;
-  onclose: (() => void) | null;
+  onclose: ((event?: CloseEvent) => void) | null;
   onerror: (() => void) | null;
   readyState: number;
   send: ReturnType<typeof vi.fn>;
@@ -40,12 +44,16 @@ type Socket = {
 describe("useProjectWebSocket relation invalidation", () => {
   let socket: Socket;
   let invalidate: MockInstance<QueryClient["invalidateQueries"]>;
+  let remove: MockInstance<QueryClient["removeQueries"]>;
+  let client: QueryClient;
 
   function mount() {
-    const client = new QueryClient();
+    client = new QueryClient();
     invalidate = vi
       .spyOn(client, "invalidateQueries")
       .mockResolvedValue(undefined);
+    // Spied but not stubbed: the revocation test reads the cache afterwards.
+    remove = vi.spyOn(client, "removeQueries");
 
     renderHook(
       () => {
@@ -101,6 +109,8 @@ describe("useProjectWebSocket relation invalidation", () => {
   });
 
   afterEach(() => {
+    // Unmounted so a hook from an earlier test cannot answer this one's grant.
+    cleanup();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
@@ -164,6 +174,124 @@ describe("useProjectWebSocket relation invalidation", () => {
     receive({ type, projectId: "project-1", taskId: "task-1" });
 
     expect(invalidatedKeys()).not.toContain(projectRelationsKey);
+  });
+
+  // The socket closing is the only signal a revoked member gets, so the caches
+  // have to be dropped here or the project stays in the sidebar and the board
+  // keeps showing what it held when access ended.
+  it("drops the project's caches when access is revoked", () => {
+    // Seeded under the keys the app's hooks really use. An earlier version
+    // asserted on the removal call's own arguments and so could not notice
+    // that the detail key it removed was one no query used.
+    client.setQueryData(["tasks", "project-1"], { columns: [] });
+    client.setQueryData(["projects", "workspace-1", "project-1"], {
+      name: "Private",
+    });
+
+    socket.onclose?.({ code: 4403 } as CloseEvent);
+
+    expect(client.getQueryData(["tasks", "project-1"])).toBeUndefined();
+    expect(
+      client.getQueryData(["projects", "workspace-1", "project-1"]),
+    ).toBeUndefined();
+    expect(invalidatedKeys()).toContain(JSON.stringify(["projects"]));
+  });
+
+  // A 4403 stops reconnects for good, so being added back while the board is
+  // still open has to restart them, or it stays without realtime updates.
+  it("reconnects when access is granted after a revocation", () => {
+    const constructor = globalThis.WebSocket as unknown as ReturnType<
+      typeof vi.fn
+    >;
+    socket.onclose?.({ code: 4403 } as CloseEvent);
+    expect(constructor).toHaveBeenCalledTimes(1);
+
+    announceProjectAccessGranted("project-1");
+
+    expect(constructor).toHaveBeenCalledTimes(2);
+  });
+
+  // A probe is a guess. The upgrade is refused with an HTTP 403, which
+  // reaches the client as an ordinary close, so a refused probe must stop
+  // there rather than retry and poll a project it cannot read.
+  it("goes back to stopped when a probe is refused", () => {
+    vi.useFakeTimers();
+    try {
+      const constructor = globalThis.WebSocket as unknown as ReturnType<
+        typeof vi.fn
+      >;
+      socket.onclose?.({ code: 4403 } as CloseEvent);
+
+      probeRevokedProjects();
+      expect(constructor).toHaveBeenCalledTimes(2);
+      // Refused before it opened.
+      socket.onclose?.({ code: 1006 } as CloseEvent);
+      vi.advanceTimersByTime(120_000);
+
+      expect(constructor).toHaveBeenCalledTimes(2);
+      expect(invalidatedKeys()).not.toContain(
+        JSON.stringify(["tasks", "project-1"]),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // A grant can be stale by the time the upgrade runs, if the user was
+  // removed again in between, so it is held to one attempt as a probe is.
+  it("goes back to stopped when a grant's upgrade is refused", () => {
+    vi.useFakeTimers();
+    try {
+      const constructor = globalThis.WebSocket as unknown as ReturnType<
+        typeof vi.fn
+      >;
+      socket.onclose?.({ code: 4403 } as CloseEvent);
+
+      announceProjectAccessGranted("project-1");
+      expect(constructor).toHaveBeenCalledTimes(2);
+      socket.onclose?.({ code: 1006 } as CloseEvent);
+      vi.advanceTimersByTime(120_000);
+
+      expect(constructor).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Once open, the attempt is an ordinary connection again: a later drop
+  // retries as usual.
+  it("retries as usual after a granted reconnect opened", () => {
+    vi.useFakeTimers();
+    try {
+      const constructor = globalThis.WebSocket as unknown as ReturnType<
+        typeof vi.fn
+      >;
+      socket.onclose?.({ code: 4403 } as CloseEvent);
+      announceProjectAccessGranted("project-1");
+      socket.onopen?.();
+      socket.onclose?.({ code: 1006 } as CloseEvent);
+      vi.advanceTimersByTime(2_000);
+
+      expect(constructor).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores a grant while the board is still connected", () => {
+    const constructor = globalThis.WebSocket as unknown as ReturnType<
+      typeof vi.fn
+    >;
+
+    announceProjectAccessGranted("project-1");
+
+    expect(constructor).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves them alone on an ordinary close", () => {
+    socket.onclose?.({ code: 1006 } as CloseEvent);
+
+    expect(remove).not.toHaveBeenCalled();
   });
 
   it("ignores a malformed message", () => {
