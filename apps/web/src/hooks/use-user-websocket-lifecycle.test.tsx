@@ -119,7 +119,7 @@ describe("user WebSocket lifecycle", () => {
     unmount();
     expect(vi.getTimerCount()).toBe(0);
   });
-  it("retains the five-retry limit and does not duplicate retries on repeated close events", () => {
+  it("backs off five times without duplicating retries, then keeps trying once a minute", () => {
     const { unmount } = renderHook(useUserWebSocket);
     for (let retry = 0; retry < 5; retry++) {
       act(() => {
@@ -130,13 +130,37 @@ describe("user WebSocket lifecycle", () => {
       });
       expect(TestSocket.instances).toHaveLength(retry + 2);
     }
+    // The reconnect is what reconciles access changes missed while down, so
+    // a long outage slows the attempts rather than ending them.
+    act(() => {
+      TestSocket.instances.at(-1)?.onclose?.();
+      TestSocket.instances.at(-1)?.onclose?.();
+      vi.advanceTimersByTime(59_999);
+    });
+    expect(TestSocket.instances).toHaveLength(6);
+    act(() => vi.advanceTimersByTime(1));
+    expect(TestSocket.instances).toHaveLength(7);
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("reconciles access on a reconnect after the slow retries", () => {
+    renderHook(useUserWebSocket);
+    act(() => TestSocket.instances[0].open());
+    for (let retry = 0; retry < 5; retry++) {
+      act(() => {
+        TestSocket.instances.at(-1)?.onclose?.();
+        vi.advanceTimersByTime(1000 * 2 ** retry);
+      });
+    }
     act(() => {
       TestSocket.instances.at(-1)?.onclose?.();
       vi.advanceTimersByTime(60_000);
     });
-    expect(TestSocket.instances).toHaveLength(6);
-    unmount();
-    expect(vi.getTimerCount()).toBe(0);
+    client.resetQueries.mockClear();
+    act(() => TestSocket.instances.at(-1)?.open());
+
+    expect(client.resetQueries).toHaveBeenCalledWith({ type: "inactive" });
   });
 });
 

@@ -420,21 +420,33 @@ async function moveProject(
   // target's administrators, who gain it through their role, and instance
   // administrators, whose lists change on both sides. Each is told where they
   // now stand; only actual losses get the permanent close.
-  const [survivors, targetAdministrators, instanceAdministrators] =
-    await Promise.all([
+  //
+  // Settled one by one, so a failed lookup costs only its own group the
+  // notice rather than everyone the others found.
+  const [survivorLookup, targetLookup, instanceLookup] =
+    await Promise.allSettled([
       db
         .select({ userId: projectMemberTable.userId })
         .from(projectMemberTable)
-        .where(eq(projectMemberTable.projectId, id)),
+        .where(eq(projectMemberTable.projectId, id))
+        .then((rows) => rows.map((row) => row.userId)),
       workspaceWideProjectUserIds(targetWorkspaceId),
       instanceAdministratorIds(),
-    ]).catch((error) => {
-      console.error(`Failed to list who sees moved project ${id}:`, error);
-      return [[], [], []] as [{ userId: string }[], string[], string[]];
-    });
+    ]);
+  const settled = (lookup: PromiseSettledResult<string[]>) => {
+    if (lookup.status === "fulfilled") return lookup.value;
+    console.error(
+      `Failed to list who sees moved project ${id}:`,
+      lookup.reason,
+    );
+    return [];
+  };
+  const survivors = settled(survivorLookup);
+  const targetAdministrators = settled(targetLookup);
+  const instanceAdministrators = settled(instanceLookup);
   const affected = new Set([
     ...mayLoseAccess,
-    ...survivors.map((row) => row.userId),
+    ...survivors,
     ...targetAdministrators,
     ...instanceAdministrators,
   ]);

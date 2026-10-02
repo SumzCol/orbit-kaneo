@@ -42,6 +42,7 @@ vi.mock("../../apps/api/src/ws", async (original) => ({
 // Projects whose access lookup fails, to check that a failure after the
 // mutation committed neither fails the request nor stops the others.
 const failingLookups: Set<string> = vi.hoisted(() => new Set());
+const failInstanceAdminLookup = vi.hoisted(() => ({ on: false }));
 vi.mock("../../apps/api/src/utils/project-access", async (original) => {
   const actual =
     await original<typeof import("../../apps/api/src/utils/project-access")>();
@@ -53,6 +54,10 @@ vi.mock("../../apps/api/src/utils/project-access", async (original) => {
       }
       return actual.userCanAccessProject(projectId, userId);
     },
+    instanceAdministratorIds: async () => {
+      if (failInstanceAdminLookup.on) throw new Error("lookup failed");
+      return actual.instanceAdministratorIds();
+    },
   };
 });
 
@@ -61,6 +66,7 @@ beforeEach(async () => {
   closed.length = 0;
   notified.length = 0;
   failingLookups.clear();
+  failInstanceAdminLookup.on = false;
 });
 
 async function leaveWorkspace(workspaceId: string, userId: string) {
@@ -472,5 +478,45 @@ describe("everyone whose sidebar a move changes", () => {
     }
     const [move] = closed.filter((entry) => entry.projectId === project.id);
     expect(move.revokedUserIds).toEqual([]);
+  });
+});
+
+describe("a move whose lookup of who sees it partly fails", () => {
+  // The three groups are listed separately, so one failing must not cost the
+  // others their notice.
+  it("still tells the members who came along", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const survivor = await addWorkspaceMember(source.workspace.id, "member");
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: survivor.id,
+      role: "member",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id, survivor.id],
+    });
+    failInstanceAdminLookup.on = true;
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    expect(notified).toContainEqual({
+      userId: survivor.id,
+      projectId: project.id,
+      hasAccess: true,
+    });
   });
 });

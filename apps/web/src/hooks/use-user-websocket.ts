@@ -18,6 +18,10 @@ export function getUserWsUrl() {
 
 const MAX_RETRIES = 5;
 const BASE_DELAY = 1000;
+// After the backoff runs out, keep trying at this pace. The reconnect is what
+// reconciles access changes missed while down, so a tab left open through a
+// long outage must still get one eventually.
+const SLOW_RETRY_DELAY = 60_000;
 const WS_PING_INTERVAL_MS = 30_000;
 
 /**
@@ -76,6 +80,12 @@ export function useUserWebSocket() {
           // keeps rendering what it holds until its query is reset. Its hits
           // can quote a project the missed message would have taken away.
           void queryClient.resetQueries({ queryKey: ["search"] });
+          // Which projects a missed message was about is unknown, and any of
+          // the board, task, comment or settings caches could be one's. The
+          // inactive ones are all reset, so whatever is opened next loads
+          // afresh and is refused if access went. The ones on screen are left
+          // to their own socket, which the sweep closes if access is gone.
+          void queryClient.resetQueries({ type: "inactive" });
           // A grant missed while down would leave a board stopped by 4403
           // with no realtime updates. Each such board tries once.
           probeRevokedProjects();
@@ -139,6 +149,8 @@ export function useUserWebSocket() {
           const delay = BASE_DELAY * 2 ** retries;
           retries += 1;
           retryTimeout = setTimeout(connect, delay);
+        } else {
+          retryTimeout = setTimeout(connect, SLOW_RETRY_DELAY);
         }
       };
     }
