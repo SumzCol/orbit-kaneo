@@ -628,3 +628,59 @@ describe("an owner who loses sharing permission but keeps the project", () => {
     ).toBe(403);
   });
 });
+
+describe("a banned owner's feeds", () => {
+  async function memberWithFeed() {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const member = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, member.id],
+    });
+    const feed = await insertFeed(project.id, member.id);
+    return { member, feed };
+  }
+
+  async function ban(userId: string, banExpires: Date | null) {
+    await db
+      .update(schema.userTable)
+      .set({ banned: true, banExpires })
+      .where(eq(schema.userTable.id, userId));
+  }
+
+  // A ban revokes sessions and API keys; a feed link carries neither, and
+  // an explicit member passes the project check on membership alone.
+  it("are refused and deleted, and stay gone after the ban is lifted", async () => {
+    const { member, feed } = await memberWithFeed();
+
+    await ban(member.id, null);
+    expect(await fetchFeed(feed.token)).toBe(404);
+    await db
+      .update(schema.userTable)
+      .set({ banned: false })
+      .where(eq(schema.userTable.id, member.id));
+
+    expect(await fetchFeed(feed.token)).toBe(404);
+    expect(await feedsOf(member.id)).toEqual([]);
+  });
+
+  it("are deleted by the cleanup a ban runs", async () => {
+    const { member } = await memberWithFeed();
+
+    await ban(member.id, null);
+    // What the after hook on /admin/ban-user runs.
+    await pruneUserCalendarFeeds(member.id);
+
+    expect(await feedsOf(member.id)).toEqual([]);
+  });
+
+  it("work again once a ban has expired", async () => {
+    const { member, feed } = await memberWithFeed();
+
+    await ban(member.id, new Date(Date.now() - 60_000));
+
+    expect(await fetchFeed(feed.token)).toBe(200);
+  });
+});

@@ -20,6 +20,7 @@ import {
   labelTable,
   projectTable,
   taskTable,
+  userTable,
 } from "../database/schema";
 import { boundedTaskRead } from "../task/bounded-read";
 import { userCanAccessProject } from "../utils/project-access";
@@ -46,6 +47,24 @@ const feedColumns = {
   timeZone: calendarFeedTable.timeZone,
   createdAt: calendarFeedTable.createdAt,
 };
+
+/**
+ * Whether a feed may still be read as its owner. Their access to the project,
+ * as for a request -- and their account not banned, since a feed link is the
+ * one way in that a ban's revoked sessions and API keys do not cover.
+ */
+async function ownerCanReadFeed(projectId: string, userId: string) {
+  const [owner] = await db
+    .select({ banned: userTable.banned, banExpires: userTable.banExpires })
+    .from(userTable)
+    .where(eq(userTable.id, userId))
+    .limit(1);
+  const banned =
+    owner?.banned === true &&
+    (!owner.banExpires || owner.banExpires.getTime() > Date.now());
+  if (banned) return false;
+  return userCanAccessProject(projectId, userId);
+}
 
 export async function createCalendarFeed(
   projectId: string,
@@ -196,7 +215,7 @@ export async function getCalendarFeed(token: string) {
   // for. Removal deletes their feeds too, but that cleanup can be missed --
   // a move, a role change -- and this check cannot. Answered as not found so
   // the link reveals nothing about why it stopped.
-  if (!(await userCanAccessProject(project.id, feed.userId))) {
+  if (!(await ownerCanReadFeed(project.id, feed.userId))) {
     // Deleted as well as refused, so restoring the owner's access later --
     // a role given back, a cleanup that failed -- cannot revive the link.
     await db
@@ -315,10 +334,12 @@ export async function pruneCalendarFeeds(
       );
     const byOwner = new Map<string, string[]>();
     for (const feed of feeds) {
-      byOwner.set(feed.userId, [...(byOwner.get(feed.userId) ?? []), feed.id]);
+      const ids = byOwner.get(feed.userId);
+      if (ids) ids.push(feed.id);
+      else byOwner.set(feed.userId, [feed.id]);
     }
     for (const [userId, ids] of byOwner) {
-      if (await userCanAccessProject(projectId, userId)) continue;
+      if (await ownerCanReadFeed(projectId, userId)) continue;
       await db
         .delete(calendarFeedTable)
         .where(inArray(calendarFeedTable.id, ids));
@@ -367,7 +388,8 @@ export async function pruneWorkspaceCalendarFeeds(
 /**
  * `pruneCalendarFeeds` for every feed one user holds, in any workspace. For a
  * change that can end their access everywhere at once: losing the instance
- * administrator role, which reaches projects in workspaces they never joined.
+ * administrator role, which reaches projects in workspaces they never joined,
+ * or a ban.
  * Never throws, for the same reason.
  */
 export async function pruneUserCalendarFeeds(userId: string) {

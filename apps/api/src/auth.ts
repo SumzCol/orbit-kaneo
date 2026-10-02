@@ -844,6 +844,17 @@ export const auth = betterAuth({
         await pruneFeedsAfterRoleEdit(ctx);
       }
 
+      // A ban revokes sessions and API keys, but a feed link carries neither.
+      // The fetch refuses a banned owner's feeds; deleting them keeps an unban
+      // from reviving links that may have been passed on.
+      if (
+        ctx.path === "/admin/ban-user" &&
+        !(ctx.context.returned instanceof APIError) &&
+        typeof ctx.body?.userId === "string"
+      ) {
+        await pruneUserCalendarFeeds(ctx.body.userId);
+      }
+
       if (ctx.path.startsWith("/sign-up") || ctx.path.startsWith("/sign-in")) {
         const newSession = ctx.context.newSession;
         if (newSession) {

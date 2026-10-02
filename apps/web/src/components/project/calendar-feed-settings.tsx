@@ -23,6 +23,7 @@ import {
 } from "@/fetchers/calendar-feed";
 import useGetLabelsByWorkspace from "@/hooks/queries/label/use-get-labels-by-workspace";
 import { useWorkspacePermission } from "@/hooks/use-workspace-permission";
+import { authClient } from "@/lib/auth-client";
 import { toast } from "@/lib/toast";
 
 type LabelOption = { value: string; label: string };
@@ -46,12 +47,18 @@ export function CalendarFeedSettings({ projectId }: { projectId: string }) {
   const [selected, setSelected] = useState<LabelOption[]>([]);
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const queryClient = useQueryClient();
-  const queryKey = ["calendar-feeds", projectId];
+  const { data: session } = authClient.useSession();
+  const userId = session?.user?.id;
+  // Keyed by user: these are one person's secret links, and the query client
+  // outlives a sign-out, so a second account in the same browser must not be
+  // handed the first one's from cache.
+  const queryKey = ["calendar-feeds", projectId, userId];
   const feedsQuery = useQuery({
     queryKey,
     // Not gated on sharing permission: these are the caller's own links, and
     // someone who lost that permission must still be able to revoke them.
     queryFn: () => getCalendarFeeds(projectId),
+    enabled: Boolean(userId),
   });
   const create = useMutation({
     mutationFn: () =>
