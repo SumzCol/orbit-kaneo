@@ -158,14 +158,26 @@ describe("CalendarFeedSettings", () => {
     );
   });
 
-  it("does not fetch secret links or show controls without sharing permission", () => {
+  // The list holds only the caller's own links, and an owner who lost
+  // sharing permission but kept the project must still be able to revoke one
+  // that works. Creating a link is what needs the permission.
+  it("lists and revokes the caller's own feeds without sharing permission, but cannot create", async () => {
     canShare = false;
+    vi.mocked(getCalendarFeeds).mockResolvedValue([feed]);
     renderSettings();
     expect(
       screen.getByText("settings:calendarFeeds.permissionRequired"),
     ).toBeInTheDocument();
-    expect(getCalendarFeeds).not.toHaveBeenCalled();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "settings:calendarFeeds.revoke",
+      }),
+    );
+    await waitFor(() =>
+      expect(revokeCalendarFeed).toHaveBeenCalledWith("project-1", "feed-1"),
+    );
   });
 
   it("reports loading failures without presenting a misleading empty state", async () => {

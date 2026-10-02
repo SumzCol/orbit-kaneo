@@ -29,6 +29,16 @@ const sharingMiddleware = [
   workspaceAccess.fromProject("projectId"),
   requireWorkspacePermission({ project: ["share"] }),
 ];
+// Listing and revoking reach only the caller's own feeds, so they need no
+// more than access to the project. Requiring project:share here too would
+// leave an owner who lost it, but kept the project, unable to revoke a link
+// that still works -- and nobody else can revoke it for them.
+const ownFeedMiddleware = [workspaceAccess.fromProject("projectId")];
+const ownFeedErrors = {
+  400: errorResponse("Invalid request or unknown project"),
+  401: errorResponse("Authentication required"),
+  403: errorResponse("No workspace access, or no access to the project"),
+};
 const managementErrors = {
   400: errorResponse("Invalid request or unknown project"),
   401: errorResponse("Authentication required"),
@@ -75,12 +85,12 @@ const calendarFeed = apiRouter<BaseVariables & { workspaceId: string }>()
       tags: ["Calendar feeds"],
       summary: "List project calendar feeds",
       description:
-        "List the caller's own secret calendar subscription links for this project. Requires project sharing permission.",
-      middleware: sharingMiddleware,
+        "List the caller's own secret calendar subscription links for this project. Needs access to the project; creating a link needs project sharing permission.",
+      middleware: ownFeedMiddleware,
       request: { params: calendarFeedProjectParam },
       responses: {
         200: jsonResponse("Calendar feeds", z.array(calendarFeedSchema)),
-        ...managementErrors,
+        ...ownFeedErrors,
       },
     }),
     async (c) => {
@@ -144,7 +154,7 @@ const calendarFeed = apiRouter<BaseVariables & { workspaceId: string }>()
       summary: "Revoke a calendar feed",
       description:
         "Revoke one of the caller's calendar subscription links, preventing further access through it.",
-      middleware: sharingMiddleware,
+      middleware: ownFeedMiddleware,
       request: { params: calendarFeedDeleteParam },
       responses: {
         200: jsonResponse(
@@ -154,7 +164,7 @@ const calendarFeed = apiRouter<BaseVariables & { workspaceId: string }>()
         404: errorResponse(
           "Calendar feed not found among the caller's feeds in this project",
         ),
-        ...managementErrors,
+        ...ownFeedErrors,
       },
     }),
     async (c) =>

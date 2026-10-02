@@ -8284,7 +8284,7 @@
           "Calendar feeds"
         ],
         "summary": "List project calendar feeds",
-        "description": "List the caller's own secret calendar subscription links for this project. Requires project sharing permission.",
+        "description": "List the caller's own secret calendar subscription links for this project. Needs access to the project; creating a link needs project sharing permission.",
         "parameters": [
           {
             "schema": {
@@ -8330,7 +8330,7 @@
             }
           },
           "403": {
-            "description": "No workspace access or missing project sharing permission",
+            "description": "No workspace access, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8496,7 +8496,7 @@
             }
           },
           "403": {
-            "description": "No workspace access or missing project sharing permission",
+            "description": "No workspace access, or no access to the project",
             "content": {
               "text/plain": {
                 "schema": {

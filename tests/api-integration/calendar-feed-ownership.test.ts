@@ -580,3 +580,51 @@ describe("an instance administrator's feeds", () => {
     expect(await fetchFeed(feed.token)).toBe(200);
   });
 });
+
+describe("an owner who loses sharing permission but keeps the project", () => {
+  // Their link still works, so they must still be able to revoke it; nobody
+  // else can, since listing and revoking only reach the caller's own.
+  it("can still list and revoke their feed", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const member = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, member.id],
+    });
+    const feed = await insertFeed(project.id, member.id);
+
+    mockAuthenticatedSession(member);
+    const { app } = createApp();
+    const endpoint = `/api/calendar-feed/project/${project.id}`;
+
+    const listed = (await (await app.request(endpoint)).json()) as {
+      id: string;
+    }[];
+    expect(listed.map((entry) => entry.id)).toEqual([feed.id]);
+    expect(
+      (await app.request(`${endpoint}/${feed.id}`, { method: "DELETE" }))
+        .status,
+    ).toBe(200);
+    expect(await fetchFeed(feed.token)).toBe(404);
+  });
+
+  it("is refused for a project they cannot open", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const outsider = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+
+    mockAuthenticatedSession(outsider);
+    const { app } = createApp();
+
+    expect(
+      (await app.request(`/api/calendar-feed/project/${project.id}`)).status,
+    ).toBe(403);
+  });
+});
