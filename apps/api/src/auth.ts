@@ -45,7 +45,10 @@ import {
   pruneFeedsAfterRoleEdit,
   rememberRoleEditForFeeds,
 } from "./calendar-feed/prune-after-role-change";
-import { pruneWorkspaceCalendarFeeds } from "./calendar-feed/service";
+import {
+  pruneUserCalendarFeeds,
+  pruneWorkspaceCalendarFeeds,
+} from "./calendar-feed/service";
 import db, { schema } from "./database";
 import { authDatabaseAdapter } from "./database/auth-adapter";
 import { publishEvent } from "./events";
@@ -656,6 +659,19 @@ export const auth = betterAuth({
             });
           }
           return clearEmailVerificationOnAdminChange(user, ctx);
+        },
+        // An instance administrator reaches every project, including ones in
+        // workspaces they never joined, and their calendar feeds read with
+        // that. Losing the role ends it, and the feeds are deleted rather than
+        // left to the fetch check, which would let the role revive them.
+        after: async (user, ctx) => {
+          if (
+            (ctx?.path === "/admin/set-role" ||
+              ctx?.path === "/admin/update-user") &&
+            !hasInstanceAdminRole(user.role ?? null)
+          ) {
+            await pruneUserCalendarFeeds(user.id);
+          }
         },
       },
       create: {

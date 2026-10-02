@@ -363,3 +363,23 @@ export async function pruneWorkspaceCalendarFeeds(
     );
   }
 }
+
+/**
+ * `pruneCalendarFeeds` for every feed one user holds, in any workspace. For a
+ * change that can end their access everywhere at once: losing the instance
+ * administrator role, which reaches projects in workspaces they never joined.
+ * Never throws, for the same reason.
+ */
+export async function pruneUserCalendarFeeds(userId: string) {
+  try {
+    const projects = await db
+      .selectDistinct({ projectId: calendarFeedTable.projectId })
+      .from(calendarFeedTable)
+      .where(eq(calendarFeedTable.userId, userId));
+    for (const { projectId } of projects) {
+      await pruneCalendarFeeds(projectId, [userId]);
+    }
+  } catch (error) {
+    console.error(`Failed to prune calendar feeds for ${userId}:`, error);
+  }
+}

@@ -12,6 +12,7 @@ import {
 } from "../../apps/api/src/calendar-feed/prune-after-role-change";
 import {
   pruneCalendarFeeds,
+  pruneUserCalendarFeeds,
   pruneWorkspaceCalendarFeeds,
 } from "../../apps/api/src/calendar-feed/service";
 import db, { schema } from "../../apps/api/src/database";
@@ -518,5 +519,64 @@ describe("a prune racing restored access", () => {
     expect((await feedsOf(admin.id)).map((feed) => feed.id)).toEqual([
       replacement?.id,
     ]);
+  });
+});
+
+describe("an instance administrator's feeds", () => {
+  async function setInstanceRole(userId: string, role: string) {
+    await db
+      .update(schema.userTable)
+      .set({ role })
+      .where(eq(schema.userTable.id, userId));
+  }
+
+  // They can make feeds in workspaces they never joined, reading through the
+  // role alone, so losing the role has to delete those.
+  it("are deleted when the role is taken away, and stay gone if it returns", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+    const [admin] = await db
+      .insert(schema.userTable)
+      .values({
+        id: `user-${randomBytes(8).toString("hex")}`,
+        email: `admin-${randomBytes(8).toString("hex")}@example.com`,
+        emailVerified: true,
+        name: "Instance admin",
+        role: "admin",
+      })
+      .returning();
+    const feed = await insertFeed(project.id, admin.id);
+    expect(await fetchFeed(feed.token)).toBe(200);
+
+    await setInstanceRole(admin.id, "user");
+    // What the after hook on /admin/set-role and /admin/update-user runs.
+    await pruneUserCalendarFeeds(admin.id);
+    await setInstanceRole(admin.id, "admin");
+
+    expect(await feedsOf(admin.id)).toEqual([]);
+    expect(await fetchFeed(feed.token)).toBe(404);
+  });
+
+  it("are kept where they still have access another way", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+    await setInstanceRole(owner.id, "admin");
+    const feed = await insertFeed(project.id, owner.id);
+
+    await setInstanceRole(owner.id, "user");
+    await pruneUserCalendarFeeds(owner.id);
+
+    // Still an explicit member and the workspace's owner.
+    expect(await fetchFeed(feed.token)).toBe(200);
   });
 });
