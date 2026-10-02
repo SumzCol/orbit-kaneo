@@ -41,7 +41,10 @@ export function useUserWebSocket() {
     let retries = 0;
     let retryTimeout: ReturnType<typeof setTimeout> | null = null;
     let pingInterval: ReturnType<typeof setInterval> | null = null;
-    let hasConnected = false;
+    // Set once the socket has been down: after a reconnect, or after a failed
+    // first attempt, since the page may have loaded its data over HTTP while
+    // no socket was there to hear about changes to it.
+    let missedMessages = false;
 
     function clearPing() {
       if (pingInterval !== null) {
@@ -65,7 +68,7 @@ export function useUserWebSocket() {
         // that gap would leave the sidebar and search stale indefinitely.
         // Refreshing on every reconnect covers it without the server having
         // to track who missed what.
-        if (hasConnected) {
+        if (missedMessages) {
           refreshProjectLists(queryClient);
           // A project's detail is cached as ["projects", workspaceId, id].
           // Invalidating does not stop an inactive one being shown again
@@ -90,7 +93,6 @@ export function useUserWebSocket() {
           // with no realtime updates. Each such board tries once.
           probeRevokedProjects();
         }
-        hasConnected = true;
         clearPing();
         pingInterval = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
@@ -144,6 +146,7 @@ export function useUserWebSocket() {
         if (disposed || activeSocket !== ws) return;
         clearPing();
         activeSocket = null;
+        missedMessages = true;
 
         if (retries < MAX_RETRIES) {
           const delay = BASE_DELAY * 2 ** retries;

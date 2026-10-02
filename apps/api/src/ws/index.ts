@@ -230,8 +230,8 @@ export async function shutdownWebSocketAdapter() {
  * commit after it, on this instance or any other, and the permanent code
  * would then end a session the user is entitled to: the client stops
  * reconnecting and drops the project. So each id is asked again here, and
- * only the ones still without access get 4403. A lookup that fails is not
- * evidence of revocation, so that user gets the ordinary close instead.
+ * only the ones still without access get 4403. A lookup that fails keeps
+ * the sender's answer.
  */
 async function closeMovedProjectConnections(
   projectId: string,
@@ -254,6 +254,13 @@ async function closeMovedProjectConnections(
         stillRevoked.add(userId);
       }
     } catch (error) {
+      // Kept on the sender's answer, which said access was lost. The
+      // ordinary close is not recoverable here: these connections are already
+      // out of the map the sweep walks, and the client would go on retrying
+      // against a 403 with the old board still cached, since only 4403 drops
+      // it. Someone who in fact kept access gets their board back on reload
+      // or the next user-socket reconnect.
+      stillRevoked.add(userId);
       console.error(
         `Failed to revalidate a moved project's revocation for ${projectId}:`,
         error,

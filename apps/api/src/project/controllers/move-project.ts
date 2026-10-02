@@ -412,8 +412,12 @@ async function moveProject(
   // the project. Asked again before anybody is told their access ended.
   //
   // The move has committed by now, so a failed lookup must not fail the
-  // request. It is not evidence of revocation either: that user gets the
-  // ordinary move close, and the sweep ends the session if access is gone.
+  // request. For someone who may have lost access it is not evidence either
+  // way, but the ordinary close cannot be taken back: their connection leaves
+  // the map the sweep walks, and their client would retry against a 403 with
+  // the board still cached. So they go on the revoked list, where the close
+  // asks once more and keeps the permanent code only if that fails too. They
+  // are not told their access ended, since that is not known.
   //
   // Everyone else whose sidebar the move changes is asked too: the members
   // who came along, whose project now lists under another workspace, the
@@ -452,6 +456,7 @@ async function moveProject(
   ]);
   const lostAccess: string[] = [];
   const stillHaveAccess: string[] = [];
+  const uncertain: string[] = [];
   for (const userId of affected) {
     try {
       if (await userCanAccessProject(id, userId)) {
@@ -460,6 +465,7 @@ async function moveProject(
         lostAccess.push(userId);
       }
     } catch (error) {
+      if (mayLoseAccess.includes(userId)) uncertain.push(userId);
       console.error(
         `Failed to revalidate access to moved project ${id} for ${userId}:`,
         error,
@@ -471,7 +477,7 @@ async function moveProject(
   // drops the project's caches and stops retrying on 4403, and a second
   // message would race this one -- on a peer the move close would usually win,
   // leaving a removed member retrying a connection they can no longer make.
-  await closeProjectConnections(id, lostAccess);
+  await closeProjectConnections(id, [...lostAccess, ...uncertain]);
   for (const userId of lostAccess) {
     notifyProjectAccessChanged(userId, id, false);
   }

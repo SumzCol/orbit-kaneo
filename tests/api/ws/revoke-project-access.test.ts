@@ -349,6 +349,24 @@ describe("revokeProjectAccess", () => {
     );
   });
 
+  // These connections are already out of the map the sweep walks, so the
+  // ordinary close could not be recovered from if access really went.
+  it("keeps the revocation when the move's lookup fails", async () => {
+    await initializeWebSocketAdapter();
+    const removed = connect("proj-1", "user-removed");
+    access.fail = true;
+    try {
+      await closeProjectConnections("proj-1", ["user-removed"]);
+    } finally {
+      access.fail = false;
+    }
+
+    expect(removed.ws.close).toHaveBeenCalledWith(
+      4403,
+      "Project access revoked",
+    );
+  });
+
   it("never sends the control message to a socket", async () => {
     await initializeWebSocketAdapter();
 

@@ -144,6 +144,20 @@ describe("user WebSocket lifecycle", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  // The page loads its data over HTTP whether or not the socket is up, so a
+  // first connection that only succeeds after retries may have missed changes.
+  it("reconciles when the first connection succeeds only after a retry", () => {
+    renderHook(useUserWebSocket);
+    act(() => {
+      TestSocket.instances[0].onclose?.();
+      vi.advanceTimersByTime(1000);
+    });
+    client.resetQueries.mockClear();
+    act(() => TestSocket.instances[1].open());
+
+    expect(client.resetQueries).toHaveBeenCalledWith({ type: "inactive" });
+  });
+
   it("reconciles access on a reconnect after the slow retries", () => {
     renderHook(useUserWebSocket);
     act(() => TestSocket.instances[0].open());

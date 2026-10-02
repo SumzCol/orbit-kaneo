@@ -414,9 +414,16 @@ describe("a lookup that fails after the change has committed", () => {
         source.user.id,
       ),
     ).resolves.toMatchObject({ id: project.id });
-    // Unknown, so the ordinary move close rather than the permanent one.
+    // Unknown, but the ordinary close could not be taken back, so they stay
+    // on the revoked list, where the close asks again. Not told their access
+    // ended, which is not known.
     const [move] = closed.filter((entry) => entry.projectId === project.id);
-    expect(move.revokedUserIds).toEqual([]);
+    expect(move.revokedUserIds).toContain(sourceOnly.id);
+    expect(notified).not.toContainEqual({
+      userId: sourceOnly.id,
+      projectId: project.id,
+      hasAccess: false,
+    });
   });
 });
 
