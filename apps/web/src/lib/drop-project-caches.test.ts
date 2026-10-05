@@ -178,4 +178,22 @@ describe("dropProjectCaches", () => {
       client.getQueryData(["task-relations", "task-elsewhere"]),
     ).toBeUndefined();
   });
+
+  // A refetch that fails, as it does for someone removed from the workspace,
+  // keeps the old data, so the project is taken out of the lists directly.
+  it("removes the project from every cached workspace list", () => {
+    const client = new QueryClient();
+    client.setQueryData(
+      ["projects", "workspace-1"],
+      [{ id: "project-1" }, { id: "project-2" }],
+    );
+    client.setQueryData(["projects", "workspace-2"], [{ id: "project-1" }]);
+
+    dropProjectCaches(client, "project-1");
+
+    expect(client.getQueryData(["projects", "workspace-1"])).toEqual([
+      { id: "project-2" },
+    ]);
+    expect(client.getQueryData(["projects", "workspace-2"])).toEqual([]);
+  });
 });

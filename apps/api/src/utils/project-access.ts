@@ -234,9 +234,10 @@ export async function userCanAccessProject(
 export async function roleSeesAllProjects(
   workspaceId: string,
   role: string,
+  database: Pick<typeof db, "select"> = db,
 ): Promise<boolean> {
   const statements =
-    (await customRoleStatements(workspaceId, role)) ??
+    (await customRoleStatements(workspaceId, role, database)) ??
     builtInRoleStatements(role);
 
   return Boolean(
@@ -251,8 +252,12 @@ export async function roleSeesAllProjects(
  */
 export async function workspaceWideProjectUserIds(
   workspaceId: string,
+  // The move reads this inside its transaction and must pass it. A second
+  // pooled connection taken while the transaction holds one let enough
+  // concurrent moves fill the pool and time each other out.
+  database: Pick<typeof db, "select"> = db,
 ): Promise<string[]> {
-  const members = await db
+  const members = await database
     .select({
       userId: schema.workspaceUserTable.userId,
       role: schema.workspaceUserTable.role,
@@ -267,7 +272,7 @@ export async function workspaceWideProjectUserIds(
     if (!member.role) continue;
     let allowed = seesAll.get(member.role);
     if (allowed === undefined) {
-      allowed = await roleSeesAllProjects(workspaceId, member.role);
+      allowed = await roleSeesAllProjects(workspaceId, member.role, database);
       seesAll.set(member.role, allowed);
     }
     if (allowed) userIds.push(member.userId);

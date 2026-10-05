@@ -380,22 +380,29 @@ async function deliverToLocalConnections(
   if (!connections) return;
   const recipients = [...connections];
   let workspaceId: string | null;
+  let workspaceKnown = true;
   try {
     workspaceId = await currentProjectWorkspace(projectId);
   } catch (error) {
     console.error("Failed to validate project broadcast access:", error);
     workspaceId = null;
+    workspaceKnown = false;
   }
   const payload = JSON.stringify(message);
+  const moved: ProjectConnection[] = [];
   for (const conn of recipients) {
     // A move may have closed these connections while the lookup was in flight.
     if (!projectConnections.get(projectId)?.has(conn)) continue;
     if (conn.workspaceId !== workspaceId) {
       removeConnection(projectId, conn);
-      try {
-        conn.ws.close(1008, "Project workspace changed");
-      } catch {
-        /* Already closed. */
+      if (workspaceKnown) {
+        moved.push(conn);
+      } else {
+        try {
+          conn.ws.close(1008, "Project workspace changed");
+        } catch {
+          /* Already closed. */
+        }
       }
       continue;
     }
@@ -404,6 +411,48 @@ async function deliverToLocalConnections(
       conn.ws.send(payload);
     } catch {
       removeConnection(projectId, conn);
+    }
+  }
+  if (moved.length > 0) await closeMissedMoveConnections(projectId, moved);
+}
+
+/**
+ * Closes connections an event found on a project that has since moved, which
+ * means this instance missed the move's own message.
+ *
+ * The move message would have carried who lost access. Without it, the
+ * ordinary close is the wrong default for them: these connections are
+ * already out of the map the sweep walks, and their client would retry
+ * against a 403 with the board still cached, since only 4403 drops it. So
+ * each user is asked here. A lookup that fails keeps the permanent code, for
+ * the same reason; someone who in fact kept access gets the board back on
+ * reload or the next user-socket reconnect.
+ */
+async function closeMissedMoveConnections(
+  projectId: string,
+  connections: ProjectConnection[],
+) {
+  const lost = new Set<string>();
+  for (const userId of new Set(connections.map((conn) => conn.userId))) {
+    try {
+      if (!(await userCanAccessProject(projectId, userId))) lost.add(userId);
+    } catch (error) {
+      lost.add(userId);
+      console.error(
+        `Failed to revalidate access to moved project ${projectId}:`,
+        error,
+      );
+    }
+  }
+  for (const conn of connections) {
+    try {
+      if (lost.has(conn.userId)) {
+        conn.ws.close(ACCESS_REVOKED_CLOSE_CODE, "Project access revoked");
+      } else {
+        conn.ws.close(1008, "Project workspace changed");
+      }
+    } catch {
+      /* Already closed. */
     }
   }
 }

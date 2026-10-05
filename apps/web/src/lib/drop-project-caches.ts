@@ -81,6 +81,21 @@ export function dropProjectCaches(queryClient: QueryClient, projectId: string) {
   // project. The API filters those ends by visibility, so every relation
   // query is reset and refetched under the new access.
   void queryClient.resetQueries({ queryKey: ["task-relations"] });
+  // Taken out of every cached workspace list now rather than left to the
+  // refetch. A user removed from the workspace gets a 403 for its list, and a
+  // failed refetch keeps the old data, so the project would stay listed.
+  queryClient.setQueriesData<unknown>(
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "projects" && query.queryKey.length === 2,
+    },
+    (projects: unknown) =>
+      Array.isArray(projects)
+        ? projects.filter(
+            (project) => (project as { id?: string })?.id !== projectId,
+          )
+        : projects,
+  );
   // The board renders from its own store copy of the tasks, and only writes
   // to it when query data arrives, so the removal above leaves an open board
   // showing everything it held. Cleared only when it holds this project, so

@@ -527,3 +527,48 @@ describe("a move whose lookup of who sees it partly fails", () => {
     });
   });
 });
+
+describe("moves running at once", () => {
+  // The pool holds ten connections. A move that read through the pool while
+  // its transaction held a connection needed a second one, so once every
+  // connection was held by a move waiting its turn, the one holding the lock
+  // could not get its second and timed out. Twice the pool size makes sure
+  // the pool fills before the first move gets that far.
+  it(
+    "all complete when more run than the pool has connections",
+    { timeout: 120_000 },
+    async () => {
+      const source = await createWorkspaceMember({ role: "owner" });
+      const target = await createWorkspaceMember({ role: "owner" });
+      await db.insert(schema.workspaceUserTable).values({
+        workspaceId: target.workspace.id,
+        userId: source.user.id,
+        role: "owner",
+        joinedAt: new Date(),
+      });
+      const projects = [];
+      for (let i = 0; i < 20; i++) {
+        const { project } = await createProjectFixture({
+          workspaceId: source.workspace.id,
+          members: [source.user.id],
+        });
+        projects.push(project);
+      }
+
+      const results = await Promise.allSettled(
+        projects.map((project) =>
+          moveProject(
+            project.id,
+            source.workspace.id,
+            target.workspace.id,
+            source.user.id,
+          ),
+        ),
+      );
+
+      expect(results.filter((result) => result.status === "rejected")).toEqual(
+        [],
+      );
+    },
+  );
+});

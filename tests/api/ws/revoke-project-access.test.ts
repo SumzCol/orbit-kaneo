@@ -367,6 +367,35 @@ describe("revokeProjectAccess", () => {
     );
   });
 
+  // A peer that missed the move's own message learns of it from the next
+  // event, with no list of who lost access. Those connections leave the map
+  // the sweep walks, so the close it gives them is final.
+  it("revokes, on a missed move, a user who lost access", async () => {
+    await initializeWebSocketAdapter();
+    const removed = connect("proj-1", "user-removed");
+    const kept = connect("proj-1", "user-kept");
+    access.allowed.clear();
+    access.allowed.add("proj-1:user-kept");
+    projectWorkspace.id = "workspace-2";
+
+    broadcastToProject("proj-1", {
+      type: "TASK_UPDATED",
+      projectId: "proj-1",
+      taskId: "task-1",
+    });
+    await vi.waitFor(() => expect(removed.ws.close).toHaveBeenCalled());
+    await vi.waitFor(() => expect(kept.ws.close).toHaveBeenCalled());
+
+    expect(removed.ws.close).toHaveBeenCalledWith(
+      4403,
+      "Project access revoked",
+    );
+    expect(kept.ws.close).toHaveBeenCalledWith(
+      1008,
+      "Project workspace changed",
+    );
+  });
+
   it("never sends the control message to a socket", async () => {
     await initializeWebSocketAdapter();
 

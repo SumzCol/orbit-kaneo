@@ -78,8 +78,10 @@ async function moveProject(
     // their role, with no row below to show for it, so dropping rows alone
     // would never tell them their access ended. Read before the move, while
     // the project still belongs to that workspace.
-    const sourceAdministrators =
-      await workspaceWideProjectUserIds(sourceWorkspaceId);
+    const sourceAdministrators = await workspaceWideProjectUserIds(
+      sourceWorkspaceId,
+      tx,
+    );
 
     // The key doubles as the ticket-id prefix (KAN-12), and short-id lookup
     // resolves it per workspace with a limit of 1. Two projects sharing a key
