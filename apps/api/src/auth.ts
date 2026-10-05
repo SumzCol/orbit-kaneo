@@ -41,6 +41,7 @@ import {
   formatBillableWorkspacesMessage,
 } from "./billing/controllers/find-billable-workspaces";
 import { syncWorkspaceSeats } from "./billing/controllers/sync-seats";
+import { shouldPruneFeedsAfterAdminUpdate } from "./calendar-feed/should-prune-after-admin-update";
 import {
   pruneFeedsAfterRoleEdit,
   rememberRoleEditForFeeds,
@@ -666,10 +667,15 @@ export const auth = betterAuth({
         // left to the fetch check, which would let the role revive them.
         after: async (user, ctx) => {
           if (
-            (ctx?.path === "/admin/set-role" ||
-              ctx?.path === "/admin/update-user") &&
-            !hasInstanceAdminRole(user.role ?? null)
+            ctx?.path !== "/admin/set-role" &&
+            ctx?.path !== "/admin/update-user"
           ) {
+            return;
+          }
+          // /admin/update-user can set a ban as well as a role. A banned
+          // owner's feeds are refused at fetch whatever their role, and are
+          // deleted here so lifting the ban does not revive them.
+          if (shouldPruneFeedsAfterAdminUpdate(user)) {
             await pruneUserCalendarFeeds(user.id);
           }
         },
