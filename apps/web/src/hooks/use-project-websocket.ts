@@ -493,6 +493,12 @@ export function useProjectWebSocket(projectId: string) {
           probing = false;
           revoked = true;
           retries = MAX_RETRIES;
+          // The grant that started this attempt refetched the board first. If
+          // access went again before the upgrade, that fresh data is private
+          // and the message saying so may never come, so it is dropped here
+          // as on a 4403. A network failure with access intact costs only a
+          // refetch.
+          dropProjectCaches(queryClient, projectId);
           return;
         }
 

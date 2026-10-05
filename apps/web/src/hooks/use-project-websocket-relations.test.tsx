@@ -258,6 +258,18 @@ describe("useProjectWebSocket relation invalidation", () => {
     }
   });
 
+  // The grant refetched the board before the upgrade; if access went again
+  // in between, that data must not outlive the refused attempt.
+  it("drops the project's caches when a grant's upgrade is refused", () => {
+    socket.onclose?.({ code: 4403 } as CloseEvent);
+    announceProjectAccessGranted("project-1");
+    client.setQueryData(["tasks", "project-1"], { columns: [] });
+
+    socket.onclose?.({ code: 1006 } as CloseEvent);
+
+    expect(client.getQueryData(["tasks", "project-1"])).toBeUndefined();
+  });
+
   // Once open, the attempt is an ordinary connection again: a later drop
   // retries as usual.
   it("retries as usual after a granted reconnect opened", () => {
