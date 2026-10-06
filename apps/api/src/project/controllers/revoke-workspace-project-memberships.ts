@@ -2,9 +2,8 @@ import { and, eq, inArray } from "drizzle-orm";
 import db from "../../database";
 import { projectMemberTable, projectTable } from "../../database/schema";
 import {
-  projectUserKey,
-  resolveProjectAccess,
   roleSeesAllProjects,
+  userCanAccessProject,
 } from "../../utils/project-access";
 import { notifyProjectAccessChanged, revokeProjectAccess } from "../../ws";
 
@@ -59,19 +58,25 @@ async function revokeWorkspaceProjectMemberships(
     );
   }
 
-  // Batched: for a departing administrator this is every project in the
-  // workspace, and the removal hook waits on it.
-  const answers = await resolveProjectAccess(
-    [...affected].map((projectId) => ({ projectId, userId })),
-  );
   for (const projectId of affected) {
     // An instance administrator still reaches the project after losing the
     // workspace membership, so the close would cost them realtime updates
     // they are still entitled to. Only the ones who actually lost access are
-    // disconnected. A project whose lookup failed is not evidence either way,
-    // so it is skipped and left to the sweep.
-    const stillHasAccess = answers.get(projectUserKey({ projectId, userId }));
-    if (stillHasAccess === undefined) continue;
+    // disconnected.
+    //
+    // One project's failed lookup must not leave the rest unnotified, and it
+    // is not evidence of revocation, so that project is skipped and left to
+    // the sweep.
+    let stillHasAccess: boolean;
+    try {
+      stillHasAccess = await userCanAccessProject(projectId, userId);
+    } catch (error) {
+      console.error(
+        `Failed to revalidate access to project ${projectId} for ${userId}:`,
+        error,
+      );
+      continue;
+    }
     if (!stillHasAccess) {
       revokeProjectAccess(projectId, userId);
     }

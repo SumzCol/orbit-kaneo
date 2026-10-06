@@ -45,11 +45,6 @@ import db, { schema } from "./database";
 import { authDatabaseAdapter } from "./database/auth-adapter";
 import { publishEvent } from "./events";
 import revokeWorkspaceProjectMemberships from "./project/controllers/revoke-workspace-project-memberships";
-import {
-  rememberRoleReach,
-  revalidateAfterMemberRoleChange,
-  revalidateAfterRoleUpdate,
-} from "./project/controllers/role-update-access";
 import clearEmailVerificationOnAdminChange from "./user/controllers/clear-email-verification-on-admin-change";
 import deleteAccountData from "./user/controllers/delete-account-data";
 import prepareAdminUserRemoval from "./user/controllers/prepare-admin-user-removal";
@@ -506,22 +501,6 @@ export const auth = betterAuth({
             });
           }
         },
-        // A role that reached every project did so without project rows, so
-        // moving someone off it ends access nothing else would notice until
-        // the sweep, and their other tabs would keep the projects listed.
-        afterUpdateMemberRole: async ({
-          member,
-          previousRole,
-          organization,
-        }) => {
-          if (member?.userId && previousRole && organization?.id) {
-            await revalidateAfterMemberRoleChange(
-              organization.id,
-              member.userId,
-              previousRole,
-            );
-          }
-        },
         afterRemoveMember: async ({ member }) => {
           if (member?.organizationId) {
             // Awaited, unlike the seat sync: this is a revocation, and the
@@ -702,10 +681,6 @@ export const auth = betterAuth({
         await prepareAdminUserRemoval(ctx);
       }
 
-      if (ctx.path === "/organization/update-role") {
-        await rememberRoleReach(ctx);
-      }
-
       if (ctx.path === "/organization/invite-member") {
         // Better Auth swallows email failures in runInBackgroundOrAwait.
         // Invitation callers need the delivery result, including on resend.
@@ -831,12 +806,6 @@ export const auth = betterAuth({
       }
     }),
     after: createAuthMiddleware(async (ctx) => {
-      // Role edits run through Better Auth with no lifecycle hook of their
-      // own; the before hook above recorded what the role used to reach.
-      if (ctx.path === "/organization/update-role") {
-        await revalidateAfterRoleUpdate(ctx);
-      }
-
       if (ctx.path.startsWith("/sign-up") || ctx.path.startsWith("/sign-in")) {
         const newSession = ctx.context.newSession;
         if (newSession) {
