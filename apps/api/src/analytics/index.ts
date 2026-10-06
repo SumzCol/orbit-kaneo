@@ -30,9 +30,7 @@ const getProjectSummaryRoute = createRoute({
     400: errorResponse(
       "Unknown project, or its workspace could not be determined",
     ),
-    403: errorResponse(
-      "No workspace access, or missing task:read permission, or no access to the project",
-    ),
+    403: errorResponse("No workspace access, or missing task:read permission"),
   },
 });
 
@@ -57,9 +55,7 @@ const getProjectBreakdownRoute = createRoute({
     400: errorResponse(
       "Unknown project, an unknown grouping, or a workspace that could not be determined",
     ),
-    403: errorResponse(
-      "No workspace access, or missing task:read permission, or no access to the project",
-    ),
+    403: errorResponse("No workspace access, or missing task:read permission"),
   },
 });
 

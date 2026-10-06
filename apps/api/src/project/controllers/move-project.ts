@@ -21,7 +21,6 @@ import {
   taskTable,
   userNotificationWorkspaceProjectTable,
   workspaceUserTable,
-  projectMemberTable,
 } from "../../database/schema";
 import { publishEvent } from "../../events";
 import { closeProjectConnections } from "../../ws";
@@ -225,130 +224,6 @@ async function moveProject(
           ),
         ),
       );
-
-    // Project membership is scoped to the project's workspace, so the source
-    // workspace's members cannot come along: the member list would hand their
-    // names and email addresses to the destination. Dropped rather than
-    // translated, the same way an assignee outside the target is unassigned
-    // above.
-    await tx
-      .delete(projectMemberTable)
-      .where(
-        and(
-          eq(projectMemberTable.projectId, id),
-          notInArray(
-            projectMemberTable.userId,
-            tx
-              .select({ userId: workspaceUserTable.userId })
-              .from(workspaceUserTable)
-              .where(eq(workspaceUserTable.workspaceId, targetWorkspaceId)),
-          ),
-        ),
-      );
-
-    // The members who survive are in the target workspace too, but their rows
-    // still point at the source membership. Left alone they would keep access
-    // through a workspace the project no longer belongs to, and leaving the
-    // target later would not touch them. Re-pointed to the target membership
-    // so the next removal from that workspace ends them as it should.
-    //
-    // Only rows that still point at the user's live source membership. A row
-    // whose link was nulled when its user left the source workspace already
-    // grants nothing, and re-pointing it would quietly give back access that
-    // was taken away, just because that person happens to be in the target.
-    await tx
-      .update(projectMemberTable)
-      .set({
-        workspaceMemberId: sql`(
-          select ${workspaceUserTable.id} from ${workspaceUserTable}
-          where ${workspaceUserTable.workspaceId} = ${targetWorkspaceId}
-            and ${workspaceUserTable.userId} = ${projectMemberTable.userId}
-        )`,
-      })
-      .where(
-        and(
-          eq(projectMemberTable.projectId, id),
-          sql`${projectMemberTable.workspaceMemberId} in (
-            select ${workspaceUserTable.id} from ${workspaceUserTable}
-            where ${workspaceUserTable.workspaceId} = ${sourceWorkspaceId}
-              and ${workspaceUserTable.userId} = ${projectMemberTable.userId}
-          )`,
-        ),
-      );
-
-    // A keeper is added only when no effective member survived the move.
-    // Seeding regardless would hand the mover a standing membership they never
-    // asked for, one that outlives the administrative role that let them move
-    // the project.
-    //
-    // "Effective" means a live link. After the re-point above, every row that
-    // still counts points at a target membership, and a stale row is null. A
-    // stale row must not count as a survivor, or a project left holding only
-    // stale rows gets no keeper and nobody can reach it.
-    //
-    // The mover is the natural keeper but not a guaranteed one: an instance
-    // administrator reaches the target workspace without a membership row, and
-    // a project_member row for somebody outside the workspace grants nothing.
-    // So the fallback is the longest-standing member of the target, and if the
-    // workspace somehow has none, the project is left to its administrators
-    // rather than given an invented member.
-    const [survivor] = await tx
-      .select({ userId: projectMemberTable.userId })
-      .from(projectMemberTable)
-      .where(
-        and(
-          eq(projectMemberTable.projectId, id),
-          isNotNull(projectMemberTable.workspaceMemberId),
-        ),
-      )
-      .limit(1);
-
-    const [keeper] = survivor
-      ? []
-      : await tx
-          .select({
-            id: workspaceUserTable.id,
-            userId: workspaceUserTable.userId,
-          })
-          .from(workspaceUserTable)
-          .where(
-            and(
-              eq(workspaceUserTable.workspaceId, targetWorkspaceId),
-              eq(workspaceUserTable.userId, currentUserId),
-            ),
-          )
-          .limit(1);
-
-    const [fallback] = survivor
-      ? []
-      : keeper
-        ? [keeper]
-        : await tx
-            .select({
-              id: workspaceUserTable.id,
-              userId: workspaceUserTable.userId,
-            })
-            .from(workspaceUserTable)
-            .where(eq(workspaceUserTable.workspaceId, targetWorkspaceId))
-            .orderBy(workspaceUserTable.joinedAt)
-            .limit(1);
-
-    if (fallback) {
-      await tx
-        .insert(projectMemberTable)
-        .values({
-          projectId: id,
-          userId: fallback.userId,
-          workspaceMemberId: fallback.id,
-        })
-        // The keeper may already hold a stale row here. Keeping it on the
-        // conflict would leave the project with no effective member while
-        // looking like it has one, so the link is rewritten instead.
-        .onConflictDoUpdate({
-          target: [projectMemberTable.projectId, projectMemberTable.userId],
-          set: { workspaceMemberId: fallback.id },
-        });
-    }
 
     // Assets and task labels denormalize the project's workspace.
     await tx

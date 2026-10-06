@@ -38,9 +38,7 @@ const getActivitiesRoute = createRoute({
     400: errorResponse(
       "Unknown task, or its workspace could not be determined",
     ),
-    403: errorResponse(
-      "No access to the task's workspace, or no access to the project",
-    ),
+    403: errorResponse("No access to the task's workspace"),
   },
 });
 
@@ -73,7 +71,7 @@ const createActivityRoute = createRoute({
       },
     },
     403: errorResponse(
-      "No workspace access, or missing task:update permission, or no access to the project",
+      "No workspace access, or missing task:update permission",
     ),
   },
 });
@@ -100,7 +98,7 @@ const createCommentRoute = createRoute({
     200: jsonResponse("The created comment", activitySchema),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission, or no access to the project",
+      "No workspace access, or missing task:update permission",
     ),
   },
 });
@@ -122,9 +120,7 @@ const updateCommentRoute = createRoute({
   responses: {
     200: jsonResponse("The updated comment", activitySchema),
     400: errorResponse("Invalid body, or unknown activity"),
-    403: errorResponse(
-      "Not the author, or no access to the workspace, or no access to the project",
-    ),
+    403: errorResponse("Not the author, or no access to the workspace"),
     404: errorResponse("Comment not found"),
   },
 });
@@ -146,9 +142,7 @@ const deleteCommentRoute = createRoute({
   responses: {
     200: jsonResponse("The deleted comment", activitySchema),
     400: errorResponse("Invalid body, or unknown activity"),
-    403: errorResponse(
-      "Not the author, or no access to the workspace, or no access to the project",
-    ),
+    403: errorResponse("Not the author, or no access to the workspace"),
     404: errorResponse("Comment not found"),
   },
 });

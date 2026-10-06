@@ -6,13 +6,7 @@ const { state } = vi.hoisted(() => ({
   state: {
     resolveCalls: 0,
     validateCalls: [] as { userId: string; workspaceId: string }[],
-    projectChecks: [] as { userId: unknown; projectId: string }[],
     caller: "anonymous" as "anonymous" | "member" | "outsider",
-    projectMember: true,
-    apiKey: undefined as
-      | { id: string; userId: string; enabled: boolean; permissions: unknown }
-      | undefined,
-    keysSeen: [] as unknown[],
   },
 }));
 
@@ -24,7 +18,7 @@ vi.mock("../../../apps/api/src/utils/authenticate-api-request", () => ({
     if (state.caller === "anonymous") {
       throw new HTTPException(401, { message: "Unauthorized" });
     }
-    return { userId: `user-${state.caller}`, apiKey: state.apiKey };
+    return { userId: `user-${state.caller}` };
   },
 }));
 
@@ -39,24 +33,10 @@ vi.mock("../../../apps/api/src/utils/validate-workspace-access", () => ({
   },
 }));
 
-vi.mock("../../../apps/api/src/utils/project-access", () => ({
-  canAccessProject: async (c: Context, projectId: string) => {
-    state.projectChecks.push({ userId: c.get("userId"), projectId });
-    state.keysSeen.push(c.get("apiKey"));
-    return state.projectMember;
-  },
-}));
-
 const { authorizeAssetAccess, isPublicAsset } =
   await import("../../../apps/api/src/utils/authorize-asset-access");
 
-function createContext() {
-  const values = new Map<string, unknown>();
-  return {
-    set: (key: string, value: unknown) => values.set(key, value),
-    get: (key: string) => values.get(key),
-  } as unknown as Context;
-}
+const context = {} as Context;
 
 async function statusOf(promise: Promise<void>) {
   try {
@@ -71,16 +51,13 @@ describe("authorizeAssetAccess", () => {
   beforeEach(() => {
     state.resolveCalls = 0;
     state.validateCalls = [];
-    state.projectChecks = [];
     state.caller = "anonymous";
-    state.projectMember = true;
   });
 
   it("allows an anonymous caller to read an asset of a public project", async () => {
     const status = await statusOf(
-      authorizeAssetAccess(createContext(), {
+      authorizeAssetAccess(context, {
         workspaceId: "workspace-1",
-        projectId: "project-1",
         surface: "description",
         isPublic: true,
       }),
@@ -94,9 +71,8 @@ describe("authorizeAssetAccess", () => {
 
   it("rejects an anonymous caller for a private asset", async () => {
     const status = await statusOf(
-      authorizeAssetAccess(createContext(), {
+      authorizeAssetAccess(context, {
         workspaceId: "workspace-1",
-        projectId: "project-1",
         surface: "description",
         isPublic: false,
       }),
@@ -109,9 +85,8 @@ describe("authorizeAssetAccess", () => {
     state.caller = "outsider";
 
     const status = await statusOf(
-      authorizeAssetAccess(createContext(), {
+      authorizeAssetAccess(context, {
         workspaceId: "workspace-1",
-        projectId: "project-1",
         surface: "description",
         isPublic: null,
       }),
@@ -120,13 +95,12 @@ describe("authorizeAssetAccess", () => {
     expect(status).toBe(403);
   });
 
-  it("allows a project member to read a private asset", async () => {
+  it("allows a workspace member to read a private asset", async () => {
     state.caller = "member";
 
     const status = await statusOf(
-      authorizeAssetAccess(createContext(), {
+      authorizeAssetAccess(context, {
         workspaceId: "workspace-1",
-        projectId: "project-1",
         surface: "description",
         isPublic: false,
       }),
@@ -137,82 +111,16 @@ describe("authorizeAssetAccess", () => {
       { userId: "user-member", workspaceId: "workspace-1" },
     ]);
   });
-
-  it("rejects a workspace member who is not on the asset's project", async () => {
-    state.caller = "member";
-    state.projectMember = false;
-
-    const status = await statusOf(
-      authorizeAssetAccess(createContext(), {
-        workspaceId: "workspace-1",
-        projectId: "project-1",
-        isPublic: false,
-        surface: "description",
-      }),
-    );
-
-    expect(status).toBe(403);
-    expect(state.projectChecks).toEqual([
-      { userId: "user-member", projectId: "project-1" },
-    ]);
-  });
-  // The administrator exception is decided by hasWorkspacePermission, which
-  // reads the key's permission scope from the context. Without it a narrow key
-  // gets its owner's full rights.
-  it("hands the verified API key to the project check", async () => {
-    state.caller = "member";
-    state.projectMember = true;
-    state.keysSeen.length = 0;
-    state.apiKey = {
-      id: "key-1",
-      userId: "user-member",
-      enabled: true,
-      permissions: { task: ["read"] },
-    };
-    try {
-      await authorizeAssetAccess(createContext(), {
-        workspaceId: "workspace-1",
-        projectId: "project-1",
-        isPublic: false,
-        surface: "description",
-      });
-    } finally {
-      state.apiKey = undefined;
-    }
-
-    expect(state.keysSeen).toEqual([
-      expect.objectContaining({ permissions: { task: ["read"] } }),
-    ]);
-  });
-
   it.each(["comment", "unknown"])(
     "keeps %s assets private even in a public project",
     async (surface) => {
-      const asset = {
-        workspaceId: "workspace-1",
-        projectId: "project-1",
-        isPublic: true,
-        surface,
-      };
+      const asset = { workspaceId: "workspace-1", isPublic: true, surface };
       expect(isPublicAsset(asset)).toBe(false);
-      expect(await statusOf(authorizeAssetAccess(createContext(), asset))).toBe(
-        401,
-      );
+      expect(await statusOf(authorizeAssetAccess(context, asset))).toBe(401);
       state.caller = "outsider";
-      expect(await statusOf(authorizeAssetAccess(createContext(), asset))).toBe(
-        403,
-      );
+      expect(await statusOf(authorizeAssetAccess(context, asset))).toBe(403);
       state.caller = "member";
-      state.projectChecks.length = 0;
-      expect(await statusOf(authorizeAssetAccess(createContext(), asset))).toBe(
-        200,
-      );
-      // Asserted on the project the check ran against, not just the status:
-      // with the asset's projectId missing the mock is handed `undefined`,
-      // and a 200 proves nothing about which project was authorized.
-      expect(state.projectChecks).toEqual([
-        { userId: "user-member", projectId: "project-1" },
-      ]);
+      expect(await statusOf(authorizeAssetAccess(context, asset))).toBe(200);
     },
   );
 });

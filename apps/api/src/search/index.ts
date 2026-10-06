@@ -4,7 +4,6 @@ import {
   errorResponse,
   jsonResponse,
 } from "../openapi";
-import { canSeeAllProjects } from "../utils/project-access";
 import { workspaceAccess } from "../utils/workspace-access-middleware";
 import globalSearch from "./controllers/global-search";
 import { searchResponseSchema } from "./response";
@@ -17,7 +16,7 @@ const globalSearchRoute = createRoute({
   tags: ["Search"],
   summary: "Global search",
   description:
-    "Search across tasks, projects, workspaces, comments, and activities in one workspace. Results are ranked by relevance and returned as a single flat list, each entry tagged with its `type`. Only projects the caller is a member of are searched, plus every project in the workspace for its administrators.",
+    "Search across tasks, projects, workspaces, comments, and activities in one workspace. Results are ranked by relevance and returned as a single flat list, each entry tagged with its `type`.",
   middleware: [workspaceAccess.fromQuery()] as const,
   request: { query: searchQuery },
   responses: {
@@ -42,7 +41,6 @@ const search = apiRouter().openapi(globalSearchRoute, async (c) => {
       workspaceId,
       projectId,
       limit,
-      seesAllProjects: await canSeeAllProjects(c),
     }),
     200,
   );

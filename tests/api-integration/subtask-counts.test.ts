@@ -128,12 +128,7 @@ describe("API integration: subtask counters", () => {
       completed: 1,
       total: 4,
     });
-    // Relations are filtered to the projects the caller can see; the fixture
-    // seeds the workspace's members onto every project it creates.
-    const relations = await getTaskRelations(parent.id, member.workspace.id, {
-      userId: member.user.id,
-      seesAllProjects: false,
-    });
+    const relations = await getTaskRelations(parent.id, member.workspace.id);
     expect(
       relations.filter((relation) => relation.targetTask?.isCompleted),
     ).toHaveLength(1);

@@ -133,15 +133,6 @@ export async function authenticateApiRequest(c: Context): Promise<void> {
 export async function resolveAssetBearerOrCookie(c: Context): Promise<{
   userId: string;
   apiKeyId?: string;
-  // The whole key, not only its id: its permission scope has to reach any
-  // authorization that runs after this, or a scoped key falls back to the
-  // full rights of the user who owns it.
-  apiKey?: {
-    id: string;
-    userId: string;
-    enabled: boolean;
-    permissions: Record<string, string[]> | null;
-  };
 }> {
   const { token, malformed } = parseBearerToken(c.req.header("Authorization"));
   if (malformed) {
@@ -155,12 +146,6 @@ export async function resolveAssetBearerOrCookie(c: Context): Promise<{
       return {
         userId: apiKeyResult.key.userId,
         apiKeyId: apiKeyResult.key.id,
-        apiKey: {
-          id: apiKeyResult.key.id,
-          userId: apiKeyResult.key.userId,
-          enabled: apiKeyResult.key.enabled,
-          permissions: apiKeyResult.key.permissions,
-        },
       };
     }
     throw new HTTPException(401, { message: "Unauthorized" });
@@ -172,12 +157,6 @@ export async function resolveAssetBearerOrCookie(c: Context): Promise<{
       return {
         userId: apiKeyResult.key.userId,
         apiKeyId: apiKeyResult.key.id,
-        apiKey: {
-          id: apiKeyResult.key.id,
-          userId: apiKeyResult.key.userId,
-          enabled: apiKeyResult.key.enabled,
-          permissions: apiKeyResult.key.permissions,
-        },
       };
     }
     const sessionResult = await getSessionFromBearerOnlyHeaders(c);

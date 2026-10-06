@@ -10,7 +10,6 @@ import {
   errorResponse,
   jsonResponse,
 } from "../openapi";
-import { canAccessProject, canSeeAllProjects } from "../utils/project-access";
 import { requireWorkspacePermission } from "../utils/require-workspace-permission";
 import { validateWorkspaceAccess } from "../utils/validate-workspace-access";
 import { workspaceAccess } from "../utils/workspace-access-middleware";
@@ -30,27 +29,14 @@ import {
   taskRelationParam,
 } from "./schema";
 
-async function scopeOfTask(taskId: string) {
+async function workspaceIdOfTask(taskId: string) {
   const [task] = await db
-    .select({
-      workspaceId: projectTable.workspaceId,
-      projectId: projectTable.id,
-    })
+    .select({ workspaceId: projectTable.workspaceId })
     .from(taskTable)
     .innerJoin(projectTable, eq(taskTable.projectId, projectTable.id))
     .where(eq(taskTable.id, taskId))
     .limit(1);
-  return task ?? null;
-}
-
-// These routes resolve their own scope instead of using `workspaceAccess`, so
-// the project visibility rule has to be applied here by hand.
-async function requireProjectAccess(c: Context, projectId: string) {
-  if (!(await canAccessProject(c, projectId))) {
-    throw new HTTPException(403, {
-      message: "You don't have access to this project",
-    });
-  }
+  return task?.workspaceId ?? null;
 }
 
 function requireUserId(c: Context) {
@@ -68,7 +54,6 @@ async function scopeToSourceTask(c: Context, next: Next) {
 
   const body = (await c.req.json().catch(() => ({}))) as {
     sourceTaskId?: unknown;
-    targetTaskId?: unknown;
   };
   const sourceTaskId =
     typeof body?.sourceTaskId === "string" ? body.sourceTaskId : null;
@@ -76,31 +61,13 @@ async function scopeToSourceTask(c: Context, next: Next) {
     throw new HTTPException(400, { message: "sourceTaskId is required" });
   }
 
-  const source = await scopeOfTask(sourceTaskId);
-  if (!source) {
+  const workspaceId = await workspaceIdOfTask(sourceTaskId);
+  if (!workspaceId) {
     throw new HTTPException(404, { message: "Source task not found" });
   }
 
-  await validateWorkspaceAccess(userId, source.workspaceId);
-  c.set("workspaceId", source.workspaceId);
-  await requireProjectAccess(c, source.projectId);
-
-  // The target is half of the relation the caller is creating, and the
-  // controller only checks that it is in the same workspace, so it needs the
-  // same visibility check as the source.
-  const targetTaskId =
-    typeof body?.targetTaskId === "string" ? body.targetTaskId : null;
-  if (targetTaskId) {
-    const target = await scopeOfTask(targetTaskId);
-    if (!target) {
-      throw new HTTPException(404, { message: "Target task not found" });
-    }
-    if (target.workspaceId !== source.workspaceId) {
-      throw new HTTPException(404, { message: "Target task not found" });
-    }
-    await requireProjectAccess(c, target.projectId);
-  }
-
+  await validateWorkspaceAccess(userId, workspaceId);
+  c.set("workspaceId", workspaceId);
   return next();
 }
 
@@ -109,10 +76,7 @@ async function scopeToRelation(c: Context, next: Next) {
 
   const id = c.req.param("id");
   const [rel] = await db
-    .select({
-      sourceTaskId: taskRelationTable.sourceTaskId,
-      targetTaskId: taskRelationTable.targetTaskId,
-    })
+    .select({ sourceTaskId: taskRelationTable.sourceTaskId })
     .from(taskRelationTable)
     .where(eq(taskRelationTable.id, id ?? ""))
     .limit(1);
@@ -120,30 +84,13 @@ async function scopeToRelation(c: Context, next: Next) {
     throw new HTTPException(404, { message: "Task relation not found" });
   }
 
-  const source = await scopeOfTask(rel.sourceTaskId);
-  if (!source) {
+  const workspaceId = await workspaceIdOfTask(rel.sourceTaskId);
+  if (!workspaceId) {
     throw new HTTPException(404, { message: "Task not found" });
   }
 
-  await validateWorkspaceAccess(userId, source.workspaceId);
-  c.set("workspaceId", source.workspaceId);
-  await requireProjectAccess(c, source.projectId);
-
-  // Both ends, not just the source. The deleted relation is returned to the
-  // caller, so authorizing one end would hand back the id of a task in a
-  // project they cannot open -- and let them cut a link they cannot see.
-  //
-  // A foreign or missing target reads as a missing relation, matching what a
-  // legacy cross-workspace row already answered: from the caller's side there
-  // is no such relation to act on, and saying more would confirm the target.
-  const target = await scopeOfTask(rel.targetTaskId);
-  if (!target || target.workspaceId !== source.workspaceId) {
-    throw new HTTPException(404, { message: "Task relation not found" });
-  }
-  if (target.projectId !== source.projectId) {
-    await requireProjectAccess(c, target.projectId);
-  }
-
+  await validateWorkspaceAccess(userId, workspaceId);
+  c.set("workspaceId", workspaceId);
   return next();
 }
 
@@ -154,7 +101,7 @@ const getTaskRelationsRoute = createRoute({
   tags: ["Task Relations"],
   summary: "Get task relations",
   description:
-    "Get every relation where the task is the source or the target, each with a summary of both linked tasks. Relations pointing outside the caller's workspace, or into a project they cannot open, are omitted.",
+    "Get every relation where the task is the source or the target, each with a summary of both linked tasks. Relations pointing outside the caller's workspace are omitted.",
   middleware: [workspaceAccess.fromTaskId("taskId")] as const,
   request: { params: taskIdParam },
   responses: {
@@ -165,9 +112,7 @@ const getTaskRelationsRoute = createRoute({
     400: errorResponse(
       "Unknown task, or its workspace could not be determined",
     ),
-    403: errorResponse(
-      "No access to the task's workspace, or no access to the project",
-    ),
+    403: errorResponse("No access to the task's workspace"),
   },
 });
 
@@ -192,9 +137,7 @@ const getProjectTaskRelationsRoute = createRoute({
     400: errorResponse(
       "Unknown project, or its workspace could not be determined",
     ),
-    403: errorResponse(
-      "No workspace access, or missing task:read permission, or no access to the project",
-    ),
+    403: errorResponse("No workspace access, or missing task:read permission"),
   },
 });
 
@@ -220,7 +163,7 @@ const createTaskRelationRoute = createRoute({
     200: jsonResponse("The created relation", taskRelationSchema),
     400: errorResponse("Invalid body"),
     403: errorResponse(
-      "No workspace access, missing task:update permission, or no access to the source or target task's project",
+      "No workspace access, or missing task:update permission",
     ),
     404: errorResponse("Source or target task not found"),
     409: errorResponse("This relation already exists"),
@@ -242,7 +185,7 @@ const deleteTaskRelationRoute = createRoute({
   responses: {
     200: jsonResponse("The deleted relation", taskRelationSchema),
     403: errorResponse(
-      "No workspace access, missing task:update permission, or no access to a linked task's project",
+      "No workspace access, or missing task:update permission",
     ),
     404: errorResponse("Task relation not found, or its source task is gone"),
   },
@@ -255,14 +198,7 @@ const taskRelation = apiRouter<BaseVariables & { workspaceId: string }>()
   )
   .openapi(getTaskRelationsRoute, async (c) =>
     c.json(
-      await getTaskRelations(
-        c.req.valid("param").taskId,
-        c.get("workspaceId"),
-        {
-          userId: c.get("userId"),
-          seesAllProjects: await canSeeAllProjects(c),
-        },
-      ),
+      await getTaskRelations(c.req.valid("param").taskId, c.get("workspaceId")),
       200,
     ),
   )

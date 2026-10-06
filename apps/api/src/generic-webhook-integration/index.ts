@@ -95,9 +95,7 @@ const getGenericWebhookIntegrationRoute = createRoute({
     400: errorResponse(
       "Unknown project, or its workspace could not be determined",
     ),
-    403: errorResponse(
-      "No access to the project's workspace, or no access to the project",
-    ),
+    403: errorResponse("No access to the project's workspace"),
   },
 });
 

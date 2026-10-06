@@ -81,7 +81,6 @@ import { migrateNotificationPreferencesSchema } from "./utils/migrate-notificati
 import { migrateSessionColumn } from "./utils/migrate-session-column";
 import { migrateWorkspaceUserEmail } from "./utils/migrate-workspace-user-email";
 import { normalizeApiServerUrl } from "./utils/openapi-spec";
-import { canAccessProject } from "./utils/project-access";
 import { seedDefaultWorkspaceRoles } from "./utils/seed-default-workspace-roles";
 import { drainSignInEmails } from "./utils/sign-in-email-tasks";
 import { validateWorkspaceAccess } from "./utils/validate-workspace-access";
@@ -430,7 +429,7 @@ export function createApp() {
       tags: ["Assets"],
       summary: "Download asset",
       description:
-        "Download an uploaded asset. Readable without signing in only when it belongs to a public project; otherwise only by the project's own members and by workspace and instance administrators, who reach every project. Image types are served inline, everything else as an attachment.",
+        "Download an uploaded asset. Readable without signing in only when it belongs to a public project; image types are served inline, everything else as an attachment.",
       security: [],
       request: { params: z.object({ id: z.string() }) },
       responses: {
@@ -453,7 +452,6 @@ export function createApp() {
           filename: schema.assetTable.filename,
           surface: schema.assetTable.surface,
           workspaceId: schema.assetTable.workspaceId,
-          projectId: schema.assetTable.projectId,
           isPublic: schema.projectTable.isPublic,
         })
         .from(schema.assetTable)
@@ -859,17 +857,6 @@ export function createApp() {
 
         await validateWorkspaceAccess(userId, project.workspaceId);
         workspaceId = project.workspaceId;
-
-        // A project's realtime stream is as restricted as its board.
-        // `canAccessProject` resolves workspace permissions from the context,
-        // so the workspace has to be on it first.
-        c.set("workspaceId", project.workspaceId);
-
-        if (!(await canAccessProject(c, projectId))) {
-          throw new HTTPException(403, {
-            message: "You don't have access to this project",
-          });
-        }
       }
 
       const windowId = c.req.query("windowId");

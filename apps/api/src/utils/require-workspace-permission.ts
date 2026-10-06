@@ -7,7 +7,7 @@ import { isInstanceAdmin } from "./is-instance-admin";
 
 type PermissionMap = Record<string, string[]>;
 
-export function builtInRoleStatements(
+function builtInRoleStatements(
   role: string,
 ): Record<string, readonly string[]> | null {
   if (role in builtInRoles) {
@@ -50,7 +50,7 @@ function parsePermissionStatements(
   return result;
 }
 
-export async function customRoleStatements(
+async function customRoleStatements(
   workspaceId: string,
   role: string,
 ): Promise<Record<string, readonly string[]> | null> {
@@ -70,7 +70,7 @@ export async function customRoleStatements(
   return parsePermissionStatements(row.permission);
 }
 
-export function satisfies(
+function satisfies(
   statements: Record<string, readonly string[]>,
   required: PermissionMap,
 ): boolean {

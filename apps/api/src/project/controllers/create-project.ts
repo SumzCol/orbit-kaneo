@@ -1,11 +1,6 @@
-import { and, eq, max, sql } from "drizzle-orm";
+import { eq, max, sql } from "drizzle-orm";
 import db from "../../database";
-import {
-  columnTable,
-  projectMemberTable,
-  projectTable,
-  workspaceUserTable,
-} from "../../database/schema";
+import { columnTable, projectTable } from "../../database/schema";
 
 // Keep in sync with DEFAULT_COLUMNS in src/migrations/column-migration.ts, which
 // seeds the same set for legacy projects that have no columns at all.
@@ -22,7 +17,6 @@ async function createProject(
   name: string,
   icon: string,
   slug: string,
-  creatorId: string,
 ) {
   return db.transaction(async (tx) => {
     // Serialize ordering writes per workspace: without this, two concurrent
@@ -51,33 +45,6 @@ async function createProject(
       .returning();
 
     if (createdProject) {
-      // Without this the creator could not open the project they just made:
-      // a project is readable by its members, and it starts with none.
-      //
-      // Only when the row would count, though. An instance administrator can
-      // create a project in a workspace they never joined, and membership
-      // requires a live workspace membership, so the row would be inert --
-      // leaving a project that claims a creator it does not have. They reach
-      // it by their role either way.
-      const [creatorMembership] = await tx
-        .select({ id: workspaceUserTable.id })
-        .from(workspaceUserTable)
-        .where(
-          and(
-            eq(workspaceUserTable.workspaceId, workspaceId),
-            eq(workspaceUserTable.userId, creatorId),
-          ),
-        )
-        .limit(1);
-
-      if (creatorMembership) {
-        await tx.insert(projectMemberTable).values({
-          projectId: createdProject.id,
-          userId: creatorId,
-          workspaceMemberId: creatorMembership.id,
-        });
-      }
-
       for (const col of DEFAULT_PROJECT_COLUMNS) {
         await tx.insert(columnTable).values({
           projectId: createdProject.id,
