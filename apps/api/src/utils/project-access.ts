@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { type AnyColumn, and, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Context } from "hono";
 import db, { schema } from "../database";
@@ -309,13 +309,34 @@ export function projectUserKey(pair: ProjectUserPair) {
  * rules: an explicit membership through the exact workspace membership, an
  * instance administrator, or a workspace role that reaches every project.
  */
+/**
+ * Rows whose (project, user) is one of `pairs`, matched as pairs in SQL.
+ * Filtering projects and users separately would join every requested project
+ * to every requested user, up to the square of the batch, before the pairs
+ * were picked out in memory.
+ */
+function exactPairs(
+  projectColumn: AnyColumn,
+  userColumn: AnyColumn,
+  pairs: ProjectUserPair[],
+) {
+  const projectIds = sql.join(
+    pairs.map((pair) => sql`${pair.projectId}`),
+    sql`, `,
+  );
+  const userIds = sql.join(
+    pairs.map((pair) => sql`${pair.userId}`),
+    sql`, `,
+  );
+  return sql`(${projectColumn}, ${userColumn}) in (select * from unnest(array[${projectIds}]::text[], array[${userIds}]::text[]))`;
+}
+
 export async function accessibleProjectPairs(
   pairs: ProjectUserPair[],
 ): Promise<Set<string>> {
   const allowed = new Set<string>();
   if (pairs.length === 0) return allowed;
 
-  const projectIds = [...new Set(pairs.map((pair) => pair.projectId))];
   const userIds = [...new Set(pairs.map((pair) => pair.userId))];
   const wanted = new Set(pairs.map(projectUserKey));
 
@@ -344,9 +365,10 @@ export async function accessibleProjectPairs(
       ),
     )
     .where(
-      and(
-        inArray(schema.projectMemberTable.projectId, projectIds),
-        inArray(schema.projectMemberTable.userId, userIds),
+      exactPairs(
+        schema.projectMemberTable.projectId,
+        schema.projectMemberTable.userId,
+        pairs,
       ),
     );
   for (const row of memberships) {
@@ -381,9 +403,10 @@ export async function accessibleProjectPairs(
       ),
     )
     .where(
-      and(
-        inArray(schema.projectTable.id, projectIds),
-        inArray(schema.workspaceUserTable.userId, userIds),
+      exactPairs(
+        schema.projectTable.id,
+        schema.workspaceUserTable.userId,
+        pairs,
       ),
     );
   const seesAll = new Map<string, boolean>();
