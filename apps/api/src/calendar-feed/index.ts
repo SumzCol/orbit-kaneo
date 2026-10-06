@@ -8,6 +8,7 @@ import {
 } from "../openapi";
 import {
   hasWorkspacePermission,
+  requireApiKeyScope,
   requireWorkspacePermission,
 } from "../utils/require-workspace-permission";
 import { workspaceAccess } from "../utils/workspace-access-middleware";
@@ -34,19 +35,19 @@ const sharingMiddleware = [
 // leave an owner who lost it, but kept the project, unable to revoke a link
 // that still works -- and nobody else can revoke it for them.
 //
-// project:read is still required. Every role carries it, so it costs a
-// signed-in member nothing, but it is where an API key's scope is enforced:
-// without it, a key scoped to anything at all could list its user's secret
-// feed links.
+// An API key is still held to its scope: it needs project:read, or a key
+// scoped to anything at all could list its user's secret feed links. Only
+// the key is checked, not the role -- a custom role carrying project:share
+// alone can create a feed, and must be able to manage it.
 const ownFeedMiddleware = [
   workspaceAccess.fromProject("projectId"),
-  requireWorkspacePermission({ project: ["read"] }),
+  requireApiKeyScope({ project: ["read"] }),
 ];
 const ownFeedErrors = {
   400: errorResponse("Invalid request or unknown project"),
   401: errorResponse("Authentication required"),
   403: errorResponse(
-    "No workspace access, no access to the project, or missing project:read permission",
+    "No workspace access, no access to the project, or an API key without project:read",
   ),
 };
 const managementErrors = {

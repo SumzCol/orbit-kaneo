@@ -8330,7 +8330,7 @@
             }
           },
           "403": {
-            "description": "No workspace access, no access to the project, or missing project:read permission",
+            "description": "No workspace access, no access to the project, or an API key without project:read",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8496,7 +8496,7 @@
             }
           },
           "403": {
-            "description": "No workspace access, no access to the project, or missing project:read permission",
+            "description": "No workspace access, no access to the project, or an API key without project:read",
             "content": {
               "text/plain": {
                 "schema": {

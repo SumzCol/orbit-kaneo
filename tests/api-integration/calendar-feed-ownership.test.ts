@@ -11,6 +11,7 @@ import {
   rememberRoleEditForFeeds,
 } from "../../apps/api/src/calendar-feed/prune-after-role-change";
 import {
+  createCalendarFeed,
   pruneCalendarFeeds,
   pruneUserCalendarFeeds,
   pruneWorkspaceCalendarFeeds,
@@ -891,5 +892,140 @@ describe("a move or a departure racing a re-add", () => {
 
     // Their access never depended on the workspace.
     expect(await fetchFeed(feed.token)).toBe(200);
+  });
+});
+
+describe("a feed kept across a move", () => {
+  // A feed stores workspace label definitions, which stay behind on a move
+  // while the tasks' labels go with the project. Unmapped, the feed would
+  // match nothing in the new workspace and silently go empty.
+  it("still lists the project's labelled tasks in the new workspace", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id],
+    });
+    const [definition] = await db
+      .insert(schema.labelTable)
+      .values({
+        name: "Release",
+        color: "gray",
+        workspaceId: source.workspace.id,
+      })
+      .returning();
+    const [task] = await db
+      .insert(schema.taskTable)
+      .values({
+        title: "Ship the moved release",
+        projectId: project.id,
+        number: 1,
+        dueDate: new Date("2026-11-01T12:00:00Z"),
+      })
+      .returning();
+    await db.insert(schema.labelTable).values({
+      name: "Release",
+      color: "gray",
+      workspaceId: source.workspace.id,
+      taskId: task.id,
+    });
+    const [feed] = await db
+      .insert(calendarFeedTable)
+      .values({
+        projectId: project.id,
+        userId: source.user.id,
+        labelIds: [definition.id],
+        timeZone: "UTC",
+        token: randomBytes(32).toString("hex"),
+      })
+      .returning();
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    const { app } = createApp();
+    const response = await app.request(
+      `/api/calendar-feed/${feed.token}/calendar.ics`,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("Ship the moved release");
+  });
+});
+
+describe("a role that can share but not read projects", () => {
+  // It can create a feed, so it must be able to see and revoke it; only an
+  // API key is held to project:read here.
+  it("can list and revoke its own feed", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const publisher = await addWorkspaceMember(workspace.id, "publisher");
+    await db.insert(schema.workspaceRoleTable).values({
+      workspaceId: workspace.id,
+      role: "publisher",
+      permission: JSON.stringify({ project: ["share"] }),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, publisher.id],
+    });
+    const feed = await insertFeed(project.id, publisher.id);
+
+    mockAuthenticatedSession(publisher);
+    const { app } = createApp();
+    const endpoint = `/api/calendar-feed/project/${project.id}`;
+
+    const listed = await app.request(endpoint);
+    expect(listed.status).toBe(200);
+    expect(
+      ((await listed.json()) as { id: string }[]).map((entry) => entry.id),
+    ).toEqual([feed.id]);
+    expect(
+      (await app.request(`${endpoint}/${feed.id}`, { method: "DELETE" }))
+        .status,
+    ).toBe(200);
+  });
+});
+
+describe("a feed created while its owner is being removed", () => {
+  // The route checked access before the removal; the creation must check
+  // again under the lock, or it inserts a link the removal never saw.
+  it("is refused once the removal has gone through", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const member = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, member.id],
+    });
+    const [label] = await db
+      .insert(schema.labelTable)
+      .values({ name: "Release", color: "gray", workspaceId: workspace.id })
+      .returning();
+
+    await removeProjectMember(project.id, workspace.id, member.id, owner.id);
+
+    await expect(
+      createCalendarFeed(
+        project.id,
+        workspace.id,
+        member.id,
+        [label.id],
+        "UTC",
+        false,
+      ),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(await feedsOf(member.id)).toEqual([]);
   });
 });

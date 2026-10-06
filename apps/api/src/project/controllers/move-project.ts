@@ -25,7 +25,10 @@ import {
 } from "../../database/schema";
 import { publishEvent } from "../../events";
 import { closeProjectConnections } from "../../ws";
-import { deleteInaccessibleFeeds } from "../../calendar-feed/service";
+import {
+  deleteInaccessibleFeeds,
+  remapMovedFeedLabels,
+} from "../../calendar-feed/service";
 
 async function moveProject(
   id: string,
@@ -389,6 +392,7 @@ async function moveProject(
     // also takes: after the commit, a re-add could land before the check and
     // keep the old links. Asked on the transaction, which sees the move.
     await deleteInaccessibleFeeds(tx, id);
+    await remapMovedFeedLabels(tx, id, targetWorkspaceId);
 
     return { movedProject, unassignedTasks: unassigned };
   });

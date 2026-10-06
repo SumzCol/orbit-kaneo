@@ -163,3 +163,23 @@ export function requireWorkspacePermission(permissions: PermissionMap) {
     return next();
   };
 }
+
+/**
+ * Holds an API key to its scope without asking anything of the user's role.
+ *
+ * For routes whose access a role does not decide -- a caller's own resources,
+ * reachable with project access alone -- but which a scoped key should still
+ * only reach when its scope says so. A key with no scope recorded is
+ * unrestricted, as in `requireWorkspacePermission`; a browser session passes.
+ */
+export function requireApiKeyScope(permissions: PermissionMap) {
+  return async (c: Context, next: Next) => {
+    const apiKey = c.get("apiKey") as
+      | { permissions?: Record<string, string[]> | null }
+      | undefined;
+    if (apiKey?.permissions && !satisfies(apiKey.permissions, permissions)) {
+      throw new HTTPException(403, { message: "Insufficient API key scope" });
+    }
+    return next();
+  };
+}
