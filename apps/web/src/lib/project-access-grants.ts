@@ -1,21 +1,25 @@
 /**
- * Tells an open board that access to its project may have been given back.
+ * Carries access changes from the user socket to an open board's own.
  *
- * A board whose socket was closed with 4403 stops reconnecting for good, and
- * a grant arrives on the user socket rather than on the board's own, so it
- * needs a way across. Local to this tab: every tab gets its own copy of the
- * user message.
+ * Access changes arrive on the user socket, not on the board's, and a board's
+ * socket may be closed, between retries or polling when they do, so it needs
+ * a way across. Local to this tab: every tab gets its own copy of the user
+ * message.
  *
- * A "grant" is the server saying so. A "probe" is a guess, sent when the user
- * socket reconnects and a grant may have been missed while it was down: the
- * board tries once, and goes back to stopped if the upgrade is refused.
+ * - "grant": the server says access was given. A board stopped by 4403 tries
+ *   to reconnect.
+ * - "revoke": the server says access ended. A board with no open socket to
+ *   receive the 4403 stops retrying and polling, as if it had.
+ * - "probe": a guess, sent when the user socket reconnects and either kind of
+ *   message may have been missed while it was down. A board that is stopped
+ *   or not connected tries once; a refused attempt drops its caches.
  */
-export type AccessSignal = "grant" | "probe";
+export type AccessSignal = "grant" | "revoke" | "probe";
 type Listener = (signal: AccessSignal) => void;
 
 const listeners = new Map<string, Set<Listener>>();
 
-export function onProjectAccessGranted(
+export function onProjectAccessSignal(
   projectId: string,
   listener: Listener,
 ): () => void {
@@ -32,14 +36,20 @@ export function onProjectAccessGranted(
   };
 }
 
-export function announceProjectAccessGranted(projectId: string) {
+function signal(projectId: string, kind: AccessSignal) {
   for (const listener of [...(listeners.get(projectId) ?? [])]) {
-    listener("grant");
+    listener(kind);
   }
 }
 
-export function probeRevokedProjects() {
-  for (const forProject of [...listeners.values()]) {
-    for (const listener of [...forProject]) listener("probe");
-  }
+export function announceProjectAccessGranted(projectId: string) {
+  signal(projectId, "grant");
+}
+
+export function announceProjectAccessLost(projectId: string) {
+  signal(projectId, "revoke");
+}
+
+export function probeProjectBoards() {
+  for (const projectId of [...listeners.keys()]) signal(projectId, "probe");
 }

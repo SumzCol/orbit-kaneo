@@ -7,7 +7,7 @@ import {
   it,
   vi,
 } from "vite-plus/test";
-import { onProjectAccessGranted } from "@/lib/project-access-grants";
+import { onProjectAccessSignal } from "@/lib/project-access-grants";
 import { useUserWebSocket } from "./use-user-websocket";
 
 const { client, auth } = vi.hoisted(() => ({
@@ -17,6 +17,7 @@ const { client, auth } = vi.hoisted(() => ({
     resetQueries: vi.fn(),
     getQueryData: vi.fn(),
     getQueriesData: vi.fn(() => []),
+    setQueriesData: vi.fn(),
   },
   auth: { userId: "user-a" as string | null },
 }));
@@ -295,7 +296,7 @@ describe("project access changes on the user socket", () => {
   // neither, so both are woken directly.
   it("wakes that project's board when access is granted", () => {
     const granted = vi.fn();
-    const stop = onProjectAccessGranted("project-1", granted);
+    const stop = onProjectAccessSignal("project-1", granted);
 
     receive({
       type: "PROJECT_ACCESS_CHANGED",
@@ -312,7 +313,7 @@ describe("project access changes on the user socket", () => {
 
   it("does not wake the board when access ends", () => {
     const granted = vi.fn();
-    const stop = onProjectAccessGranted("project-1", granted);
+    const stop = onProjectAccessSignal("project-1", granted);
 
     receive({
       type: "PROJECT_ACCESS_CHANGED",
@@ -321,7 +322,22 @@ describe("project access changes on the user socket", () => {
     });
     stop();
 
-    expect(granted).not.toHaveBeenCalled();
+    expect(granted).not.toHaveBeenCalledWith("grant");
+  });
+
+  // A board whose own socket is down has no 4403 coming, so it is told.
+  it("tells the board when access ends", () => {
+    const signal = vi.fn();
+    const stop = onProjectAccessSignal("project-1", signal);
+
+    receive({
+      type: "PROJECT_ACCESS_CHANGED",
+      projectId: "project-1",
+      hasAccess: false,
+    });
+    stop();
+
+    expect(signal).toHaveBeenCalledExactlyOnceWith("revoke");
   });
 
   // Nothing replays a message sent while the socket was down, so a reconnect
@@ -365,7 +381,7 @@ describe("project access changes on the user socket", () => {
   // 4403 for good, so each one is asked to try once.
   it("probes revoked boards on a reconnect, not the first connect", () => {
     const signal = vi.fn();
-    const stop = onProjectAccessGranted("project-1", signal);
+    const stop = onProjectAccessSignal("project-1", signal);
     renderHook(() => useUserWebSocket());
     act(() => TestSocket.instances[0].open());
     expect(signal).not.toHaveBeenCalled();

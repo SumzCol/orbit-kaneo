@@ -4,7 +4,8 @@ import { dropProjectCaches } from "@/lib/drop-project-caches";
 import { refreshProjectLists } from "@/lib/refresh-project-lists";
 import {
   announceProjectAccessGranted,
-  probeRevokedProjects,
+  announceProjectAccessLost,
+  probeProjectBoards,
 } from "@/lib/project-access-grants";
 import { useEffect } from "react";
 import { getApiUrl } from "@/fetchers/get-api-url";
@@ -90,8 +91,12 @@ export function useUserWebSocket() {
           // to their own socket, which the sweep closes if access is gone.
           void queryClient.resetQueries({ type: "inactive" });
           // A grant missed while down would leave a board stopped by 4403
-          // with no realtime updates. Each such board tries once.
-          probeRevokedProjects();
+          // with no realtime updates, and a revocation missed while a board's
+          // own socket was also down would leave its mounted data in place,
+          // with no connection for the sweep to close. Each board that is
+          // stopped or disconnected tries once; a refused attempt drops its
+          // caches.
+          probeProjectBoards();
         }
         clearPing();
         pingInterval = setInterval(() => {
@@ -125,6 +130,7 @@ export function useUserWebSocket() {
             void queryClient.resetQueries({ queryKey: ["search"] });
             if (message.projectId && message.hasAccess === false) {
               dropProjectCaches(queryClient, message.projectId);
+              announceProjectAccessLost(message.projectId);
             }
             if (message.projectId && message.hasAccess === true) {
               // A board left open since its access was revoked holds an

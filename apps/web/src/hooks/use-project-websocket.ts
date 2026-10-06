@@ -14,7 +14,7 @@ import getExternalLinks from "@/fetchers/external-link/get-external-links";
 import { patchBoardTask } from "@/lib/patch-board-task";
 import { dropProjectCaches } from "@/lib/drop-project-caches";
 import { refreshProjectLists } from "@/lib/refresh-project-lists";
-import { onProjectAccessGranted } from "@/lib/project-access-grants";
+import { onProjectAccessSignal } from "@/lib/project-access-grants";
 import { isPerTaskRelationQuery } from "@/lib/relation-query-keys";
 import type { ProjectWithTasks } from "@/types/project";
 
@@ -73,20 +73,50 @@ export function useProjectWebSocket(projectId: string) {
     // added back while the board stays open would otherwise leave it without
     // realtime updates until the route remounts.
     let revoked = false;
-    // Every attempt after a 4403 is a single one until the socket opens,
-    // whether a grant or a reconnect's guess started it: a grant can be stale
-    // by the time the upgrade runs, if the user was removed again. The
-    // upgrade is refused with a plain HTTP 403, which reaches the client as
-    // an ordinary close, so a refused attempt must not fall through to the
-    // retries and the fallback poll against a project it cannot read.
+    // An attempt that an access signal starts -- a grant, or a reconnect's
+    // guess -- is a single one until the socket opens. A grant can be stale by
+    // the time the upgrade runs, and the upgrade is refused with a plain HTTP
+    // 403, which reaches the client as an ordinary close, so a refused attempt
+    // must not fall through to the retries and the fallback poll against a
+    // project it cannot read. It drops the caches too: the board may have
+    // been refetched first, and the message saying access ended may not come.
     let probing = false;
-    const stopListeningForGrant = onProjectAccessGranted(projectId, () => {
-      if (disposed || !revoked) return;
-      revoked = false;
-      probing = true;
-      retries = 0;
-      connect();
-    });
+    function stopRetrying() {
+      if (retryTimeout !== null) {
+        clearTimeout(retryTimeout);
+        retryTimeout = null;
+      }
+      if (fallbackInterval !== null) {
+        clearInterval(fallbackInterval);
+        fallbackInterval = null;
+      }
+    }
+    const stopListeningForAccess = onProjectAccessSignal(
+      projectId,
+      (signal) => {
+        if (disposed) return;
+        if (signal === "revoke") {
+          // An open socket gets the server's 4403. One that is closed,
+          // between retries or polling would keep trying against a 403, and
+          // ignore a later grant, so it stops here as if the 4403 had come.
+          if (activeSocket || revoked) return;
+          stopRetrying();
+          revoked = true;
+          retries = MAX_RETRIES;
+          return;
+        }
+        // A connected or connecting board needs nothing. A grant only wakes a
+        // board stopped by 4403; a probe also tries one that is disconnected,
+        // since what it missed while down is unknown.
+        if (activeSocket) return;
+        if (signal === "grant" && !revoked) return;
+        stopRetrying();
+        revoked = false;
+        probing = true;
+        retries = 0;
+        connect();
+      },
+    );
 
     function invalidateDetails(message: {
       type: string;
@@ -583,7 +613,7 @@ export function useProjectWebSocket(projectId: string) {
 
     return () => {
       unsubscribe();
-      stopListeningForGrant();
+      stopListeningForAccess();
       if (healthyTimeout !== null) clearTimeout(healthyTimeout);
       pendingMessages.clear();
       if (burstReconcileTimer !== null) clearTimeout(burstReconcileTimer);

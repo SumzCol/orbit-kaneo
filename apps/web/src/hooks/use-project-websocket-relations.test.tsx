@@ -27,7 +27,8 @@ import { cleanup, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import {
   announceProjectAccessGranted,
-  probeRevokedProjects,
+  announceProjectAccessLost,
+  probeProjectBoards,
 } from "@/lib/project-access-grants";
 import { useProjectWebSocket } from "./use-project-websocket";
 
@@ -222,7 +223,7 @@ describe("useProjectWebSocket relation invalidation", () => {
       >;
       socket.onclose?.({ code: 4403 } as CloseEvent);
 
-      probeRevokedProjects();
+      probeProjectBoards();
       expect(constructor).toHaveBeenCalledTimes(2);
       // Refused before it opened.
       socket.onclose?.({ code: 1006 } as CloseEvent);
@@ -288,6 +289,63 @@ describe("useProjectWebSocket relation invalidation", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // With no open socket there is no 4403 to receive, so the user socket's
+  // message is what stops it; otherwise it retries against a 403 and then
+  // ignores a later grant.
+  it("stops retrying when access is lost while it is disconnected", () => {
+    vi.useFakeTimers();
+    try {
+      const constructor = globalThis.WebSocket as unknown as ReturnType<
+        typeof vi.fn
+      >;
+      socket.onclose?.({ code: 1006 } as CloseEvent);
+
+      announceProjectAccessLost("project-1");
+      vi.advanceTimersByTime(120_000);
+      expect(constructor).toHaveBeenCalledTimes(1);
+
+      // And is woken by a later grant, as after a 4403.
+      announceProjectAccessGranted("project-1");
+      expect(constructor).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // A revocation missed while both sockets were down left the mounted data
+  // with no connection for the sweep to close. A disconnected board tries
+  // once when the user socket comes back, and a refusal drops its caches.
+  it("tries once when probed while disconnected, and drops its caches if refused", () => {
+    vi.useFakeTimers();
+    try {
+      const constructor = globalThis.WebSocket as unknown as ReturnType<
+        typeof vi.fn
+      >;
+      socket.onclose?.({ code: 1006 } as CloseEvent);
+      client.setQueryData(["tasks", "project-1"], { columns: [] });
+
+      probeProjectBoards();
+      expect(constructor).toHaveBeenCalledTimes(2);
+      socket.onclose?.({ code: 1006 } as CloseEvent);
+      vi.advanceTimersByTime(120_000);
+
+      expect(constructor).toHaveBeenCalledTimes(2);
+      expect(client.getQueryData(["tasks", "project-1"])).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores a probe while connected", () => {
+    const constructor = globalThis.WebSocket as unknown as ReturnType<
+      typeof vi.fn
+    >;
+
+    probeProjectBoards();
+
+    expect(constructor).toHaveBeenCalledTimes(1);
   });
 
   it("ignores a grant while the board is still connected", () => {
