@@ -1,3 +1,4 @@
+import type { IssueWrite } from "../../sync/issue-write";
 import type { Octokit } from "octokit";
 
 const labelColors: Record<string, string> = {
@@ -23,6 +24,8 @@ export async function ensureLabelsExist(
   owner: string,
   repo: string,
   labels: string[],
+  requireSuccess = false,
+  write: IssueWrite = (send) => send(),
 ) {
   for (const labelName of labels) {
     try {
@@ -34,13 +37,16 @@ export async function ensureLabelsExist(
     } catch {
       try {
         const color = getLabelColor(labelName);
-        await octokit.rest.issues.createLabel({
-          owner,
-          repo,
-          name: labelName,
-          color,
-        });
+        await write(() =>
+          octokit.rest.issues.createLabel({
+            owner,
+            repo,
+            name: labelName,
+            color,
+          }),
+        );
       } catch (createError) {
+        if (requireSuccess) throw createError;
         console.error(`Failed to create label "${labelName}":`, createError);
       }
     }
@@ -53,17 +59,29 @@ export async function addLabelsToIssue(
   repo: string,
   issueNumber: number,
   labels: string[],
+  requireSuccess = false,
+  write: IssueWrite = (send) => send(),
 ) {
   try {
-    await ensureLabelsExist(octokit, owner, repo, labels);
-
-    await octokit.rest.issues.addLabels({
+    await ensureLabelsExist(
+      octokit,
       owner,
       repo,
-      issue_number: issueNumber,
       labels,
-    });
+      requireSuccess,
+      write,
+    );
+
+    await write(() =>
+      octokit.rest.issues.addLabels({
+        owner,
+        repo,
+        issue_number: issueNumber,
+        labels,
+      }),
+    );
   } catch (error) {
+    if (requireSuccess) throw error;
     console.error("Failed to add labels to issue:", error);
   }
 }
@@ -74,14 +92,17 @@ export async function removeLabel(
   repo: string,
   issueNumber: number,
   labelName: string,
+  write: IssueWrite = (send) => send(),
 ) {
   try {
-    await octokit.rest.issues.removeLabel({
-      owner,
-      repo,
-      issue_number: issueNumber,
-      name: labelName,
-    });
+    await write(() =>
+      octokit.rest.issues.removeLabel({
+        owner,
+        repo,
+        issue_number: issueNumber,
+        name: labelName,
+      }),
+    );
   } catch (error) {
     if (
       typeof error === "object" &&

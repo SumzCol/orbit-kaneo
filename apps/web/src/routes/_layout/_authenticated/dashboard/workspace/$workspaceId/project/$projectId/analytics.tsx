@@ -54,7 +54,7 @@ function ProjectAnalytics() {
     isError: columnsFailed,
     refetch: refetchColumns,
   } = useGetColumns(projectId, {
-    refetchOnMount: true,
+    refreshOnMount: true,
     // Column edits publish no WebSocket event, and this view stays open.
     refetchInterval: 5 * 60 * 1000,
   });
