@@ -54,6 +54,11 @@ import db, { schema } from "./database";
 import { authDatabaseAdapter } from "./database/auth-adapter";
 import { publishEvent } from "./events";
 import revokeWorkspaceProjectMemberships from "./project/controllers/revoke-workspace-project-memberships";
+import {
+  rememberRoleReach,
+  revalidateAfterMemberRoleChange,
+  revalidateAfterRoleUpdate,
+} from "./project/controllers/role-update-access";
 import clearEmailVerificationOnAdminChange from "./user/controllers/clear-email-verification-on-admin-change";
 import deleteAccountData from "./user/controllers/delete-account-data";
 import prepareAdminUserRemoval from "./user/controllers/prepare-admin-user-removal";
@@ -510,11 +515,24 @@ export const auth = betterAuth({
             });
           }
         },
-        // A calendar feed reads as its owner, and a narrower role can end
-        // access they had through the old one. Deleted rather than left to
-        // the fetch check, which would let the old role revive the link.
-        afterUpdateMemberRole: async ({ member, organization }) => {
+        // A role that reached every project did so without project rows, so
+        // moving someone off it ends access nothing else would notice until
+        // the sweep, and their other tabs would keep the projects listed.
+        // Their calendar feeds read as them too, so those are pruned as well:
+        // left to the fetch check, giving the old role back would revive them.
+        afterUpdateMemberRole: async ({
+          member,
+          previousRole,
+          organization,
+        }) => {
           if (member?.userId && organization?.id) {
+            if (previousRole) {
+              await revalidateAfterMemberRoleChange(
+                organization.id,
+                member.userId,
+                previousRole,
+              );
+            }
             await pruneWorkspaceCalendarFeeds(organization.id, [member.userId]);
           }
         },
@@ -536,6 +554,7 @@ export const auth = betterAuth({
                 await revokeWorkspaceProjectMemberships(
                   member.organizationId,
                   member.userId,
+                  member.role,
                 );
               } catch (error) {
                 console.error(
@@ -716,6 +735,7 @@ export const auth = betterAuth({
       }
 
       if (ctx.path === "/organization/update-role") {
+        await rememberRoleReach(ctx);
         await rememberRoleEditForFeeds(ctx);
       }
 
@@ -845,8 +865,11 @@ export const auth = betterAuth({
     }),
     after: createAuthMiddleware(async (ctx) => {
       // Role edits run through Better Auth with no lifecycle hook of their
-      // own, and can narrow what every member holding the role reaches.
+      // own; the before hook above recorded what the role used to reach. An
+      // edit can narrow what every member holding the role reaches, which
+      // ends their sessions and their calendar feeds alike.
       if (ctx.path === "/organization/update-role") {
+        await revalidateAfterRoleUpdate(ctx);
         await pruneFeedsAfterRoleEdit(ctx);
       }
 

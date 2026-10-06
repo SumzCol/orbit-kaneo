@@ -1,8 +1,11 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { type AnyColumn, and, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Context } from "hono";
 import db, { schema } from "../database";
-import { hasInstanceAdminRole } from "./instance-admin-role";
+import {
+  hasInstanceAdminRole,
+  instanceAdminRoleSql,
+} from "./instance-admin-role";
 import {
   builtInRoleStatements,
   customRoleStatements,
@@ -224,11 +227,246 @@ export async function userCanAccessProject(
     .limit(1);
   if (!member?.role) return false;
 
+  return roleSeesAllProjects(member.workspaceId, member.role, database);
+}
+
+/**
+ * Whether a workspace role reaches every project in the workspace, by the same
+ * `workspace:manage_settings` rule as `canSeeAllProjects`. Custom roles take
+ * precedence over the built-in role of the same name.
+ */
+export async function roleSeesAllProjects(
+  workspaceId: string,
+  role: string,
+  database: Pick<typeof db, "select"> = db,
+): Promise<boolean> {
   const statements =
-    (await customRoleStatements(member.workspaceId, member.role, database)) ??
-    builtInRoleStatements(member.role);
+    (await customRoleStatements(workspaceId, role, database)) ??
+    builtInRoleStatements(role);
 
   return Boolean(
     statements && satisfies(statements, { workspace: ["manage_settings"] }),
   );
+}
+
+/**
+ * The workspace's members whose role reaches every project in it. They hold no
+ * project_member rows for that access, so anything working out who loses a
+ * project from the rows alone has to add them.
+ */
+export async function workspaceWideProjectUserIds(
+  workspaceId: string,
+  // The move reads this inside its transaction and must pass it. A second
+  // pooled connection taken while the transaction holds one let enough
+  // concurrent moves fill the pool and time each other out.
+  database: Pick<typeof db, "select"> = db,
+): Promise<string[]> {
+  const members = await database
+    .select({
+      userId: schema.workspaceUserTable.userId,
+      role: schema.workspaceUserTable.role,
+    })
+    .from(schema.workspaceUserTable)
+    .where(eq(schema.workspaceUserTable.workspaceId, workspaceId));
+
+  // Few distinct roles per workspace, so each is resolved once.
+  const seesAll = new Map<string, boolean>();
+  const userIds: string[] = [];
+  for (const member of members) {
+    if (!member.role) continue;
+    let allowed = seesAll.get(member.role);
+    if (allowed === undefined) {
+      allowed = await roleSeesAllProjects(workspaceId, member.role, database);
+      seesAll.set(member.role, allowed);
+    }
+    if (allowed) userIds.push(member.userId);
+  }
+  return userIds;
+}
+
+/**
+ * Instance administrators, who reach every project in every workspace with
+ * neither a row nor a workspace role to show for it. A change that moves a
+ * project between workspaces changes what their sidebars list too.
+ */
+export async function instanceAdministratorIds(): Promise<string[]> {
+  const admins = await db
+    .select({ id: schema.userTable.id })
+    .from(schema.userTable)
+    .where(instanceAdminRoleSql(schema.userTable.role));
+  return admins.map((admin) => admin.id);
+}
+
+export type ProjectUserPair = { projectId: string; userId: string };
+
+export function projectUserKey(pair: ProjectUserPair) {
+  return `${pair.projectId}\u0000${pair.userId}`;
+}
+
+/**
+ * `userCanAccessProject` for many pairs at once, as the set of keys
+ * (`projectUserKey`) that pass.
+ *
+ * The single check costs up to four queries a pair, which a sweep over every
+ * open board multiplies by the number of connections. This answers any number
+ * of pairs in three queries plus one per distinct workspace role, by the same
+ * rules: an explicit membership through the exact workspace membership, an
+ * instance administrator, or a workspace role that reaches every project.
+ */
+/**
+ * Rows whose (project, user) is one of `pairs`, matched as pairs in SQL.
+ * Filtering projects and users separately would join every requested project
+ * to every requested user, up to the square of the batch, before the pairs
+ * were picked out in memory.
+ */
+function exactPairs(
+  projectColumn: AnyColumn,
+  userColumn: AnyColumn,
+  pairs: ProjectUserPair[],
+) {
+  const projectIds = sql.join(
+    pairs.map((pair) => sql`${pair.projectId}`),
+    sql`, `,
+  );
+  const userIds = sql.join(
+    pairs.map((pair) => sql`${pair.userId}`),
+    sql`, `,
+  );
+  return sql`(${projectColumn}, ${userColumn}) in (select * from unnest(array[${projectIds}]::text[], array[${userIds}]::text[]))`;
+}
+
+export async function accessibleProjectPairs(
+  pairs: ProjectUserPair[],
+): Promise<Set<string>> {
+  const allowed = new Set<string>();
+  if (pairs.length === 0) return allowed;
+
+  const userIds = [...new Set(pairs.map((pair) => pair.userId))];
+  const wanted = new Set(pairs.map(projectUserKey));
+
+  const memberships = await db
+    .select({
+      projectId: schema.projectMemberTable.projectId,
+      userId: schema.projectMemberTable.userId,
+    })
+    .from(schema.projectMemberTable)
+    .innerJoin(
+      schema.projectTable,
+      eq(schema.projectTable.id, schema.projectMemberTable.projectId),
+    )
+    .innerJoin(
+      schema.workspaceUserTable,
+      and(
+        eq(
+          schema.workspaceUserTable.id,
+          schema.projectMemberTable.workspaceMemberId,
+        ),
+        eq(
+          schema.workspaceUserTable.workspaceId,
+          schema.projectTable.workspaceId,
+        ),
+        eq(schema.workspaceUserTable.userId, schema.projectMemberTable.userId),
+      ),
+    )
+    .where(
+      exactPairs(
+        schema.projectMemberTable.projectId,
+        schema.projectMemberTable.userId,
+        pairs,
+      ),
+    );
+  for (const row of memberships) {
+    const key = projectUserKey(row);
+    if (wanted.has(key)) allowed.add(key);
+  }
+
+  const admins = await db
+    .select({ id: schema.userTable.id })
+    .from(schema.userTable)
+    .where(
+      and(
+        inArray(schema.userTable.id, userIds),
+        instanceAdminRoleSql(schema.userTable.role),
+      ),
+    );
+  const adminIds = new Set(admins.map((admin) => admin.id));
+
+  const roles = await db
+    .select({
+      projectId: schema.projectTable.id,
+      workspaceId: schema.projectTable.workspaceId,
+      userId: schema.workspaceUserTable.userId,
+      role: schema.workspaceUserTable.role,
+    })
+    .from(schema.projectTable)
+    .innerJoin(
+      schema.workspaceUserTable,
+      eq(
+        schema.workspaceUserTable.workspaceId,
+        schema.projectTable.workspaceId,
+      ),
+    )
+    .where(
+      exactPairs(
+        schema.projectTable.id,
+        schema.workspaceUserTable.userId,
+        pairs,
+      ),
+    );
+  const seesAll = new Map<string, boolean>();
+  const roleByPair = new Map<string, { workspaceId: string; role: string }>();
+  for (const row of roles) {
+    if (row.role) roleByPair.set(projectUserKey(row), row);
+  }
+
+  for (const pair of pairs) {
+    const key = projectUserKey(pair);
+    if (allowed.has(key)) continue;
+    if (adminIds.has(pair.userId)) {
+      allowed.add(key);
+      continue;
+    }
+    const member = roleByPair.get(key);
+    if (!member) continue;
+    const roleKey = `${member.workspaceId}\u0000${member.role}`;
+    let allowedByRole = seesAll.get(roleKey);
+    if (allowedByRole === undefined) {
+      allowedByRole = await roleSeesAllProjects(
+        member.workspaceId,
+        member.role,
+      );
+      seesAll.set(roleKey, allowedByRole);
+    }
+    if (allowedByRole) allowed.add(key);
+  }
+
+  return allowed;
+}
+
+/**
+ * `accessibleProjectPairs` over any number of pairs, in bounded batches, as a
+ * map from `projectUserKey` to whether that pair has access. A pair whose
+ * batch failed is absent: a failed lookup is not evidence either way, so the
+ * caller leaves it to the sweep rather than guessing.
+ */
+export async function resolveProjectAccess(
+  pairs: ProjectUserPair[],
+  batchSize = 500,
+): Promise<Map<string, boolean>> {
+  const answers = new Map<string, boolean>();
+  for (let start = 0; start < pairs.length; start += batchSize) {
+    const batch = pairs.slice(start, start + batchSize);
+    let allowed: Set<string>;
+    try {
+      allowed = await accessibleProjectPairs(batch);
+    } catch (error) {
+      console.error("Failed to resolve project access:", error);
+      continue;
+    }
+    for (const pair of batch) {
+      const key = projectUserKey(pair);
+      answers.set(key, allowed.has(key));
+    }
+  }
+  return answers;
 }

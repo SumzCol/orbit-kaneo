@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import db from "../../database";
+import { notifyProjectAccessChanged } from "../../ws";
 import {
   projectMemberTable,
   projectTable,
@@ -95,6 +96,7 @@ async function addProjectMember(
     });
   }
 
+  notifyProjectAccessChanged(userId, projectId, true);
   return added;
 }
 
