@@ -202,6 +202,8 @@ export async function shutdownWebSocketAdapter() {
   projectBroadcastTimeouts.clear();
   projectBroadcastQueues.clear();
   recentRevocations.clear();
+  heldConnections.clear();
+  revalidations.clear();
 
   const currentAdapter = adapter;
   if (currentAdapter) {
@@ -249,15 +251,29 @@ async function closeMovedProjectConnections(
   projectConnections.delete(projectId);
   if (connections.length === 0) return;
 
+  // Every connected user is asked, not only the ones the sender named: a
+  // removal that committed after the move built its list would otherwise get
+  // the ordinary close here, and its own revocation would then find nothing
+  // left to close with 4403. Moves are rare, so one lookup per user is fine.
   const connected = new Set(connections.map((conn) => conn.userId));
+  const named = new Set(revokedUserIds);
   const stillRevoked = new Set<string>();
-  for (const userId of revokedUserIds) {
-    if (!connected.has(userId)) continue;
+  for (const userId of connected) {
     try {
       if (!(await userCanAccessProject(projectId, userId))) {
         stillRevoked.add(userId);
+        rememberRevocation(projectId, userId);
       }
     } catch (error) {
+      // Not evidence for a user the sender did not name: they keep the
+      // ordinary close.
+      if (!named.has(userId)) {
+        console.error(
+          `Failed to check access to moved project ${projectId}:`,
+          error,
+        );
+        continue;
+      }
       // Kept on the sender's answer, which said access was lost. The
       // ordinary close is not recoverable here: these connections are already
       // out of the map the sweep walks, and the client would go on retrying
@@ -540,20 +556,47 @@ function closeIfStillRevoked(projectId: string, userId: string) {
   revalidateUserConnections(projectId, userId);
 }
 
+// Connections taken out of delivery while their user's access is looked up,
+// and how many lookups each project and user has had. A later revocation for
+// the same user has to find connections an earlier lookup still holds, and an
+// earlier lookup must not put them back on an answer a later one supersedes.
+const heldConnections = new Map<string, Set<ProjectConnection>>();
+const revalidations = new Map<string, number>();
+
 function revalidateUserConnections(projectId: string, userId: string) {
   // Taken out of delivery before the lookup, which is asynchronous: an event
   // broadcast meanwhile would otherwise still reach a user whose access has
   // just ended. Put back only if the lookup confirms access, or fails, since
   // a failed lookup is not evidence and the sweep must still see them.
+  const key = revocationKey(projectId, userId);
   const connections = projectConnections.get(projectId);
-  const held = [...(connections ?? [])].filter(
-    (conn) => conn.userId === userId,
-  );
-  if (held.length === 0) return;
+  const held = new Set(heldConnections.get(key));
+  for (const conn of connections ?? []) {
+    if (conn.userId === userId) held.add(conn);
+  }
+  if (held.size === 0) return;
   for (const conn of held) connections?.delete(conn);
   if (connections?.size === 0) projectConnections.delete(projectId);
+  heldConnections.set(key, held);
+  const generation = (revalidations.get(key) ?? 0) + 1;
+  revalidations.set(key, generation);
 
-  const restore = () => {
+  const settle = (outcome: "restore" | "close") => {
+    // A newer revocation started its own lookup while this one ran; that one
+    // decides, since this answer may predate it.
+    if (revalidations.get(key) !== generation) return;
+    heldConnections.delete(key);
+    revalidations.delete(key);
+    if (outcome === "close") {
+      for (const conn of held) {
+        try {
+          conn.ws.close(ACCESS_REVOKED_CLOSE_CODE, "Project access revoked");
+        } catch {
+          // Already gone; dropping it reaches the same end state.
+        }
+      }
+      return;
+    }
     let current = projectConnections.get(projectId);
     if (!current) {
       current = new Set();
@@ -563,21 +606,9 @@ function revalidateUserConnections(projectId: string, userId: string) {
   };
 
   void userCanAccessProject(projectId, userId)
-    .then((allowed) => {
-      if (allowed) {
-        restore();
-        return;
-      }
-      for (const conn of held) {
-        try {
-          conn.ws.close(ACCESS_REVOKED_CLOSE_CODE, "Project access revoked");
-        } catch {
-          // Already gone; dropping it reaches the same end state.
-        }
-      }
-    })
+    .then((allowed) => settle(allowed ? "restore" : "close"))
     .catch((error) => {
-      restore();
+      settle("restore");
       console.error(
         `Failed to revalidate a revocation for project ${projectId}:`,
         error,

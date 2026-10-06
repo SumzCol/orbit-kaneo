@@ -84,6 +84,11 @@ export function useProjectWebSocket(projectId: string) {
     // project it cannot read. It drops the caches too: the board may have
     // been refetched first, and the message saying access ended may not come.
     let probing = false;
+    // A grant that arrived while a socket was still open. Board and user
+    // events are not ordered against each other, so a 4403 for a revocation
+    // the grant has since undone can close that socket afterwards; the grant
+    // then turns that close into one more attempt instead of a final stop.
+    let grantSinceOpen = false;
     function stopRetrying() {
       if (retryTimeout !== null) {
         clearTimeout(retryTimeout);
@@ -109,6 +114,7 @@ export function useProjectWebSocket(projectId: string) {
           return;
         }
         if (signal === "revoke") {
+          grantSinceOpen = false;
           // An open socket gets the server's 4403. One that is closed,
           // between retries or polling would keep trying against a 403, and
           // ignore a later grant, so it stops here as if the 4403 had come.
@@ -121,7 +127,10 @@ export function useProjectWebSocket(projectId: string) {
         // An open or connecting board needs nothing more. A grant only wakes
         // a board stopped by 4403; a probe also tries one that is
         // disconnected, since what it missed while down is unknown.
-        if (activeSocket) return;
+        if (activeSocket) {
+          if (signal === "grant") grantSinceOpen = true;
+          return;
+        }
         if (signal === "grant" && !revoked) return;
         stopRetrying();
         revoked = false;
@@ -217,6 +226,7 @@ export function useProjectWebSocket(projectId: string) {
       ws.onopen = () => {
         if (disposed || activeSocket !== ws) return;
         probing = false;
+        grantSinceOpen = false;
         needsReconcile = true;
         flushPending();
         if (healthyTimeout !== null) clearTimeout(healthyTimeout);
@@ -555,6 +565,17 @@ export function useProjectWebSocket(projectId: string) {
             retries = 0;
             connect();
           }, UNCONFIRMED_REVOCATION_RETRY_MS);
+          return;
+        }
+
+        if (event?.code === ACCESS_REVOKED_CLOSE_CODE && grantSinceOpen) {
+          // Possibly the revocation the grant has since undone. The caches go
+          // as on any 4403, then one attempt settles it either way.
+          grantSinceOpen = false;
+          dropProjectCaches(queryClient, projectId);
+          probing = true;
+          retries = 0;
+          connect();
           return;
         }
 

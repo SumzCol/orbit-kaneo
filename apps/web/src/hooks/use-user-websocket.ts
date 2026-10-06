@@ -44,10 +44,11 @@ export function useUserWebSocket() {
     let retries = 0;
     let retryTimeout: ReturnType<typeof setTimeout> | null = null;
     let pingInterval: ReturnType<typeof setInterval> | null = null;
-    // Set once the socket has been down: after a reconnect, or after a failed
-    // first attempt, since the page may have loaded its data over HTTP while
-    // no socket was there to hear about changes to it.
-    let missedMessages = false;
+    // Messages sent before this socket registers are lost, the first time as
+    // much as after a drop: the page may have loaded its data over HTTP and
+    // had it change before the socket was there to hear it. So every open
+    // reconciles, the first included.
+    let missedMessages = true;
     let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
     function scheduleAccessReconcile() {
       if (reconcileTimer !== null) return;

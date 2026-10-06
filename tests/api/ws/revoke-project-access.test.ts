@@ -504,6 +504,74 @@ describe("revokeProjectAccess", () => {
     );
   });
 
+  // An earlier lookup that saw a brief re-add must not put the connection
+  // back after a later revocation, whose lookup has since closed it.
+  it("does not restore a connection on a lookup a later revocation superseded", async () => {
+    await initializeWebSocketAdapter();
+    const conn = connect("proj-1", "user-flaky");
+    access.allowed.clear();
+    access.allowed.add("proj-1:user-flaky");
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let calls = 0;
+    access.gate = async () => {
+      calls += 1;
+      if (calls === 1) await held;
+    };
+    try {
+      revokeProjectAccess("proj-1", "user-flaky");
+      // Only the first lookup is held; the in-memory adapter may loop the
+      // revocation back and run another, which settles on its own.
+      await vi.waitFor(() => expect(calls).toBeGreaterThanOrEqual(1));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      access.allowed.clear();
+      revokeProjectAccess("proj-1", "user-flaky");
+      await vi.waitFor(() =>
+        expect(conn.ws.close).toHaveBeenCalledWith(
+          4403,
+          "Project access revoked",
+        ),
+      );
+      // The first lookup now answers on the brief re-add.
+      access.allowed.add("proj-1:user-flaky");
+    } finally {
+      access.gate = undefined;
+      release();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    broadcastToProject("proj-1", {
+      type: "TASK_UPDATED",
+      projectId: "proj-1",
+      taskId: "task-1",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(conn.ws.send).not.toHaveBeenCalled();
+  });
+
+  // The sender's list can be out of date: a removal that committed after it
+  // was built would otherwise get the ordinary close and never a 4403.
+  it("revokes a connected user the move's list did not name", async () => {
+    await initializeWebSocketAdapter();
+    const unnamed = connect("proj-1", "user-unnamed");
+    const kept = connect("proj-1", "user-kept");
+    access.allowed.clear();
+    access.allowed.add("proj-1:user-kept");
+
+    await closeProjectConnections("proj-1", []);
+
+    expect(unnamed.ws.close).toHaveBeenCalledWith(
+      4403,
+      "Project access revoked",
+    );
+    expect(kept.ws.close).toHaveBeenCalledWith(
+      1008,
+      "Project workspace changed",
+    );
+  });
+
   it("never sends the control message to a socket", async () => {
     await initializeWebSocketAdapter();
 

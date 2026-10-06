@@ -49,6 +49,10 @@ class TestSocket {
     this.onopen?.();
   }
 }
+function clearClient() {
+  for (const method of Object.values(client)) method.mockClear();
+}
+
 describe("user WebSocket lifecycle", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -72,8 +76,10 @@ describe("user WebSocket lifecycle", () => {
     auth.userId = "user-b";
     rerender();
     const current = TestSocket.instances[1];
+    act(() => current.open());
+    // Opening reconciles; what follows is about events from the old socket.
+    clearClient();
     act(() => {
-      current.open();
       old.onclose?.();
       old.onopen?.();
       old.onmessage?.({
@@ -201,6 +207,8 @@ describe("project access changes on the user socket", () => {
     renderHook(() => useUserWebSocket());
     const [socket] = TestSocket.instances;
     act(() => socket.open());
+    // Opening reconciles too; only what the message does is under test.
+    clearClient();
     act(() => socket.onmessage?.({ data: JSON.stringify(message) }));
     // The workspace-wide refresh runs once per burst, a moment later.
     act(() => vi.advanceTimersByTime(100));
@@ -307,7 +315,10 @@ describe("project access changes on the user socket", () => {
     });
     stop();
 
-    expect(granted).toHaveBeenCalledOnce();
+    // Besides the probe the first connect sends to every board.
+    expect(
+      granted.mock.calls.filter(([kind]) => kind === "grant"),
+    ).toHaveLength(1);
     expect(client.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["tasks", "project-1"],
     });
@@ -334,6 +345,7 @@ describe("project access changes on the user socket", () => {
     renderHook(() => useUserWebSocket());
     const [socket] = TestSocket.instances;
     act(() => socket.open());
+    clearClient();
     act(() => {
       for (let i = 0; i < 20; i++) {
         socket.onmessage?.({
@@ -366,17 +378,20 @@ describe("project access changes on the user socket", () => {
     });
     stop();
 
-    expect(signal).toHaveBeenCalledExactlyOnceWith("revoke");
+    expect(
+      signal.mock.calls.filter(([kind]) => kind === "revoke"),
+    ).toHaveLength(1);
   });
 
   // Nothing replays a message sent while the socket was down, so a reconnect
   // refreshes what such a message would have fixed.
-  it("refreshes the project list and drops search on a reconnect, not the first connect", () => {
+  // Messages sent before the socket registers are lost on the first open as
+  // much as after a drop, so both reconcile.
+  it("refreshes the project list and drops search on the first connect and on a reconnect", () => {
     renderHook(() => useUserWebSocket());
     act(() => TestSocket.instances[0].open());
-    expect(client.invalidateQueries).not.toHaveBeenCalled();
-    expect(client.removeQueries).not.toHaveBeenCalled();
-    expect(client.resetQueries).not.toHaveBeenCalled();
+    expect(client.resetQueries).toHaveBeenCalledWith({ queryKey: ["search"] });
+    clearClient();
 
     act(() => {
       TestSocket.instances[0].onclose?.();
@@ -408,12 +423,13 @@ describe("project access changes on the user socket", () => {
 
   // A grant missed while the socket was down would leave a board stopped by
   // 4403 for good, so each one is asked to try once.
-  it("probes revoked boards on a reconnect, not the first connect", () => {
+  it("probes boards on the first connect and on a reconnect", () => {
     const signal = vi.fn();
     const stop = onProjectAccessSignal("project-1", signal);
     renderHook(() => useUserWebSocket());
     act(() => TestSocket.instances[0].open());
-    expect(signal).not.toHaveBeenCalled();
+    expect(signal).toHaveBeenCalledExactlyOnceWith("probe");
+    signal.mockClear();
 
     act(() => {
       TestSocket.instances[0].onclose?.();

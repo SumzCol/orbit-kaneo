@@ -391,6 +391,22 @@ describe("useProjectWebSocket relation invalidation", () => {
     }
   });
 
+  // Board and user events are not ordered. A grant can arrive while the
+  // socket is still open, before the 4403 for the revocation it undid; that
+  // close must not then stop the board for good.
+  it("tries again when a 4403 follows a grant it may predate", () => {
+    const constructor = globalThis.WebSocket as unknown as ReturnType<
+      typeof vi.fn
+    >;
+    client.setQueryData(["tasks", "project-1"], { columns: [] });
+
+    announceProjectAccessGranted("project-1");
+    socket.onclose?.({ code: 4403 } as CloseEvent);
+
+    expect(constructor).toHaveBeenCalledTimes(2);
+    expect(client.getQueryData(["tasks", "project-1"])).toBeUndefined();
+  });
+
   it("ignores a probe while connected", () => {
     const constructor = globalThis.WebSocket as unknown as ReturnType<
       typeof vi.fn
