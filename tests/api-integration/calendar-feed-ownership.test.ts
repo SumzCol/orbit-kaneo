@@ -34,14 +34,24 @@ import {
 // a test sets it.
 const accessCheck = vi.hoisted(() => ({
   after: undefined as (() => Promise<void>) | undefined,
+  // Runs before a check made outside any transaction, where a concurrent
+  // change committed in between would be seen.
+  beforeCommitted: undefined as (() => Promise<void>) | undefined,
 }));
 vi.mock("../../apps/api/src/utils/project-access", async (original) => {
   const actual =
     await original<typeof import("../../apps/api/src/utils/project-access")>();
   return {
     ...actual,
-    userCanAccessProject: async (projectId: string, userId: string) => {
-      const allowed = await actual.userCanAccessProject(projectId, userId);
+    userCanAccessProject: async (
+      ...args: Parameters<typeof actual.userCanAccessProject>
+    ) => {
+      const beforeCommitted = accessCheck.beforeCommitted;
+      if (beforeCommitted && args.length < 3) {
+        accessCheck.beforeCommitted = undefined;
+        await beforeCommitted();
+      }
+      const allowed = await actual.userCanAccessProject(...args);
       const after = accessCheck.after;
       accessCheck.after = undefined;
       if (after) await after();
@@ -682,5 +692,42 @@ describe("a banned owner's feeds", () => {
     await ban(member.id, new Date(Date.now() - 60_000));
 
     expect(await fetchFeed(feed.token)).toBe(200);
+  });
+});
+
+describe("a removal racing a re-add", () => {
+  // Decided after the commit, the check could see the member already added
+  // back and keep the links the removal was meant to end.
+  it("deletes the feeds even if the member is added back straight after", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const member = await addWorkspaceMember(workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id, member.id],
+    });
+    await insertFeed(project.id, member.id);
+    const [membership] = await db
+      .select({ id: schema.workspaceUserTable.id })
+      .from(schema.workspaceUserTable)
+      .where(
+        and(
+          eq(schema.workspaceUserTable.workspaceId, workspace.id),
+          eq(schema.workspaceUserTable.userId, member.id),
+        ),
+      );
+    accessCheck.beforeCommitted = async () => {
+      await db.insert(schema.projectMemberTable).values({
+        projectId: project.id,
+        userId: member.id,
+        workspaceMemberId: membership.id,
+      });
+    };
+
+    await removeProjectMember(project.id, workspace.id, member.id, owner.id);
+    accessCheck.beforeCommitted = undefined;
+
+    expect(await feedsOf(member.id)).toEqual([]);
   });
 });

@@ -1,12 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
-import { pruneCalendarFeeds } from "../../calendar-feed/service";
 import db from "../../database";
 import {
+  calendarFeedTable,
   projectMemberTable,
   projectTable,
   workspaceUserTable,
 } from "../../database/schema";
+import { userCanAccessProject } from "../../utils/project-access";
 
 async function removeProjectMember(
   projectId: string,
@@ -121,16 +122,28 @@ async function removeProjectMember(
       });
     }
 
+    // Their calendar feeds read as them and carry no session, so they go
+    // too, unless their role still reaches the project. Decided here, under
+    // the project lock an add also takes: after the commit, a re-add could
+    // land before the check, which would then see access and keep the old
+    // links. Asked on the transaction, which sees the row it just deleted.
+    if (!(await userCanAccessProject(projectId, userId, tx))) {
+      await tx
+        .delete(calendarFeedTable)
+        .where(
+          and(
+            eq(calendarFeedTable.projectId, projectId),
+            eq(calendarFeedTable.userId, userId),
+          ),
+        );
+    }
+
     return row;
   });
 
   // Removal applies from the user's next request and next connection: the
   // WebSocket upgrade checks access, but a board already open is not closed
   // here. Ending open sessions as well is its own change.
-  //
-  // Their calendar feeds read as them and carry no session, so they go too,
-  // unless their role still reaches the project.
-  await pruneCalendarFeeds(projectId, [userId]);
 
   return removed;
 }

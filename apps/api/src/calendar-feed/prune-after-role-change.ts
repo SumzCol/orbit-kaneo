@@ -6,10 +6,11 @@ import { pruneWorkspaceCalendarFeeds } from "./service";
 
 /**
  * A role change can end a feed owner's access to projects they reached
- * through their role, and nothing else deletes those feeds: the fetch only
- * refuses them, so giving the role back would revive the links. Pruning asks
- * each owner's current access, so it needs nothing from before the change
- * except which members to ask.
+ * through their role. The fetch deletes a feed it refuses, but only once
+ * something fetches it: a role given back before then would find the link
+ * still there and working. So the feeds are pruned when the role changes.
+ * Pruning asks each owner's current access, so it needs nothing from before
+ * the change except which members to ask.
  *
  * That part has to be read before the edit. A rename selected by `roleId`
  * leaves only the new name afterwards, while members still hold the old one.

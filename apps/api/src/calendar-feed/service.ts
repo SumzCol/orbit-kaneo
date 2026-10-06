@@ -27,6 +27,7 @@ import { userCanAccessProject } from "../utils/project-access";
 import { type CalendarTask, streamCalendar } from "./ical";
 
 export const CALENDAR_TASK_BATCH_SIZE = 50;
+const PRUNE_CONCURRENCY = 4;
 export const CALENDAR_DESCRIPTION_CHARACTERS = 4096;
 const CALENDAR_TITLE_CHARACTERS = 1024;
 
@@ -338,11 +339,24 @@ export async function pruneCalendarFeeds(
       if (ids) ids.push(feed.id);
       else byOwner.set(feed.userId, [feed.id]);
     }
-    for (const [userId, ids] of byOwner) {
-      if (await ownerCanReadFeed(projectId, userId)) continue;
+    // A few owners at a time: a role edit can reach many, and one after
+    // another kept the auth request waiting on each in turn. Bounded so a
+    // large set does not take every pooled connection.
+    const owners = [...byOwner];
+    const lost: string[] = [];
+    for (let start = 0; start < owners.length; start += PRUNE_CONCURRENCY) {
+      const batch = owners.slice(start, start + PRUNE_CONCURRENCY);
+      const allowed = await Promise.all(
+        batch.map(([userId]) => ownerCanReadFeed(projectId, userId)),
+      );
+      batch.forEach(([, ids], index) => {
+        if (!allowed[index]) lost.push(...ids);
+      });
+    }
+    if (lost.length > 0) {
       await db
         .delete(calendarFeedTable)
-        .where(inArray(calendarFeedTable.id, ids));
+        .where(inArray(calendarFeedTable.id, lost));
     }
   } catch (error) {
     console.error(`Failed to prune calendar feeds for ${projectId}:`, error);
@@ -374,8 +388,16 @@ export async function pruneWorkspaceCalendarFeeds(
           eq(projectTable.workspaceId, workspaceId),
         ),
       );
+    // One prune per project, covering every owner of a feed there, rather
+    // than one per (project, owner) pair, each re-reading that project's feeds.
+    const ownersByProject = new Map<string, string[]>();
     for (const feed of feeds) {
-      await pruneCalendarFeeds(feed.projectId, [feed.userId]);
+      const owners = ownersByProject.get(feed.projectId);
+      if (owners) owners.push(feed.userId);
+      else ownersByProject.set(feed.projectId, [feed.userId]);
+    }
+    for (const [projectId, owners] of ownersByProject) {
+      await pruneCalendarFeeds(projectId, owners);
     }
   } catch (error) {
     console.error(

@@ -26,8 +26,9 @@ import {
 export async function isProjectMember(
   projectId: string,
   userId: string,
+  database: Pick<typeof db, "select"> = db,
 ): Promise<boolean> {
-  const [row] = await db
+  const [row] = await database
     .select({ id: schema.projectMemberTable.id })
     .from(schema.projectMemberTable)
     .innerJoin(
@@ -184,12 +185,15 @@ export function visibleProjectCondition(userId: string, seesAll: boolean) {
 export async function userCanAccessProject(
   projectId: string,
   userId: string,
+  // Inside a transaction, pass it: the answer then reflects the transaction's
+  // own changes, such as a membership it has just deleted.
+  database: Pick<typeof db, "select"> = db,
 ): Promise<boolean> {
-  if (await isProjectMember(projectId, userId)) {
+  if (await isProjectMember(projectId, userId, database)) {
     return true;
   }
 
-  const [user] = await db
+  const [user] = await database
     .select({ role: schema.userTable.role })
     .from(schema.userTable)
     .where(eq(schema.userTable.id, userId))
@@ -198,7 +202,7 @@ export async function userCanAccessProject(
     return true;
   }
 
-  const [member] = await db
+  const [member] = await database
     .select({
       role: schema.workspaceUserTable.role,
       workspaceId: schema.workspaceUserTable.workspaceId,
@@ -221,7 +225,7 @@ export async function userCanAccessProject(
   if (!member?.role) return false;
 
   const statements =
-    (await customRoleStatements(member.workspaceId, member.role)) ??
+    (await customRoleStatements(member.workspaceId, member.role, database)) ??
     builtInRoleStatements(member.role);
 
   return Boolean(

@@ -53,8 +53,11 @@ function parsePermissionStatements(
 export async function customRoleStatements(
   workspaceId: string,
   role: string,
+  // A caller inside a transaction passes it, so the read sees the
+  // transaction's own changes and takes no second pooled connection.
+  database: Pick<typeof db, "select"> = db,
 ): Promise<Record<string, readonly string[]> | null> {
-  const [row] = await db
+  const [row] = await database
     .select({ permission: schema.workspaceRoleTable.permission })
     .from(schema.workspaceRoleTable)
     .where(
