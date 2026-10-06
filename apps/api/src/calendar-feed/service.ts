@@ -86,11 +86,27 @@ export async function createCalendarFeed(
     // transaction: a creation that passed the route's check could otherwise
     // insert a link after a removal had deleted the old ones, and a quick
     // re-add would then make it valid.
-    await tx
+    //
+    // The workspace is checked on the locked row too. A move that took the
+    // lock first has already remapped the project's feeds to its new
+    // workspace's labels; going on with the old workspace would store labels
+    // the feed can no longer resolve, and it would silently stay empty.
+    const [locked] = await tx
       .select({ id: projectTable.id })
       .from(projectTable)
-      .where(eq(projectTable.id, projectId))
+      .where(
+        and(
+          eq(projectTable.id, projectId),
+          eq(projectTable.workspaceId, workspaceId),
+        ),
+      )
       .for("update");
+    if (!locked) {
+      throw new HTTPException(409, {
+        message:
+          "The project moved to another workspace while the feed was being created. Try again from its new workspace.",
+      });
+    }
     if (!(await userCanAccessProject(projectId, userId, tx))) {
       throw new HTTPException(403, {
         message: "You don't have access to this project",

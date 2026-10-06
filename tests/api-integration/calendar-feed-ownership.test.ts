@@ -1083,3 +1083,51 @@ describe("a move onto a label being deleted", () => {
     expect(stillThere?.workspaceId).toBe(source.workspace.id);
   });
 });
+
+describe("a feed created while its project moves", () => {
+  // A move that took the project lock first has already remapped the feeds
+  // to the new workspace's labels. Going on with the old workspace would
+  // store labels the feed can no longer resolve, leaving it silently empty.
+  it("is refused once the project has left the workspace", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id],
+    });
+    const [label] = await db
+      .insert(schema.labelTable)
+      .values({
+        name: "Release",
+        color: "gray",
+        workspaceId: source.workspace.id,
+      })
+      .returning();
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    // As a creation authorized in the source before the move would run.
+    await expect(
+      createCalendarFeed(
+        project.id,
+        source.workspace.id,
+        source.user.id,
+        [label.id],
+        "UTC",
+        false,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(await feedsOf(source.user.id)).toEqual([]);
+  });
+});

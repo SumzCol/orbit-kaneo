@@ -8426,6 +8426,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The project moved to another workspace while the feed was being created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       }

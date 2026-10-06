@@ -138,6 +138,9 @@ const calendarFeed = apiRouter<BaseVariables & { workspaceId: string }>()
         403: errorResponse(
           "No workspace access, missing project:share permission, or missing label:create permission for a new workspace label definition",
         ),
+        409: errorResponse(
+          "The project moved to another workspace while the feed was being created",
+        ),
       },
     }),
     async (c) => {
