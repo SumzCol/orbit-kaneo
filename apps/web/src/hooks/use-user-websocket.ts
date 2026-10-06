@@ -23,6 +23,8 @@ const BASE_DELAY = 1000;
 // reconciles access changes missed while down, so a tab left open through a
 // long outage must still get one eventually.
 const SLOW_RETRY_DELAY = 60_000;
+// Access changes arriving within this window share one workspace-wide refresh.
+const ACCESS_RECONCILE_DELAY_MS = 100;
 const WS_PING_INTERVAL_MS = 30_000;
 
 /**
@@ -46,6 +48,22 @@ export function useUserWebSocket() {
     // first attempt, since the page may have loaded its data over HTTP while
     // no socket was there to hear about changes to it.
     let missedMessages = false;
+    let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
+    function scheduleAccessReconcile() {
+      if (reconcileTimer !== null) return;
+      reconcileTimer = setTimeout(() => {
+        reconcileTimer = null;
+        if (disposed) return;
+        refreshProjectLists(queryClient);
+        // Search results carry project, task, comment and activity text, and
+        // they are cached across projects rather than per project, so there
+        // is no narrower key. Reset either way: a mounted search keeps
+        // rendering a removed query's results, and an inactive one only
+        // marked stale would be shown as it was when reopened -- with hits
+        // from a revoked project, or without a granted one.
+        void queryClient.resetQueries({ queryKey: ["search"] });
+      }, ACCESS_RECONCILE_DELAY_MS);
+    }
 
     function clearPing() {
       if (pingInterval !== null) {
@@ -119,15 +137,10 @@ export function useUserWebSocket() {
           }
           if (message.type === "PROJECT_ACCESS_CHANGED") {
             // Every session gets this, not only one with that board open, so
-            // the sidebar is what it has to fix.
-            refreshProjectLists(queryClient);
-            // Search results carry project, task, comment and activity text,
-            // and they are cached across projects rather than per project, so
-            // there is no narrower key. Reset either way: a mounted search
-            // keeps rendering a removed query's results, and an inactive one
-            // only marked stale would be shown as it was when reopened --
-            // with hits from a revoked project, or without a granted one.
-            void queryClient.resetQueries({ queryKey: ["search"] });
+            // the sidebar is what it has to fix. Leaving a workspace sends one
+            // per project, so the workspace-wide refresh runs once per burst;
+            // the project's own caches below are dropped at once.
+            scheduleAccessReconcile();
             if (message.projectId && message.hasAccess === false) {
               dropProjectCaches(queryClient, message.projectId);
               announceProjectAccessLost(message.projectId);
@@ -169,6 +182,7 @@ export function useUserWebSocket() {
     return () => {
       disposed = true;
       clearPing();
+      if (reconcileTimer !== null) clearTimeout(reconcileTimer);
       if (retryTimeout !== null) {
         clearTimeout(retryTimeout);
       }

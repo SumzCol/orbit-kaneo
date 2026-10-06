@@ -238,6 +238,9 @@ async function closeMovedProjectConnections(
   projectId: string,
   revokedUserIds: string[] = [],
 ) {
+  // Recorded before anything else, so an upgrade that passed its check
+  // before the move and registers after this has run is asked again.
+  for (const userId of revokedUserIds) rememberRevocation(projectId, userId);
   const timeout = projectBroadcastTimeouts.get(projectId);
   if (timeout) clearTimeout(timeout);
   projectBroadcastTimeouts.delete(projectId);

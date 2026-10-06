@@ -202,6 +202,8 @@ describe("project access changes on the user socket", () => {
     const [socket] = TestSocket.instances;
     act(() => socket.open());
     act(() => socket.onmessage?.({ data: JSON.stringify(message) }));
+    // The workspace-wide refresh runs once per burst, a moment later.
+    act(() => vi.advanceTimersByTime(100));
   }
 
   // Every session gets this, so the sidebar is the thing to fix. Without it
@@ -323,6 +325,33 @@ describe("project access changes on the user socket", () => {
     stop();
 
     expect(granted).not.toHaveBeenCalledWith("grant");
+  });
+
+  // Leaving a workspace sends one message per project. Each drops its own
+  // project's caches at once, but the refetch of every workspace list runs
+  // once for the burst rather than once per project in every tab.
+  it("refreshes workspace lists once for a burst of access changes", () => {
+    renderHook(() => useUserWebSocket());
+    const [socket] = TestSocket.instances;
+    act(() => socket.open());
+    act(() => {
+      for (let i = 0; i < 20; i++) {
+        socket.onmessage?.({
+          data: JSON.stringify({
+            type: "PROJECT_ACCESS_CHANGED",
+            projectId: `project-${i}`,
+            hasAccess: false,
+          }),
+        });
+      }
+    });
+    act(() => vi.advanceTimersByTime(100));
+
+    const listRefetches = client.invalidateQueries.mock.calls.filter(
+      ([filters]) =>
+        (filters as { refetchType?: string })?.refetchType === "all",
+    );
+    expect(listRefetches).toHaveLength(1);
   });
 
   // A board whose own socket is down has no 4403 coming, so it is told.

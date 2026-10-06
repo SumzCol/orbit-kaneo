@@ -487,6 +487,23 @@ describe("revokeProjectAccess", () => {
     );
   });
 
+  // A move records who lost access, so an upgrade that passed before the
+  // move and registers after its close is asked again, as after a revoke.
+  it("closes a connection that registers just after a move revoked its user", async () => {
+    await initializeWebSocketAdapter();
+    access.allowed.clear();
+    await closeProjectConnections("proj-moved", ["user-late"]);
+
+    const late = connect("proj-moved", "user-late");
+
+    await vi.waitFor(() =>
+      expect(late.ws.close).toHaveBeenCalledWith(
+        4403,
+        "Project access revoked",
+      ),
+    );
+  });
+
   it("never sends the control message to a socket", async () => {
     await initializeWebSocketAdapter();
 
