@@ -12,9 +12,6 @@ import getTask from "@/fetchers/task/get-task";
 import getLabelsByTask from "@/fetchers/label/get-labels-by-task";
 import getExternalLinks from "@/fetchers/external-link/get-external-links";
 import { patchBoardTask } from "@/lib/patch-board-task";
-import { dropProjectCaches } from "@/lib/drop-project-caches";
-import { refreshProjectLists } from "@/lib/refresh-project-lists";
-import { onProjectAccessSignal } from "@/lib/project-access-grants";
 import { isPerTaskRelationQuery } from "@/lib/relation-query-keys";
 import type { ProjectWithTasks } from "@/types/project";
 
@@ -25,14 +22,7 @@ export function getWsUrl(projectId: string) {
 }
 
 const MAX_RETRIES = 5;
-// How often a board stopped by a refused single attempt, rather than by a
-// 4403, tries again.
-const UNCONFIRMED_REVOCATION_RETRY_MS = 60_000;
 const BASE_DELAY = 1000; // 1 second
-
-// Sent by the API when the user is removed from the project; mirrors the 403
-// their next upgrade attempt would get.
-const ACCESS_REVOKED_CLOSE_CODE = 4403;
 
 // Cloudflare closes idle WebSocket connections after 100 seconds of no traffic.
 // We send a lightweight ping every 30 seconds to keep the connection alive.
@@ -72,73 +62,6 @@ export function useProjectWebSocket(projectId: string) {
     const parentCountVersions = new Map<string, number>();
     let pingInterval: ReturnType<typeof setInterval> | null = null;
     let fallbackInterval: ReturnType<typeof setInterval> | null = null;
-    // Set by a 4403 close, after which nothing reconnects on its own. Being
-    // added back while the board stays open would otherwise leave it without
-    // realtime updates until the route remounts.
-    let revoked = false;
-    // An attempt that an access signal starts -- a grant, or a reconnect's
-    // guess -- is a single one until the socket opens. A grant can be stale by
-    // the time the upgrade runs, and the upgrade is refused with a plain HTTP
-    // 403, which reaches the client as an ordinary close, so a refused attempt
-    // must not fall through to the retries and the fallback poll against a
-    // project it cannot read. It drops the caches too: the board may have
-    // been refetched first, and the message saying access ended may not come.
-    let probing = false;
-    // A grant that arrived while a socket was still open. Board and user
-    // events are not ordered against each other, so a 4403 for a revocation
-    // the grant has since undone can close that socket afterwards; the grant
-    // then turns that close into one more attempt instead of a final stop.
-    let grantSinceOpen = false;
-    function stopRetrying() {
-      if (retryTimeout !== null) {
-        clearTimeout(retryTimeout);
-        retryTimeout = null;
-      }
-      if (fallbackInterval !== null) {
-        clearInterval(fallbackInterval);
-        fallbackInterval = null;
-      }
-    }
-    const stopListeningForAccess = onProjectAccessSignal(
-      projectId,
-      (signal) => {
-        if (disposed) return;
-        // A socket still connecting has not passed the upgrade's access check.
-        // If that is refused, its close is an ordinary one, so a revocation or
-        // a probe arriving now turns the attempt into a single try: refused,
-        // the board stops and drops its caches rather than retrying.
-        const connecting =
-          activeSocket !== null && activeSocket.readyState !== WebSocket.OPEN;
-        if (connecting && signal !== "grant") {
-          probing = true;
-          return;
-        }
-        if (signal === "revoke") {
-          grantSinceOpen = false;
-          // An open socket gets the server's 4403. One that is closed,
-          // between retries or polling would keep trying against a 403, and
-          // ignore a later grant, so it stops here as if the 4403 had come.
-          if (activeSocket || revoked) return;
-          stopRetrying();
-          revoked = true;
-          retries = MAX_RETRIES;
-          return;
-        }
-        // An open or connecting board needs nothing more. A grant only wakes
-        // a board stopped by 4403; a probe also tries one that is
-        // disconnected, since what it missed while down is unknown.
-        if (activeSocket) {
-          if (signal === "grant") grantSinceOpen = true;
-          return;
-        }
-        if (signal === "grant" && !revoked) return;
-        stopRetrying();
-        revoked = false;
-        probing = true;
-        retries = 0;
-        connect();
-      },
-    );
 
     function invalidateDetails(message: {
       type: string;
@@ -225,8 +148,6 @@ export function useProjectWebSocket(projectId: string) {
 
       ws.onopen = () => {
         if (disposed || activeSocket !== ws) return;
-        probing = false;
-        grantSinceOpen = false;
         needsReconcile = true;
         flushPending();
         if (healthyTimeout !== null) clearTimeout(healthyTimeout);
@@ -529,7 +450,7 @@ export function useProjectWebSocket(projectId: string) {
         }
       };
 
-      ws.onclose = (event) => {
+      ws.onclose = () => {
         if (disposed || activeSocket !== ws) return;
         clearPing();
         if (healthyTimeout !== null) {
@@ -537,59 +458,6 @@ export function useProjectWebSocket(projectId: string) {
           healthyTimeout = null;
         }
         activeSocket = null;
-
-        // The server closes with this code when the user's access to the
-        // project is taken away. Reconnecting would only be refused at the
-        // upgrade, and the fallback poll would be refused too, so stop
-        // entirely rather than falling through to either.
-        if (probing) {
-          probing = false;
-          revoked = true;
-          retries = MAX_RETRIES;
-          // The grant that started this attempt refetched the board first. If
-          // access went again before the upgrade, that fresh data is private
-          // and the message saying so may never come, so it is dropped here
-          // as on a 4403. A network failure with access intact costs only a
-          // refetch.
-          dropProjectCaches(queryClient, projectId);
-          // A refused upgrade and a dropped network look the same from here,
-          // so this is not known to be a revocation the way a 4403 is. Tried
-          // again, once, at a slow pace: a real revocation costs one refused
-          // upgrade a minute, and a blip no longer leaves an authorized board
-          // without realtime updates for as long as the user socket stays up.
-          retryTimeout = setTimeout(() => {
-            retryTimeout = null;
-            if (disposed || !revoked || activeSocket) return;
-            revoked = false;
-            probing = true;
-            retries = 0;
-            connect();
-          }, UNCONFIRMED_REVOCATION_RETRY_MS);
-          return;
-        }
-
-        if (event?.code === ACCESS_REVOKED_CLOSE_CODE && grantSinceOpen) {
-          // Possibly the revocation the grant has since undone. The caches go
-          // as on any 4403, then one attempt settles it either way.
-          grantSinceOpen = false;
-          dropProjectCaches(queryClient, projectId);
-          probing = true;
-          retries = 0;
-          connect();
-          return;
-        }
-
-        if (event?.code === ACCESS_REVOKED_CLOSE_CODE) {
-          retries = MAX_RETRIES;
-          revoked = true;
-          // The socket closing is the only signal that arrives, so the caches
-          // have to be dropped here. Otherwise the project keeps sitting in
-          // the sidebar and the board keeps showing the tasks it had when
-          // access ended, until something unrelated happens to refetch.
-          dropProjectCaches(queryClient, projectId);
-          refreshProjectLists(queryClient);
-          return;
-        }
 
         if (retries < MAX_RETRIES) {
           const delay = BASE_DELAY * 2 ** retries; // 1s, 2s, 4s, 8s, 16s
@@ -660,7 +528,6 @@ export function useProjectWebSocket(projectId: string) {
 
     return () => {
       unsubscribe();
-      stopListeningForAccess();
       if (healthyTimeout !== null) clearTimeout(healthyTimeout);
       pendingMessages.clear();
       if (burstReconcileTimer !== null) clearTimeout(burstReconcileTimer);

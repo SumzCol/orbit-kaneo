@@ -59,7 +59,7 @@ Two exceptions keep this workable:
 
 Manage the list in **Settings → Projects → Visibility**. It shows the people added to the project; administrators can open every project without appearing there. Changing who is on a project needs the same `project:share` permission as its public link, so workspace administrators and any custom role that carries it. Only people who are already in the workspace can be added, removing a member here always leaves at least one behind, and nobody can remove themselves. Leaving the workspace is a different path: it drops that person from the workspace's projects without that check, so a project can end up with no members at all. Workspace administrators still see it and can add people back.
 
-Removing someone takes effect immediately: any board they have open on that project disconnects. Removing someone from the workspace removes them from its projects too.
+Removing someone takes effect on their next request: the project leaves their sidebar and search the next time those load, and they can no longer open the board or reconnect to it. A board they already have open is not closed at that moment. Removing someone from the workspace removes them from its projects too.
 
 When you upgrade an existing instance, every current workspace member is added to every project in their workspace, so nothing disappears on the day of the upgrade. Prune from there, project by project.
 
