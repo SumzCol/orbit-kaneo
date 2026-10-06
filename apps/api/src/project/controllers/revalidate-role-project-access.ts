@@ -21,6 +21,30 @@ const BATCH_SIZE = 500;
  * on. Projects they still reach, as an explicit member or an instance
  * administrator, are left alone.
  */
+/**
+ * Every (project, user) pair, a batch at a time. Generated as they are used
+ * rather than all at once: a role held by many members in a workspace with
+ * many projects is a product large enough to matter in memory, even though
+ * each lookup only ever sees one batch.
+ */
+export function* pairBatches(
+  projects: { id: string }[],
+  userIds: string[],
+  size = BATCH_SIZE,
+): Generator<ProjectUserPair[]> {
+  let batch: ProjectUserPair[] = [];
+  for (const project of projects) {
+    for (const userId of userIds) {
+      batch.push({ projectId: project.id, userId });
+      if (batch.length === size) {
+        yield batch;
+        batch = [];
+      }
+    }
+  }
+  if (batch.length > 0) yield batch;
+}
+
 async function revalidateRoleProjectAccess(
   workspaceId: string,
   userIds: string[],
@@ -31,12 +55,8 @@ async function revalidateRoleProjectAccess(
     .select({ id: projectTable.id })
     .from(projectTable)
     .where(eq(projectTable.workspaceId, workspaceId));
-  const pairs: ProjectUserPair[] = projects.flatMap((project) =>
-    userIds.map((userId) => ({ projectId: project.id, userId })),
-  );
 
-  for (let start = 0; start < pairs.length; start += BATCH_SIZE) {
-    const batch = pairs.slice(start, start + BATCH_SIZE);
+  for (const batch of pairBatches(projects, userIds)) {
     let allowed: Set<string>;
     try {
       allowed = await accessibleProjectPairs(batch);
