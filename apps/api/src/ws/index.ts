@@ -507,15 +507,18 @@ function revocationKey(projectId: string, userId: string) {
 
 function rememberRevocation(projectId: string, userId: string) {
   const now = Date.now();
-  if (recentRevocations.size > 1_000) {
-    for (const [key, until] of recentRevocations) {
-      if (until <= now) recentRevocations.delete(key);
-    }
+  // Entries expire in the order they were added, since every one lives the
+  // same time, so expired ones are dropped from the front until the first
+  // live one. A full scan per insertion would turn an administrator's
+  // departure from a large workspace, one revocation per project, quadratic.
+  for (const [key, until] of recentRevocations) {
+    if (until > now) break;
+    recentRevocations.delete(key);
   }
-  recentRevocations.set(
-    revocationKey(projectId, userId),
-    now + RECENT_REVOCATION_MS,
-  );
+  const key = revocationKey(projectId, userId);
+  // Re-added at the back, so the order keeps matching expiry.
+  recentRevocations.delete(key);
+  recentRevocations.set(key, now + RECENT_REVOCATION_MS);
 }
 
 function wasRecentlyRevoked(projectId: string, userId: string) {
@@ -535,11 +538,43 @@ function closeIfStillRevoked(projectId: string, userId: string) {
 }
 
 function revalidateUserConnections(projectId: string, userId: string) {
+  // Taken out of delivery before the lookup, which is asynchronous: an event
+  // broadcast meanwhile would otherwise still reach a user whose access has
+  // just ended. Put back only if the lookup confirms access, or fails, since
+  // a failed lookup is not evidence and the sweep must still see them.
+  const connections = projectConnections.get(projectId);
+  const held = [...(connections ?? [])].filter(
+    (conn) => conn.userId === userId,
+  );
+  if (held.length === 0) return;
+  for (const conn of held) connections?.delete(conn);
+  if (connections?.size === 0) projectConnections.delete(projectId);
+
+  const restore = () => {
+    let current = projectConnections.get(projectId);
+    if (!current) {
+      current = new Set();
+      projectConnections.set(projectId, current);
+    }
+    for (const conn of held) current.add(conn);
+  };
+
   void userCanAccessProject(projectId, userId)
     .then((allowed) => {
-      if (!allowed) closeLocalProjectConnectionsForUser(projectId, userId);
+      if (allowed) {
+        restore();
+        return;
+      }
+      for (const conn of held) {
+        try {
+          conn.ws.close(ACCESS_REVOKED_CLOSE_CODE, "Project access revoked");
+        } catch {
+          // Already gone; dropping it reaches the same end state.
+        }
+      }
     })
     .catch((error) => {
+      restore();
       console.error(
         `Failed to revalidate a revocation for project ${projectId}:`,
         error,

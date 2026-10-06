@@ -417,6 +417,76 @@ describe("revokeProjectAccess", () => {
     expect(other.ws.close).not.toHaveBeenCalled();
   });
 
+  // The lookup is asynchronous; an event broadcast while it runs must not
+  // reach a user whose access has just ended.
+  it("delivers nothing to a user while their access is being checked", async () => {
+    await initializeWebSocketAdapter();
+    const removed = connect("proj-1", "user-removed");
+    const kept = connect("proj-1", "user-kept");
+    access.allowed.clear();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    access.gate = () => held;
+    try {
+      revokeProjectAccess("proj-1", "user-removed");
+      broadcastToProject("proj-1", {
+        type: "TASK_UPDATED",
+        projectId: "proj-1",
+        taskId: "task-1",
+      });
+      await vi.waitFor(() => expect(kept.ws.send).toHaveBeenCalled());
+      expect(removed.ws.send).not.toHaveBeenCalled();
+    } finally {
+      access.gate = undefined;
+      release();
+    }
+    await vi.waitFor(() =>
+      expect(removed.ws.close).toHaveBeenCalledWith(
+        4403,
+        "Project access revoked",
+      ),
+    );
+  });
+
+  it("gives the connection back when the check confirms access", async () => {
+    await initializeWebSocketAdapter();
+    const readded = connect("proj-1", "user-readded");
+    access.allowed.clear();
+    access.allowed.add("proj-1:user-readded");
+
+    revokeProjectAccess("proj-1", "user-readded");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    broadcastToProject("proj-1", {
+      type: "TASK_UPDATED",
+      projectId: "proj-1",
+      taskId: "task-1",
+    });
+
+    await vi.waitFor(() => expect(readded.ws.send).toHaveBeenCalled());
+    expect(readded.ws.close).not.toHaveBeenCalled();
+  });
+
+  // Many revocations at once, as when an administrator leaves a large
+  // workspace, must not drop ones still within their minute.
+  it("still remembers a revocation after many more", async () => {
+    await initializeWebSocketAdapter();
+    access.allowed.clear();
+    revokeProjectAccess("proj-first", "user-late");
+    for (let i = 0; i < 1_200; i++) revokeProjectAccess(`proj-${i}`, "user-x");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const late = connect("proj-first", "user-late");
+
+    await vi.waitFor(() =>
+      expect(late.ws.close).toHaveBeenCalledWith(
+        4403,
+        "Project access revoked",
+      ),
+    );
+  });
+
   it("never sends the control message to a socket", async () => {
     await initializeWebSocketAdapter();
 

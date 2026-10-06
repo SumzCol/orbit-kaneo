@@ -25,6 +25,9 @@ export function getWsUrl(projectId: string) {
 }
 
 const MAX_RETRIES = 5;
+// How often a board stopped by a refused single attempt, rather than by a
+// 4403, tries again.
+const UNCONFIRMED_REVOCATION_RETRY_MS = 60_000;
 const BASE_DELAY = 1000; // 1 second
 
 // Sent by the API when the user is removed from the project; mirrors the 403
@@ -539,6 +542,19 @@ export function useProjectWebSocket(projectId: string) {
           // as on a 4403. A network failure with access intact costs only a
           // refetch.
           dropProjectCaches(queryClient, projectId);
+          // A refused upgrade and a dropped network look the same from here,
+          // so this is not known to be a revocation the way a 4403 is. Tried
+          // again, once, at a slow pace: a real revocation costs one refused
+          // upgrade a minute, and a blip no longer leaves an authorized board
+          // without realtime updates for as long as the user socket stays up.
+          retryTimeout = setTimeout(() => {
+            retryTimeout = null;
+            if (disposed || !revoked || activeSocket) return;
+            revoked = false;
+            probing = true;
+            retries = 0;
+            connect();
+          }, UNCONFIRMED_REVOCATION_RETRY_MS);
           return;
         }
 

@@ -227,7 +227,7 @@ describe("useProjectWebSocket relation invalidation", () => {
       expect(constructor).toHaveBeenCalledTimes(2);
       // Refused before it opened.
       socket.onclose?.({ code: 1006 } as CloseEvent);
-      vi.advanceTimersByTime(120_000);
+      vi.advanceTimersByTime(59_999);
 
       expect(constructor).toHaveBeenCalledTimes(2);
       expect(invalidatedKeys()).not.toContain(
@@ -251,7 +251,7 @@ describe("useProjectWebSocket relation invalidation", () => {
       announceProjectAccessGranted("project-1");
       expect(constructor).toHaveBeenCalledTimes(2);
       socket.onclose?.({ code: 1006 } as CloseEvent);
-      vi.advanceTimersByTime(120_000);
+      vi.advanceTimersByTime(59_999);
 
       expect(constructor).toHaveBeenCalledTimes(2);
     } finally {
@@ -329,7 +329,7 @@ describe("useProjectWebSocket relation invalidation", () => {
       probeProjectBoards();
       expect(constructor).toHaveBeenCalledTimes(2);
       socket.onclose?.({ code: 1006 } as CloseEvent);
-      vi.advanceTimersByTime(120_000);
+      vi.advanceTimersByTime(59_999);
 
       expect(constructor).toHaveBeenCalledTimes(2);
       expect(client.getQueryData(["tasks", "project-1"])).toBeUndefined();
@@ -354,7 +354,7 @@ describe("useProjectWebSocket relation invalidation", () => {
         if (signal === "revoke") announceProjectAccessLost("project-1");
         else probeProjectBoards();
         socket.onclose?.({ code: 1006 } as CloseEvent);
-        vi.advanceTimersByTime(120_000);
+        vi.advanceTimersByTime(59_999);
 
         expect(constructor).toHaveBeenCalledTimes(1);
         expect(client.getQueryData(["tasks", "project-1"])).toBeUndefined();
@@ -366,6 +366,30 @@ describe("useProjectWebSocket relation invalidation", () => {
       }
     },
   );
+
+  // A refused single attempt may have been a network blip rather than a
+  // revocation, so the board tries again once a minute instead of stopping
+  // for good. A 4403 from the server is not retried.
+  it("tries again a minute after a refused attempt, but not after a 4403", () => {
+    vi.useFakeTimers();
+    try {
+      const constructor = globalThis.WebSocket as unknown as ReturnType<
+        typeof vi.fn
+      >;
+      socket.onclose?.({ code: 4403 } as CloseEvent);
+      vi.advanceTimersByTime(120_000);
+      expect(constructor).toHaveBeenCalledTimes(1);
+
+      probeProjectBoards();
+      socket.onclose?.({ code: 1006 } as CloseEvent);
+      expect(constructor).toHaveBeenCalledTimes(2);
+      vi.advanceTimersByTime(60_000);
+
+      expect(constructor).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("ignores a probe while connected", () => {
     const constructor = globalThis.WebSocket as unknown as ReturnType<
