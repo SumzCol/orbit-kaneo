@@ -24,7 +24,12 @@ import {
   projectMemberTable,
 } from "../../database/schema";
 import { publishEvent } from "../../events";
-import { closeProjectConnections } from "../../ws";
+import {
+  instanceAdministratorIds,
+  userCanAccessProject,
+  workspaceWideProjectUserIds,
+} from "../../utils/project-access";
+import { closeProjectConnections, notifyProjectAccessChanged } from "../../ws";
 
 async function moveProject(
   id: string,
@@ -38,6 +43,8 @@ async function moveProject(
     });
   }
 
+  // Everyone who reached the project before the move and might not after it.
+  let mayLoseAccess: string[] = [];
   const { movedProject, unassignedTasks } = await db.transaction(async (tx) => {
     // Use a stable order for both workspaces before locking the project row.
     // This also keeps source reorders from updating a project after it moves.
@@ -66,6 +73,15 @@ async function moveProject(
           "Project doesn't exist or doesn't belong to the specified workspace",
       });
     }
+
+    // Whoever administers the source workspace reaches the project through
+    // their role, with no row below to show for it, so dropping rows alone
+    // would never tell them their access ended. Read before the move, while
+    // the project still belongs to that workspace.
+    const sourceAdministrators = await workspaceWideProjectUserIds(
+      sourceWorkspaceId,
+      tx,
+    );
 
     // The key doubles as the ticket-id prefix (KAN-12), and short-id lookup
     // resolves it per workspace with a limit of 1. Two projects sharing a key
@@ -231,7 +247,7 @@ async function moveProject(
     // names and email addresses to the destination. Dropped rather than
     // translated, the same way an assignee outside the target is unassigned
     // above.
-    await tx
+    const droppedMembers = await tx
       .delete(projectMemberTable)
       .where(
         and(
@@ -244,7 +260,14 @@ async function moveProject(
               .where(eq(workspaceUserTable.workspaceId, targetWorkspaceId)),
           ),
         ),
-      );
+      )
+      .returning({ userId: projectMemberTable.userId });
+    mayLoseAccess = [
+      ...new Set([
+        ...droppedMembers.map((member) => member.userId),
+        ...sourceAdministrators,
+      ]),
+    ];
 
     // The members who survive are in the target workspace too, but their rows
     // still point at the source membership. Left alone they would keep access
@@ -386,7 +409,83 @@ async function moveProject(
     return { movedProject, unassignedTasks: unassigned };
   });
 
-  await closeProjectConnections(id);
+  // Neither a deleted row nor a source role means access is gone: an instance
+  // administrator, or someone who also administers the target, still reaches
+  // the project. Asked again before anybody is told their access ended.
+  //
+  // The move has committed by now, so a failed lookup must not fail the
+  // request. For someone who may have lost access it is not evidence either
+  // way, but the ordinary close cannot be taken back: their connection leaves
+  // the map the sweep walks, and their client would retry against a 403 with
+  // the board still cached. So they go on the revoked list, where the close
+  // asks once more and keeps the permanent code only if that fails too. They
+  // are not told their access ended, since that is not known.
+  //
+  // Everyone else whose sidebar the move changes is asked too: the members
+  // who came along, whose project now lists under another workspace, the
+  // target's administrators, who gain it through their role, and instance
+  // administrators, whose lists change on both sides. Each is told where they
+  // now stand; only actual losses get the permanent close.
+  //
+  // Settled one by one, so a failed lookup costs only its own group the
+  // notice rather than everyone the others found.
+  const [survivorLookup, targetLookup, instanceLookup] =
+    await Promise.allSettled([
+      db
+        .select({ userId: projectMemberTable.userId })
+        .from(projectMemberTable)
+        .where(eq(projectMemberTable.projectId, id))
+        .then((rows) => rows.map((row) => row.userId)),
+      workspaceWideProjectUserIds(targetWorkspaceId),
+      instanceAdministratorIds(),
+    ]);
+  const settled = (lookup: PromiseSettledResult<string[]>) => {
+    if (lookup.status === "fulfilled") return lookup.value;
+    console.error(
+      `Failed to list who sees moved project ${id}:`,
+      lookup.reason,
+    );
+    return [];
+  };
+  const survivors = settled(survivorLookup);
+  const targetAdministrators = settled(targetLookup);
+  const instanceAdministrators = settled(instanceLookup);
+  const affected = new Set([
+    ...mayLoseAccess,
+    ...survivors,
+    ...targetAdministrators,
+    ...instanceAdministrators,
+  ]);
+  const lostAccess: string[] = [];
+  const stillHaveAccess: string[] = [];
+  const uncertain: string[] = [];
+  for (const userId of affected) {
+    try {
+      if (await userCanAccessProject(id, userId)) {
+        stillHaveAccess.push(userId);
+      } else {
+        lostAccess.push(userId);
+      }
+    } catch (error) {
+      if (mayLoseAccess.includes(userId)) uncertain.push(userId);
+      console.error(
+        `Failed to revalidate access to moved project ${id} for ${userId}:`,
+        error,
+      );
+    }
+  }
+
+  // Carried on the move message rather than sent separately. The client only
+  // drops the project's caches and stops retrying on 4403, and a second
+  // message would race this one -- on a peer the move close would usually win,
+  // leaving a removed member retrying a connection they can no longer make.
+  await closeProjectConnections(id, [...lostAccess, ...uncertain]);
+  for (const userId of lostAccess) {
+    notifyProjectAccessChanged(userId, id, false);
+  }
+  for (const userId of stillHaveAccess) {
+    notifyProjectAccessChanged(userId, id, true);
+  }
 
   if (unassignedTasks.length > 0) {
     await publishEvent("task.bulk_unassigned", {

@@ -28,6 +28,11 @@ vi.mock("../../../apps/api/src/database", () => ({
   },
 }));
 vi.mock("../../../apps/api/src/events", () => ({ subscribeToEvent: vi.fn() }));
+// A move asks every connected user's access before choosing their close code.
+// These tests are about delivery, not revocation, so everyone keeps access.
+vi.mock("../../../apps/api/src/utils/project-access", () => ({
+  userCanAccessProject: async () => true,
+}));
 vi.mock("../../../apps/api/src/redis", () => ({
   isRedisConfigured: () => m.redis,
   getRedisPub: () => ({ publish: m.publish }),
@@ -139,7 +144,7 @@ describe("project move revocation", () => {
         message: { type: "PROJECT_MOVED", projectId: "project" },
       }),
     );
-    expect(old.close).toHaveBeenCalled();
+    await vi.waitFor(() => expect(old.close).toHaveBeenCalled());
   });
   it("closes local sockets even if Redis publication fails", async () => {
     m.redis = true;

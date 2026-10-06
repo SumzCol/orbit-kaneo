@@ -14,7 +14,7 @@ const CHANNEL_PATTERN = `${CHANNEL_PREFIX}*${CHANNEL_SUFFIX}`;
 const USER_CHANNEL_PREFIX = "kaneo:ws-user:";
 const USER_CHANNEL_PATTERN = `${USER_CHANNEL_PREFIX}*${CHANNEL_SUFFIX}`;
 
-const broadcastMessageSchema = v.object({
+export const broadcastMessageSchema = v.object({
   projectId: v.string(),
   message: v.object({
     type: v.string(),
@@ -31,6 +31,10 @@ const broadcastMessageSchema = v.object({
     ),
     sourceTaskId: v.optional(v.string()),
     targetTaskId: v.optional(v.string()),
+    userId: v.optional(v.string()),
+    // Stripped here and a peer closes a revoked member's socket with the
+    // move's code instead of the revocation's, which the client ignores.
+    revokedUserIds: v.optional(v.array(v.string())),
   }),
   excludeInitiatorId: v.optional(v.string()),
 });
