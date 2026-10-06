@@ -338,6 +338,35 @@ describe("useProjectWebSocket relation invalidation", () => {
     }
   });
 
+  // Still connecting, the socket has not passed the upgrade's access check,
+  // and a refusal arrives as an ordinary close.
+  it.each(["revoke", "probe"] as const)(
+    "makes a connecting socket's attempt final on %s",
+    (signal) => {
+      vi.useFakeTimers();
+      try {
+        const constructor = globalThis.WebSocket as unknown as ReturnType<
+          typeof vi.fn
+        >;
+        socket.readyState = 0;
+        client.setQueryData(["tasks", "project-1"], { columns: [] });
+
+        if (signal === "revoke") announceProjectAccessLost("project-1");
+        else probeProjectBoards();
+        socket.onclose?.({ code: 1006 } as CloseEvent);
+        vi.advanceTimersByTime(120_000);
+
+        expect(constructor).toHaveBeenCalledTimes(1);
+        expect(client.getQueryData(["tasks", "project-1"])).toBeUndefined();
+        // Stopped as after a 4403, so a later grant wakes it.
+        announceProjectAccessGranted("project-1");
+        expect(constructor).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
   it("ignores a probe while connected", () => {
     const constructor = globalThis.WebSocket as unknown as ReturnType<
       typeof vi.fn

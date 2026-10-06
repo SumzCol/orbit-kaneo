@@ -201,6 +201,7 @@ export async function shutdownWebSocketAdapter() {
   }
   projectBroadcastTimeouts.clear();
   projectBroadcastQueues.clear();
+  recentRevocations.clear();
 
   const currentAdapter = adapter;
   if (currentAdapter) {
@@ -492,7 +493,48 @@ function closeLocalProjectConnectionsForUser(
  * client, so acting on the stale answer would end a session the user is now
  * entitled to. A failed lookup leaves the connection to the sweep.
  */
+// Revocations seen in the last minute, by project and user. An upgrade can
+// pass its access check just before a revocation and register its connection
+// just after the revocation's close has run, which would leave it authorized
+// until the sweep. A connection registering while one of these is current is
+// asked again instead.
+const RECENT_REVOCATION_MS = 60_000;
+const recentRevocations = new Map<string, number>();
+
+function revocationKey(projectId: string, userId: string) {
+  return `${projectId}\u0000${userId}`;
+}
+
+function rememberRevocation(projectId: string, userId: string) {
+  const now = Date.now();
+  if (recentRevocations.size > 1_000) {
+    for (const [key, until] of recentRevocations) {
+      if (until <= now) recentRevocations.delete(key);
+    }
+  }
+  recentRevocations.set(
+    revocationKey(projectId, userId),
+    now + RECENT_REVOCATION_MS,
+  );
+}
+
+function wasRecentlyRevoked(projectId: string, userId: string) {
+  const key = revocationKey(projectId, userId);
+  const until = recentRevocations.get(key);
+  if (until === undefined) return false;
+  if (until <= Date.now()) {
+    recentRevocations.delete(key);
+    return false;
+  }
+  return true;
+}
+
 function closeIfStillRevoked(projectId: string, userId: string) {
+  rememberRevocation(projectId, userId);
+  revalidateUserConnections(projectId, userId);
+}
+
+function revalidateUserConnections(projectId: string, userId: string) {
   void userCanAccessProject(projectId, userId)
     .then((allowed) => {
       if (!allowed) closeLocalProjectConnectionsForUser(projectId, userId);
@@ -542,6 +584,11 @@ export function addConnection(
   }
   const conn: ProjectConnection = { ws, userId, initiatorId, workspaceId };
   projectConnections.get(projectId)?.add(conn);
+  // Its upgrade may have been authorized before a revocation this instance
+  // has since acted on.
+  if (wasRecentlyRevoked(projectId, userId)) {
+    revalidateUserConnections(projectId, userId);
+  }
   return conn;
 }
 

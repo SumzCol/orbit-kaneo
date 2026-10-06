@@ -95,6 +95,16 @@ export function useProjectWebSocket(projectId: string) {
       projectId,
       (signal) => {
         if (disposed) return;
+        // A socket still connecting has not passed the upgrade's access check.
+        // If that is refused, its close is an ordinary one, so a revocation or
+        // a probe arriving now turns the attempt into a single try: refused,
+        // the board stops and drops its caches rather than retrying.
+        const connecting =
+          activeSocket !== null && activeSocket.readyState !== WebSocket.OPEN;
+        if (connecting && signal !== "grant") {
+          probing = true;
+          return;
+        }
         if (signal === "revoke") {
           // An open socket gets the server's 4403. One that is closed,
           // between retries or polling would keep trying against a 403, and
@@ -105,9 +115,9 @@ export function useProjectWebSocket(projectId: string) {
           retries = MAX_RETRIES;
           return;
         }
-        // A connected or connecting board needs nothing. A grant only wakes a
-        // board stopped by 4403; a probe also tries one that is disconnected,
-        // since what it missed while down is unknown.
+        // An open or connecting board needs nothing more. A grant only wakes
+        // a board stopped by 4403; a probe also tries one that is
+        // disconnected, since what it missed while down is unknown.
         if (activeSocket) return;
         if (signal === "grant" && !revoked) return;
         stopRetrying();

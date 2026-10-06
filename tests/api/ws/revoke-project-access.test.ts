@@ -396,6 +396,27 @@ describe("revokeProjectAccess", () => {
     );
   });
 
+  // An upgrade authorized just before the revocation can register its
+  // connection after the close has run, and would otherwise stay open until
+  // the sweep.
+  it("closes a connection that registers just after a revocation", async () => {
+    await initializeWebSocketAdapter();
+    access.allowed.clear();
+    revokeProjectAccess("proj-late", "user-late");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const late = connect("proj-late", "user-late");
+    const other = connect("proj-late", "user-other");
+
+    await vi.waitFor(() =>
+      expect(late.ws.close).toHaveBeenCalledWith(
+        4403,
+        "Project access revoked",
+      ),
+    );
+    expect(other.ws.close).not.toHaveBeenCalled();
+  });
+
   it("never sends the control message to a socket", async () => {
     await initializeWebSocketAdapter();
 
