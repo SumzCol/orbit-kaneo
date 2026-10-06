@@ -47,6 +47,7 @@ import label from "./label";
 import mattermostIntegration from "./mattermost-integration";
 import mcpRoutes, { mcpWellKnownRoutes } from "./mcp";
 import { migrateColumns } from "./migrations/column-migration";
+import { migrateProjectMemberAccess } from "./migrations/project-member-access-migration";
 import notification from "./notification";
 import notificationPreferences from "./notification-preferences";
 import oauth from "./oauth";
@@ -950,6 +951,7 @@ export async function runStartupTasks() {
   await migrateNotificationPreferencesSchema();
   await migrateGitHubIntegration();
   await migrateColumns();
+  await migrateProjectMemberAccess();
   await seedDefaultWorkspaceRoles();
 
   initializePlugins();
