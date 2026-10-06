@@ -33,11 +33,21 @@ const sharingMiddleware = [
 // more than access to the project. Requiring project:share here too would
 // leave an owner who lost it, but kept the project, unable to revoke a link
 // that still works -- and nobody else can revoke it for them.
-const ownFeedMiddleware = [workspaceAccess.fromProject("projectId")];
+//
+// project:read is still required. Every role carries it, so it costs a
+// signed-in member nothing, but it is where an API key's scope is enforced:
+// without it, a key scoped to anything at all could list its user's secret
+// feed links.
+const ownFeedMiddleware = [
+  workspaceAccess.fromProject("projectId"),
+  requireWorkspacePermission({ project: ["read"] }),
+];
 const ownFeedErrors = {
   400: errorResponse("Invalid request or unknown project"),
   401: errorResponse("Authentication required"),
-  403: errorResponse("No workspace access, or no access to the project"),
+  403: errorResponse(
+    "No workspace access, no access to the project, or missing project:read permission",
+  ),
 };
 const managementErrors = {
   400: errorResponse("Invalid request or unknown project"),

@@ -1,7 +1,12 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { pruneWorkspaceCalendarFeeds } from "../../calendar-feed/service";
 import db from "../../database";
-import { projectMemberTable, projectTable } from "../../database/schema";
+import {
+  calendarFeedTable,
+  projectMemberTable,
+  projectTable,
+  userTable,
+} from "../../database/schema";
+import { hasInstanceAdminRole } from "../../utils/instance-admin-role";
 
 /**
  * Drops every project membership a user holds inside one workspace.
@@ -30,10 +35,34 @@ async function revokeWorkspaceProjectMemberships(
     )
     .returning({ projectId: projectMemberTable.projectId });
 
-  // Their calendar feeds read as them, so every one in this workspace is
-  // asked again. Taken from the feeds rather than the rows just deleted: an
+  // Their calendar feeds read as them. Leaving the workspace ends every way
+  // into its projects except the instance administrator role, which does not
+  // depend on the workspace. So the feeds are deleted outright rather than
+  // checked: a check made now could see the user already added back, with a
+  // role that reaches every project, and keep the links the departure ended.
+  // Taken from the feeds rather than the rows just deleted, since an
   // administrator held feeds on projects they reached without a row.
-  await pruneWorkspaceCalendarFeeds(workspaceId, [userId]);
+  const [user] = await db
+    .select({ role: userTable.role })
+    .from(userTable)
+    .where(eq(userTable.id, userId))
+    .limit(1);
+  if (!hasInstanceAdminRole(user?.role ?? null)) {
+    await db
+      .delete(calendarFeedTable)
+      .where(
+        and(
+          eq(calendarFeedTable.userId, userId),
+          inArray(
+            calendarFeedTable.projectId,
+            db
+              .select({ id: projectTable.id })
+              .from(projectTable)
+              .where(eq(projectTable.workspaceId, workspaceId)),
+          ),
+        ),
+      );
+  }
 
   return removed.map((row) => row.projectId);
 }

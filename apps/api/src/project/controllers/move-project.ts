@@ -25,7 +25,7 @@ import {
 } from "../../database/schema";
 import { publishEvent } from "../../events";
 import { closeProjectConnections } from "../../ws";
-import { pruneCalendarFeeds } from "../../calendar-feed/service";
+import { deleteInaccessibleFeeds } from "../../calendar-feed/service";
 
 async function moveProject(
   id: string,
@@ -384,13 +384,16 @@ async function moveProject(
       tx,
     );
 
+    // A feed reads as its owner, and an owner left in the source workspace no
+    // longer reaches the project. Decided here, under the project lock an add
+    // also takes: after the commit, a re-add could land before the check and
+    // keep the old links. Asked on the transaction, which sees the move.
+    await deleteInaccessibleFeeds(tx, id);
+
     return { movedProject, unassignedTasks: unassigned };
   });
 
   await closeProjectConnections(id);
-  // A feed reads as its owner, and an owner left in the source workspace no
-  // longer reaches the project.
-  await pruneCalendarFeeds(id);
 
   if (unassignedTasks.length > 0) {
     await publishEvent("task.bulk_unassigned", {

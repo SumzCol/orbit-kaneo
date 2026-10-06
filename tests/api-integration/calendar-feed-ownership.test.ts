@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,7 +21,7 @@ import { createApp } from "../../apps/api/src/index";
 import moveProject from "../../apps/api/src/project/controllers/move-project";
 import removeProjectMember from "../../apps/api/src/project/controllers/remove-project-member";
 import revokeWorkspaceProjectMemberships from "../../apps/api/src/project/controllers/revoke-workspace-project-memberships";
-import { mockAuthenticatedSession } from "./helpers/auth";
+import { mockAnonymousSession, mockAuthenticatedSession } from "./helpers/auth";
 import { resetTestDatabase } from "./helpers/database";
 import {
   addWorkspaceMember,
@@ -47,7 +47,9 @@ vi.mock("../../apps/api/src/utils/project-access", async (original) => {
       ...args: Parameters<typeof actual.userCanAccessProject>
     ) => {
       const beforeCommitted = accessCheck.beforeCommitted;
-      if (beforeCommitted && args.length < 3) {
+      // Outside a transaction: no executor, or the shared one.
+      const { default: sharedDb } = await import("../../apps/api/src/database");
+      if (beforeCommitted && (args.length < 3 || args[2] === sharedDb)) {
         accessCheck.beforeCommitted = undefined;
         await beforeCommitted();
       }
@@ -729,5 +731,165 @@ describe("a removal racing a re-add", () => {
     accessCheck.beforeCommitted = undefined;
 
     expect(await feedsOf(member.id)).toEqual([]);
+  });
+});
+
+describe("an API key reaching the caller's own feeds", () => {
+  // Listing and revoking need only project access for a signed-in member,
+  // but a key is held to its scope: one scoped to something else must not
+  // read its user's secret links.
+  async function keyed(permissions: Record<string, string[]>) {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+    const feed = await insertFeed(project.id, owner.id);
+    mockAnonymousSession();
+    const key = `kaneo_test_${randomBytes(16).toString("hex")}`;
+    await db.insert(schema.apikeyTable).values({
+      referenceId: owner.id,
+      userId: owner.id,
+      key: createHash("sha256").update(key).digest("base64url"),
+      name: "scoped key",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      permissions: JSON.stringify(permissions),
+      enabled: true,
+    });
+    const { app } = createApp();
+    const endpoint = `/api/calendar-feed/project/${project.id}`;
+    const request = (path: string, method = "GET") =>
+      app.request(path, {
+        method,
+        headers: { Authorization: `Bearer ${key}` },
+      });
+    return { feed, endpoint, request };
+  }
+
+  it("refuses a key scoped to something else", async () => {
+    const { feed, endpoint, request } = await keyed({ task: ["read"] });
+
+    expect((await request(endpoint)).status).toBe(403);
+    expect((await request(`${endpoint}/${feed.id}`, "DELETE")).status).toBe(
+      403,
+    );
+    expect(await fetchFeed(feed.token)).toBe(200);
+  });
+
+  it("lets a key scoped to reading projects list them", async () => {
+    const { feed, endpoint, request } = await keyed({ project: ["read"] });
+
+    const listed = await request(endpoint);
+    expect(listed.status).toBe(200);
+    expect(
+      ((await listed.json()) as { id: string }[]).map((entry) => entry.id),
+    ).toEqual([feed.id]);
+  });
+});
+
+describe("a move or a departure racing a re-add", () => {
+  it("deletes a left-behind owner's feeds even if they are added back straight after the move", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const sourceOnly = await addWorkspaceMember(source.workspace.id, "member");
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id, sourceOnly.id],
+    });
+    await insertFeed(project.id, sourceOnly.id);
+    // Added to the target and to the project, as a quick re-add would.
+    accessCheck.beforeCommitted = async () => {
+      const [membership] = await db
+        .insert(schema.workspaceUserTable)
+        .values({
+          workspaceId: target.workspace.id,
+          userId: sourceOnly.id,
+          role: "member",
+          joinedAt: new Date(),
+        })
+        .returning();
+      await db.insert(schema.projectMemberTable).values({
+        projectId: project.id,
+        userId: sourceOnly.id,
+        workspaceMemberId: membership.id,
+      });
+    };
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+    accessCheck.beforeCommitted = undefined;
+
+    expect(await feedsOf(sourceOnly.id)).toEqual([]);
+  });
+
+  // Rejoining with a role that reaches every project, before the cleanup ran,
+  // made the check keep links the departure had ended.
+  it("deletes a departing member's feeds even if they rejoin first", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const admin = await addWorkspaceMember(workspace.id, "admin");
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+    await insertFeed(project.id, admin.id);
+
+    await leaveWorkspace(workspace.id, admin.id);
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: workspace.id,
+      userId: admin.id,
+      role: "admin",
+      joinedAt: new Date(),
+    });
+    await revokeWorkspaceProjectMemberships(workspace.id, admin.id);
+
+    expect(await feedsOf(admin.id)).toEqual([]);
+  });
+
+  it("keeps an instance administrator's feeds when they leave a workspace", async () => {
+    const { user: owner, workspace } = await createWorkspaceMember({
+      role: "owner",
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: workspace.id,
+      members: [owner.id],
+    });
+    const [instanceAdmin] = await db
+      .insert(schema.userTable)
+      .values({
+        id: `user-${randomBytes(8).toString("hex")}`,
+        email: `admin-${randomBytes(8).toString("hex")}@example.com`,
+        emailVerified: true,
+        name: "Instance admin",
+        role: "admin",
+      })
+      .returning();
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: workspace.id,
+      userId: instanceAdmin.id,
+      role: "member",
+      joinedAt: new Date(),
+    });
+    const feed = await insertFeed(project.id, instanceAdmin.id);
+
+    await leaveWorkspace(workspace.id, instanceAdmin.id);
+    await revokeWorkspaceProjectMemberships(workspace.id, instanceAdmin.id);
+
+    // Their access never depended on the workspace.
+    expect(await fetchFeed(feed.token)).toBe(200);
   });
 });

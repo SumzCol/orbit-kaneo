@@ -28,6 +28,8 @@ import { type CalendarTask, streamCalendar } from "./ical";
 
 export const CALENDAR_TASK_BATCH_SIZE = 50;
 const PRUNE_CONCURRENCY = 4;
+
+type FeedDatabase = Pick<typeof db, "select" | "delete">;
 export const CALENDAR_DESCRIPTION_CHARACTERS = 4096;
 const CALENDAR_TITLE_CHARACTERS = 1024;
 
@@ -54,8 +56,12 @@ const feedColumns = {
  * as for a request -- and their account not banned, since a feed link is the
  * one way in that a ban's revoked sessions and API keys do not cover.
  */
-async function ownerCanReadFeed(projectId: string, userId: string) {
-  const [owner] = await db
+async function ownerCanReadFeed(
+  projectId: string,
+  userId: string,
+  database: FeedDatabase = db,
+) {
+  const [owner] = await database
     .select({ banned: userTable.banned, banExpires: userTable.banExpires })
     .from(userTable)
     .where(eq(userTable.id, userId))
@@ -64,7 +70,7 @@ async function ownerCanReadFeed(projectId: string, userId: string) {
     owner?.banned === true &&
     (!owner.banExpires || owner.banExpires.getTime() > Date.now());
   if (banned) return false;
-  return userCanAccessProject(projectId, userId);
+  return userCanAccessProject(projectId, userId, database);
 }
 
 export async function createCalendarFeed(
@@ -304,7 +310,7 @@ export async function getCalendarFeed(token: string) {
 
 /**
  * Deletes the feeds on a project whose owners can no longer open it, or just
- * those of `userIds` when given.
+ * those of `userIds` when given, on `database`.
  *
  * The fetch already refuses such a feed. Deleting it keeps the link from
  * working again if the same person is given access back, which would revive a
@@ -312,52 +318,67 @@ export async function getCalendarFeed(token: string) {
  * than assumed, so an administrator removed from a project keeps the feeds
  * they still read with their role.
  *
- * Callers run this after their own change has committed, so it never throws:
- * a feed it misses is still refused at fetch.
+ * Inside a transaction, pass it: the answer then reflects the transaction's
+ * own changes, and under a lock an access grant also takes, a concurrent
+ * re-add cannot land between the check and the delete. That is how removal
+ * and a move use it.
+ */
+export async function deleteInaccessibleFeeds(
+  database: FeedDatabase,
+  projectId: string,
+  userIds?: string[],
+) {
+  // The feeds as they stand now, before anyone's access is asked. Only these
+  // rows are deleted: an owner whose access comes back while this runs can
+  // create a replacement feed, and a delete by owner would take that one too.
+  const feeds = await database
+    .select({ id: calendarFeedTable.id, userId: calendarFeedTable.userId })
+    .from(calendarFeedTable)
+    .where(
+      and(
+        eq(calendarFeedTable.projectId, projectId),
+        userIds ? inArray(calendarFeedTable.userId, userIds) : undefined,
+      ),
+    );
+  const byOwner = new Map<string, string[]>();
+  for (const feed of feeds) {
+    const ids = byOwner.get(feed.userId);
+    if (ids) ids.push(feed.id);
+    else byOwner.set(feed.userId, [feed.id]);
+  }
+  // A few owners at a time: a role edit can reach many, and one after another
+  // kept the auth request waiting on each in turn. Bounded so a large set
+  // does not take every pooled connection.
+  const owners = [...byOwner];
+  const lost: string[] = [];
+  for (let start = 0; start < owners.length; start += PRUNE_CONCURRENCY) {
+    const batch = owners.slice(start, start + PRUNE_CONCURRENCY);
+    const allowed = await Promise.all(
+      batch.map(([userId]) => ownerCanReadFeed(projectId, userId, database)),
+    );
+    batch.forEach(([, ids], index) => {
+      if (!allowed[index]) lost.push(...ids);
+    });
+  }
+  if (lost.length > 0) {
+    await database
+      .delete(calendarFeedTable)
+      .where(inArray(calendarFeedTable.id, lost));
+  }
+}
+
+/**
+ * `deleteInaccessibleFeeds` outside any transaction, for changes that commit
+ * elsewhere -- Better Auth's role and ban endpoints. Callers have already
+ * committed their change, so this never throws: a feed it misses is still
+ * refused, and deleted, at fetch.
  */
 export async function pruneCalendarFeeds(
   projectId: string,
   userIds?: string[],
 ) {
   try {
-    // The feeds as they stand now, before anyone's access is asked. Only
-    // these rows are deleted: an owner whose access comes back while this
-    // runs can create a replacement feed, and a delete by owner would take
-    // that one too.
-    const feeds = await db
-      .select({ id: calendarFeedTable.id, userId: calendarFeedTable.userId })
-      .from(calendarFeedTable)
-      .where(
-        and(
-          eq(calendarFeedTable.projectId, projectId),
-          userIds ? inArray(calendarFeedTable.userId, userIds) : undefined,
-        ),
-      );
-    const byOwner = new Map<string, string[]>();
-    for (const feed of feeds) {
-      const ids = byOwner.get(feed.userId);
-      if (ids) ids.push(feed.id);
-      else byOwner.set(feed.userId, [feed.id]);
-    }
-    // A few owners at a time: a role edit can reach many, and one after
-    // another kept the auth request waiting on each in turn. Bounded so a
-    // large set does not take every pooled connection.
-    const owners = [...byOwner];
-    const lost: string[] = [];
-    for (let start = 0; start < owners.length; start += PRUNE_CONCURRENCY) {
-      const batch = owners.slice(start, start + PRUNE_CONCURRENCY);
-      const allowed = await Promise.all(
-        batch.map(([userId]) => ownerCanReadFeed(projectId, userId)),
-      );
-      batch.forEach(([, ids], index) => {
-        if (!allowed[index]) lost.push(...ids);
-      });
-    }
-    if (lost.length > 0) {
-      await db
-        .delete(calendarFeedTable)
-        .where(inArray(calendarFeedTable.id, lost));
-    }
+    await deleteInaccessibleFeeds(db, projectId, userIds);
   } catch (error) {
     console.error(`Failed to prune calendar feeds for ${projectId}:`, error);
   }

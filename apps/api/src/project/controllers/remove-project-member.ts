@@ -1,13 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import db from "../../database";
+import { deleteInaccessibleFeeds } from "../../calendar-feed/service";
 import {
-  calendarFeedTable,
   projectMemberTable,
   projectTable,
   workspaceUserTable,
 } from "../../database/schema";
-import { userCanAccessProject } from "../../utils/project-access";
 
 async function removeProjectMember(
   projectId: string,
@@ -127,16 +126,7 @@ async function removeProjectMember(
     // the project lock an add also takes: after the commit, a re-add could
     // land before the check, which would then see access and keep the old
     // links. Asked on the transaction, which sees the row it just deleted.
-    if (!(await userCanAccessProject(projectId, userId, tx))) {
-      await tx
-        .delete(calendarFeedTable)
-        .where(
-          and(
-            eq(calendarFeedTable.projectId, projectId),
-            eq(calendarFeedTable.userId, userId),
-          ),
-        );
-    }
+    await deleteInaccessibleFeeds(tx, projectId, [userId]);
 
     return row;
   });
