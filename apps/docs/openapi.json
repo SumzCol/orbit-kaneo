@@ -7196,7 +7196,7 @@
             }
           },
           "409": {
-            "description": "Project key conflict or cross-project task relationships",
+            "description": "Project key conflict, cross-project task relationships, or a calendar feed label that is being deleted in the destination",
             "content": {
               "text/plain": {
                 "schema": {

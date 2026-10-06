@@ -1029,3 +1029,57 @@ describe("a feed created while its owner is being removed", () => {
     expect(await feedsOf(member.id)).toEqual([]);
   });
 });
+
+describe("a move onto a label being deleted", () => {
+  // The destination's definition of that name blocks a new one but cannot be
+  // used, so remapping would quietly empty the feed.
+  it("is refused instead of emptying the feed", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+      members: [source.user.id],
+    });
+    const [definition] = await db
+      .insert(schema.labelTable)
+      .values({
+        name: "Release",
+        color: "gray",
+        workspaceId: source.workspace.id,
+      })
+      .returning();
+    await db.insert(schema.labelTable).values({
+      name: "Release",
+      color: "gray",
+      workspaceId: target.workspace.id,
+      deletionStartedAt: new Date(),
+    });
+    await db.insert(calendarFeedTable).values({
+      projectId: project.id,
+      userId: source.user.id,
+      labelIds: [definition.id],
+      timeZone: "UTC",
+      token: randomBytes(32).toString("hex"),
+    });
+
+    await expect(
+      moveProject(
+        project.id,
+        source.workspace.id,
+        target.workspace.id,
+        source.user.id,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    const [stillThere] = await db
+      .select({ workspaceId: schema.projectTable.workspaceId })
+      .from(schema.projectTable)
+      .where(eq(schema.projectTable.id, project.id));
+    expect(stillThere?.workspaceId).toBe(source.workspace.id);
+  });
+});

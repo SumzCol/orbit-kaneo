@@ -530,6 +530,16 @@ export async function remapMovedFeedLabels(
       ),
     );
   const targetByName = new Map(targets.map((label) => [label.name, label.id]));
+  // A name still unresolved here has a definition in the destination that is
+  // being deleted: it blocked the insert above but cannot be used. Remapping
+  // without it would quietly empty the feed, so the move is refused until
+  // the deletion finishes.
+  const pending = definitions.find((label) => !targetByName.has(label.name));
+  if (pending) {
+    throw new HTTPException(409, {
+      message: `The label "${pending.name}" is being deleted in the destination workspace. Try the move again once that finishes.`,
+    });
+  }
 
   for (const feed of feeds) {
     const remapped = [
