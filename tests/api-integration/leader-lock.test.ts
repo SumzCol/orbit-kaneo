@@ -21,34 +21,58 @@ beforeAll(async () => {
   await ensureTestDatabaseMigrated();
 });
 
+// Seconds until the stored expiry, against the database's own UTC clock.
+async function secondsUntilExpiry() {
+  const [row] = (
+    await db.execute(sql`
+      SELECT extract(epoch from "expires_at" - (now() at time zone 'utc'))::float
+        AS seconds
+      FROM job_lease WHERE "name" = ${LEASE};
+    `)
+  ).rows as { seconds: number }[];
+  return row?.seconds;
+}
+
 describe("withJobLease across time zones", () => {
-  // The host's zone is what broke this: `expires_at` is naive, so a lease
-  // written through a JS Date landed in local wall-clock. West of UTC it was
-  // born expired and every caller claimed it at once; east of UTC it outlived
-  // its window. Both sides are computed by Postgres now, so neither the host
-  // nor the session zone can move them.
+  // The process's zone is what broke this: `expires_at` is naive, and the
+  // driver serialises a JS Date as local wall-clock, so a lease written by a
+  // process west of UTC was born expired and every caller claimed it at once,
+  // and one east of UTC outlived its window. Node applies a change to
+  // process.env.TZ immediately, so each case really runs in that zone,
+  // whichever pooled connection the queries use.
+  //
+  // The session's zone needs no case of its own: both sides of the
+  // comparison come from `now() at time zone 'utc'`, which it cannot move.
   it.each(["UTC", "America/Bogota", "Asia/Tokyo"])(
-    "holds the lease with the session in %s",
+    "holds the lease for its window with the process in %s",
     async (zone) => {
       await clearLease();
-      await db.execute(sql.raw(`SET TIME ZONE '${zone}'`));
+      const previousZone = process.env.TZ;
+      process.env.TZ = zone;
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let holding = false;
+      const first = withJobLease(
+        LEASE,
+        async () => {
+          holding = true;
+          await held;
+          return "ran";
+        },
+        () => "skipped",
+        60_000,
+      );
       try {
-        let release!: () => void;
-        const held = new Promise<void>((resolve) => {
-          release = resolve;
+        await vi.waitFor(() => {
+          expect(holding).toBe(true);
         });
-        const first = withJobLease(
-          LEASE,
-          async () => {
-            await held;
-            return "ran";
-          },
-          () => "skipped",
-        );
-        // Give the insert time to land before the second caller asks.
-        await vi.waitFor(async () => {
-          expect(await readLease()).toBeDefined();
-        });
+
+        // The live row, as withJobLease wrote it, about a minute ahead.
+        const seconds = await secondsUntilExpiry();
+        expect(seconds).toBeGreaterThan(50);
+        expect(seconds).toBeLessThanOrEqual(60);
 
         expect(
           await withJobLease(
@@ -57,44 +81,14 @@ describe("withJobLease across time zones", () => {
             () => "skipped",
           ),
         ).toBe("skipped");
-
-        release();
-        await expect(first).resolves.toBe("ran");
       } finally {
-        await db.execute(sql.raw("SET TIME ZONE 'UTC'"));
+        release();
+        await first;
+        if (previousZone === undefined) delete process.env.TZ;
+        else process.env.TZ = previousZone;
       }
     },
   );
-
-  it("stores the expiry in UTC regardless of the session zone", async () => {
-    await clearLease();
-    await db.execute(sql.raw("SET TIME ZONE 'Asia/Tokyo'"));
-    try {
-      await withJobLease(
-        LEASE,
-        async () => "ran",
-        () => "skipped",
-        60_000,
-      );
-    } finally {
-      await db.execute(sql.raw("SET TIME ZONE 'UTC'"));
-    }
-
-    // The lease is released on the way out, so write one by hand and read the
-    // stored value back against the database's own UTC clock.
-    await db.execute(sql`
-      INSERT INTO job_lease ("name", "owner", "expires_at")
-      VALUES (${LEASE}, 'probe', (now() at time zone 'utc') + interval '1 minute');
-    `);
-    const [row] = (
-      await db.execute(sql`
-        SELECT "expires_at" > (now() at time zone 'utc') AS still_valid
-        FROM job_lease WHERE "name" = ${LEASE};
-      `)
-    ).rows as { still_valid: boolean }[];
-    expect(row.still_valid).toBe(true);
-    await clearLease();
-  });
 });
 
 describe("withJobLease", () => {
