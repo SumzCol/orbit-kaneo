@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, expect, it } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
 import { migrateColumns } from "../../apps/api/src/migrations/column-migration";
+import { DEFAULT_PROJECT_COLUMNS } from "../../apps/api/src/project/controllers/create-project";
 import { resetTestDatabase } from "./helpers/database";
 import {
   createProjectFixture,
@@ -120,7 +121,9 @@ it("resumes malformed legacy integrations after repair without remigrating compl
     .values({ projectId: project.id, type: "gitea", config: "{" })
     .returning();
   await migrateColumns();
-  expect(await db.select().from(schema.columnTable)).toHaveLength(4);
+  expect(await db.select().from(schema.columnTable)).toHaveLength(
+    DEFAULT_PROJECT_COLUMNS.length,
+  );
   expect(await db.select().from(schema.workflowRuleTable)).toHaveLength(0);
   expect(await db.select().from(schema.dataMigrationTable)).toEqual([
     expect.objectContaining({
