@@ -21,6 +21,76 @@ beforeAll(async () => {
   await ensureTestDatabaseMigrated();
 });
 
+// Seconds until the stored expiry, against the database's own UTC clock.
+async function secondsUntilExpiry() {
+  const [row] = (
+    await db.execute(sql`
+      SELECT extract(epoch from "expires_at" - (now() at time zone 'utc'))::float
+        AS seconds
+      FROM job_lease WHERE "name" = ${LEASE};
+    `)
+  ).rows as { seconds: number }[];
+  return row?.seconds;
+}
+
+describe("withJobLease across time zones", () => {
+  // The process's zone is what broke this: `expires_at` is naive, and the
+  // driver serialises a JS Date as local wall-clock, so a lease written by a
+  // process west of UTC was born expired and every caller claimed it at once,
+  // and one east of UTC outlived its window. Node applies a change to
+  // process.env.TZ immediately, so each case really runs in that zone,
+  // whichever pooled connection the queries use.
+  //
+  // The session's zone needs no case of its own: both sides of the
+  // comparison come from `now() at time zone 'utc'`, which it cannot move.
+  it.each(["UTC", "America/Bogota", "Asia/Tokyo"])(
+    "holds the lease for its window with the process in %s",
+    async (zone) => {
+      await clearLease();
+      const previousZone = process.env.TZ;
+      process.env.TZ = zone;
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let holding = false;
+      const first = withJobLease(
+        LEASE,
+        async () => {
+          holding = true;
+          await held;
+          return "ran";
+        },
+        () => "skipped",
+        60_000,
+      );
+      try {
+        await vi.waitFor(() => {
+          expect(holding).toBe(true);
+        });
+
+        // The live row, as withJobLease wrote it, about a minute ahead.
+        const seconds = await secondsUntilExpiry();
+        expect(seconds).toBeGreaterThan(50);
+        expect(seconds).toBeLessThanOrEqual(60);
+
+        expect(
+          await withJobLease(
+            LEASE,
+            async () => "ran",
+            () => "skipped",
+          ),
+        ).toBe("skipped");
+      } finally {
+        release();
+        await first;
+        if (previousZone === undefined) delete process.env.TZ;
+        else process.env.TZ = previousZone;
+      }
+    },
+  );
+});
+
 describe("withJobLease", () => {
   it("lets a second caller skip while the first still holds the lease", async () => {
     await clearLease();

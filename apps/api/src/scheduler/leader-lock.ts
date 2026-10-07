@@ -14,14 +14,27 @@ export async function withJobLease<T>(
   whenHeldElsewhere: () => T,
   leaseMs: number = DEFAULT_LEASE_MS,
 ): Promise<T> {
-  const expiresAt = new Date(Date.now() + leaseMs);
-
+  // Both sides of the comparison are computed by Postgres, in UTC.
+  //
+  // `expires_at` is `timestamp without time zone`, and the driver serialises a
+  // JS Date as local wall-clock, so on any instance not running in UTC the
+  // lease was written at the wrong time. West of UTC it landed in the past:
+  // born already expired, so every caller claimed it at once. East of UTC it
+  // landed in the future and outlived its window. The
+  // comparison had the matching flaw -- `now()` is a timestamptz, and
+  // comparing it against a naive column resolves through the session's time
+  // zone rather than the one the value was written in.
+  const leaseSeconds = leaseMs / 1000;
   const claimed = await db.execute(sql`
     INSERT INTO job_lease ("name", "owner", "expires_at")
-    VALUES (${name}, ${INSTANCE_ID}, ${expiresAt})
+    VALUES (
+      ${name},
+      ${INSTANCE_ID},
+      (now() at time zone 'utc') + make_interval(secs => ${leaseSeconds})
+    )
     ON CONFLICT ("name") DO UPDATE
       SET "owner" = EXCLUDED."owner", "expires_at" = EXCLUDED."expires_at"
-      WHERE job_lease."expires_at" < now()
+      WHERE job_lease."expires_at" < (now() at time zone 'utc')
     RETURNING "name";
   `);
 
