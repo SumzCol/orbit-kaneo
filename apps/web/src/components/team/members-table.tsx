@@ -143,7 +143,12 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
     access.projectAccess === "all"
       ? t("team:projectAccess.allProjects")
       : access.projectIds.length === 0
-        ? t("team:projectAccess.noProjectAccess")
+        ? // A limited manager only sees grants for projects they can see.
+          t(
+            managerLimited
+              ? "team:projectAccess.noVisibleProjectAccess"
+              : "team:projectAccess.noProjectAccess",
+          )
         : t("team:projectAccess.projectCount", {
             count: access.projectIds.length,
           });
