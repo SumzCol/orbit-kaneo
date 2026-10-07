@@ -1,6 +1,7 @@
 import { and, type SQLWrapper, sql } from "drizzle-orm";
 import db, { schema } from "../database";
 import { projectAccessCondition } from "../project-access/project-access-condition";
+import { workspaceReachCondition } from "../project-access/workspace-reach-condition";
 import { notBannedCondition } from "../utils/user-ban";
 
 /**
@@ -17,17 +18,8 @@ export function feedOwnerCanRead(
     EXISTS (
       SELECT 1 FROM "user"
       WHERE ${and(sql`"user"."id" = ${userId}`, notBannedCondition())}
-        AND (
-          'admin' = ANY(string_to_array("user"."role", ','))
-          OR EXISTS (
-            SELECT 1 FROM project AS feed_project
-            JOIN workspace_member AS feed_member
-              ON feed_member.workspace_id = feed_project.workspace_id
-              AND feed_member.user_id = ${userId}
-            WHERE feed_project.id = ${projectId}
-          )
-        )
     )
+    AND ${workspaceReachCondition(userId, projectId)}
     AND ${projectAccessCondition(userId, projectId)}
   )`;
 }

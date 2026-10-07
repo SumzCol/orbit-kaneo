@@ -1,6 +1,7 @@
 import { and, inArray } from "drizzle-orm";
 import db, { schema } from "../database";
 import { projectAccessCondition } from "./project-access-condition";
+import { workspaceReachCondition } from "./workspace-reach-condition";
 
 export async function findAccessibleProjects(
   viewerId: string,
@@ -18,6 +19,7 @@ export async function findAccessibleProjects(
     .where(
       and(
         inArray(schema.projectTable.id, ids),
+        workspaceReachCondition(viewerId, schema.projectTable.id),
         projectAccessCondition(viewerId, schema.projectTable.id),
       ),
     );

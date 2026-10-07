@@ -2,8 +2,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
+import moveProject from "../../apps/api/src/project/controllers/move-project";
 import { mockAnonymousSession, mockAuthenticatedSession } from "./helpers/auth";
 import { resetTestDatabase } from "./helpers/database";
+import { createWorkspaceMember } from "./helpers/fixtures";
 import { addWorkspaceMember } from "./helpers/project-access/add-workspace-member";
 import { createRestrictedWorkspace } from "./helpers/project-access/create-restricted-workspace";
 import { projectAccessApi } from "./helpers/project-access/project-access-api";
@@ -281,6 +283,48 @@ describe("project access enforcement", () => {
     });
     expect(deleted.status).toBe(200);
     await expectHiddenSource();
+  });
+
+  it("hides the source project of a move from another workspace's members", async () => {
+    const ctx = await createRestrictedWorkspace();
+    mockAuthenticatedSession(ctx.owner);
+    const moved = await projectAccessApi()(`/task/move/${ctx.alphaTask.id}`, {
+      method: "PUT",
+      body: { destinationProjectId: ctx.beta.id },
+    });
+    expect(moved.status).toBe(200);
+    // Beta then leaves for a workspace whose owner never joined the first.
+    const target = await createWorkspaceMember({ role: "owner" });
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: ctx.owner.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    await moveProject(
+      ctx.beta.id,
+      ctx.workspace.id,
+      target.workspace.id,
+      ctx.owner.id,
+    );
+
+    await vi.waitFor(async () => {
+      mockAuthenticatedSession(target.user);
+      const response = await projectAccessApi()(
+        `/activity/${ctx.alphaTask.id}`,
+      );
+      const activities = (await response.json()) as {
+        type: string;
+        eventData: Record<string, unknown> | null;
+      }[];
+      expect(
+        activities.find((activity) => activity.type === "moved")?.eventData,
+      ).toMatchObject({
+        fromProjectId: null,
+        fromProjectName: null,
+        toProjectId: ctx.beta.id,
+      });
+    });
   });
 
   it("keeps tasks editable after their assignee loses access", async () => {
