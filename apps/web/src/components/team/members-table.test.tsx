@@ -88,8 +88,13 @@ const myProjectAccess = vi.fn(() => ({
   projectIds: [] as string[],
 }));
 
+const myAccessFailed = vi.fn(() => false);
+
 vi.mock("@/hooks/queries/workspace-users/use-get-my-project-access", () => ({
-  default: () => ({ data: myProjectAccess() }),
+  default: () => ({
+    data: myAccessFailed() ? undefined : myProjectAccess(),
+    isError: myAccessFailed(),
+  }),
 }));
 
 const loadedProjects = {
@@ -99,10 +104,12 @@ const loadedProjects = {
   ] as { id: string; name: string }[] | undefined,
   isLoading: false,
 };
-const projectsResult = vi.fn(() => loadedProjects);
+const projectsResult = vi.fn(
+  (_options?: { enabled?: boolean }) => loadedProjects,
+);
 
 vi.mock("@/hooks/queries/project/use-get-projects", () => ({
-  default: () => projectsResult(),
+  default: (options: { enabled?: boolean }) => projectsResult(options),
 }));
 
 const canInviteUsers = vi.fn(() => true);
@@ -125,6 +132,8 @@ beforeEach(() => {
   projectsResult.mockReturnValue(loadedProjects);
   projectAccessEntries.mockReturnValue([restrictedEntry]);
   myProjectAccess.mockReturnValue({ projectAccess: "all", projectIds: [] });
+  myAccessFailed.mockReturnValue(false);
+  projectsResult.mockClear();
 });
 
 afterEach(() => {
@@ -391,6 +400,48 @@ describe("MembersTable project access", () => {
     );
     expect(
       await screen.findByText("team:projectAccess.noneSelectedLimited"),
+    ).toBeVisible();
+  });
+
+  it("loads projects only while the access dialog is open", async () => {
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[members[2]]}
+      />,
+    );
+    // Closed, so a failed load is fetched again on the next open.
+    expect(
+      projectsResult.mock.calls.every(
+        ([options]) => options?.enabled === false,
+      ),
+    ).toBe(true);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "team:projectAccess.editAria" }),
+    );
+    await screen.findByRole("button", { name: "team:projectAccess.save" });
+    expect(projectsResult.mock.calls.at(-1)?.[0]).toMatchObject({
+      enabled: true,
+    });
+  });
+
+  it("treats a manager whose own access failed to load as limited", () => {
+    myAccessFailed.mockReturnValue(true);
+    projectAccessEntries.mockReturnValue([
+      { ...restrictedEntry, projectIds: [] },
+    ]);
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[members[2]]}
+      />,
+    );
+
+    expect(
+      screen.getByText("team:projectAccess.noVisibleProjectAccess"),
     ).toBeVisible();
   });
 });

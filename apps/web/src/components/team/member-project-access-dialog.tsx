@@ -37,9 +37,11 @@ function MemberProjectAccessDialog({
   const { t } = useTranslation();
   const [value, setValue] = useState(access);
   const [wasOpen, setWasOpen] = useState(open);
+  // Only while open, so reopening after a failed load fetches again.
   const { data: projects, isLoading: isLoadingProjects } = useGetProjects({
     workspaceId,
     includeArchived: true,
+    enabled: open,
   });
   const myAccess = useGetMyProjectAccess(workspaceId, open);
   const managerLimited =
