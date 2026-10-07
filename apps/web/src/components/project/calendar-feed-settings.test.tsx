@@ -23,6 +23,14 @@ import { toast } from "@/lib/toast";
 import { CalendarFeedSettings } from "./calendar-feed-settings";
 
 let canShare = true;
+let sessionUserId: string | undefined = "user-1";
+vi.mock("@/lib/auth-client", () => ({
+  authClient: {
+    useSession: () => ({
+      data: sessionUserId ? { user: { id: sessionUserId } } : null,
+    }),
+  },
+}));
 vi.mock("@/lib/i18n", () => ({ i18n: { t: (key: string) => key } }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -62,10 +70,11 @@ const feed = {
   timeZone: "Europe/Berlin",
   createdAt: "2026-09-23T12:00:00Z",
 };
-function renderSettings() {
-  const client = new QueryClient({
+function renderSettings(
+  client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
+  }),
+) {
   return render(
     <QueryClientProvider client={client}>
       <CalendarFeedSettings projectId="project-1" />
@@ -81,6 +90,7 @@ describe("CalendarFeedSettings", () => {
       value: () => [],
     });
     canShare = true;
+    sessionUserId = "user-1";
     vi.mocked(getCalendarFeeds).mockResolvedValue([]);
     vi.mocked(createCalendarFeed).mockResolvedValue(feed);
     vi.mocked(revokeCalendarFeed).mockResolvedValue({ success: true });
@@ -158,14 +168,55 @@ describe("CalendarFeedSettings", () => {
     );
   });
 
-  it("does not fetch secret links or show controls without sharing permission", () => {
+  // The list holds only the caller's own links, and an owner who lost
+  // sharing permission but kept the project must still be able to revoke one
+  // that works. Creating a link is what needs the permission.
+  it("lists and revokes the caller's own feeds without sharing permission, but cannot create", async () => {
     canShare = false;
+    vi.mocked(getCalendarFeeds).mockResolvedValue([feed]);
     renderSettings();
     expect(
       screen.getByText("settings:calendarFeeds.permissionRequired"),
     ).toBeInTheDocument();
-    expect(getCalendarFeeds).not.toHaveBeenCalled();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "settings:calendarFeeds.revoke",
+      }),
+    );
+    await waitFor(() =>
+      expect(revokeCalendarFeed).toHaveBeenCalledWith("project-1", "feed-1"),
+    );
+  });
+
+  // The query client outlives a sign-out, and these are one user's secret
+  // links, so another account in the same browser must fetch its own.
+  it("does not hand one user's cached links to the next account", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    vi.mocked(getCalendarFeeds).mockResolvedValue([feed]);
+    renderSettings(client);
+    expect(
+      await screen.findByDisplayValue(
+        "https://kaneo.example/api/calendar-feed/secret/calendar.ics",
+      ),
+    ).toBeInTheDocument();
+    cleanup();
+
+    sessionUserId = "user-2";
+    vi.mocked(getCalendarFeeds).mockResolvedValue([]);
+    renderSettings(client);
+
+    expect(
+      await screen.findByText("settings:calendarFeeds.empty"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByDisplayValue(
+        "https://kaneo.example/api/calendar-feed/secret/calendar.ics",
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it("reports loading failures without presenting a misleading empty state", async () => {

@@ -1,4 +1,5 @@
 import { HTTPException } from "hono/http-exception";
+import { deleteMemberInaccessibleFeeds } from "../../calendar-feed/prune-calendar-feeds";
 import db from "../../database";
 import { publishEvent } from "../../events";
 import { keepHiddenGrants } from "../../project-access/keep-hidden-grants";
@@ -65,6 +66,8 @@ async function updateMemberProjectAccess(request: {
         userId,
         ...outcome.access,
       });
+      // Their calendar feeds read as them and carry no session.
+      await deleteMemberInaccessibleFeeds(tx, workspaceId, userId);
       const after = await listAccessibleProjectIds(tx, workspaceId, userId);
       return {
         access: resolution.access,

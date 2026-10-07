@@ -5248,7 +5248,7 @@
           "Calendar feeds"
         ],
         "summary": "Subscribe to a calendar feed",
-        "description": "Read scheduled project tasks using a secret calendar feed link. Anyone with the link can read matching task titles, descriptions, and dates. Responses are streamed; descriptions longer than 4096 characters and titles or calendar names longer than 1024 characters are truncated with an ellipsis.",
+        "description": "Read scheduled project tasks using a secret calendar feed link. Anyone with the link can read matching task titles, descriptions, and dates. Each link reads as the member who created it, and stops working when they lose access to the project. Responses are streamed; descriptions longer than 4096 characters and titles or calendar names longer than 1024 characters are truncated with an ellipsis.",
         "security": [],
         "parameters": [
           {
@@ -7951,7 +7951,7 @@
             }
           },
           "409": {
-            "description": "Project key conflict or cross-project task relationships",
+            "description": "Project key conflict, cross-project task relationships, or a calendar feed label that is being deleted in the destination",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8856,7 +8856,7 @@
           "Calendar feeds"
         ],
         "summary": "List project calendar feeds",
-        "description": "List secret calendar subscription links. Requires project sharing permission.",
+        "description": "List the caller's own secret calendar subscription links for this project. Needs access to the project; creating a link needs project sharing permission.",
         "parameters": [
           {
             "schema": {
@@ -8902,7 +8902,7 @@
             }
           },
           "403": {
-            "description": "No workspace access or missing project sharing permission",
+            "description": "No workspace access, no access to the project, or an API key without project:read",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8998,6 +8998,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The project moved to another workspace while the feed was being created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       }
@@ -9009,7 +9019,7 @@
           "Calendar feeds"
         ],
         "summary": "Revoke a calendar feed",
-        "description": "Revoke a calendar subscription link, preventing further access through it.",
+        "description": "Revoke one of the caller's calendar subscription links, preventing further access through it.",
         "parameters": [
           {
             "schema": {
@@ -9068,7 +9078,7 @@
             }
           },
           "403": {
-            "description": "No workspace access or missing project sharing permission",
+            "description": "No workspace access, no access to the project, or an API key without project:read",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9078,7 +9088,7 @@
             }
           },
           "404": {
-            "description": "Calendar feed not found in this project",
+            "description": "Calendar feed not found among the caller's feeds in this project",
             "content": {
               "text/plain": {
                 "schema": {

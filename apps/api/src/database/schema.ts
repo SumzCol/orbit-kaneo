@@ -479,12 +479,23 @@ export const calendarFeedTable = pgTable(
         onDelete: "cascade",
         onUpdate: "cascade",
       }),
+    // The member the link was made for. A feed reads as its owner, so it
+    // stops working when they lose access to the project.
+    userId: text("user_id")
+      .notNull()
+      .references(() => userTable.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     token: text("token").notNull().unique(),
     labelIds: jsonb("label_ids").$type<string[]>().notNull(),
     timeZone: text("time_zone").notNull().default("UTC"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
-  (table) => [index("calendar_feed_project_id_idx").on(table.projectId)],
+  (table) => [
+    index("calendar_feed_project_id_idx").on(table.projectId),
+    index("calendar_feed_user_id_idx").on(table.userId),
+  ],
 );
 
 export const taskTable = pgTable(

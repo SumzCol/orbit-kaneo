@@ -352,16 +352,21 @@ describe("API integration: calendar feeds", () => {
     expect(await db.select().from(calendarFeedTable)).toHaveLength(0);
   });
 
+  // Creating a link needs sharing permission. Listing and revoking reach
+  // only the caller's own links, so a project member without it may still
+  // see and revoke theirs, and finds nobody else's.
   it.each(["member", "viewer"])(
-    "denies feed creation, listing, and revocation to %s roles",
+    "lets %s roles list and revoke only their own feeds, but not create",
     async (role) => {
       const { app, endpoint, create } = await setup(role);
       expect((await create()).status).toBe(403);
-      expect((await app.request(endpoint)).status).toBe(403);
+      const listed = await app.request(endpoint);
+      expect(listed.status).toBe(200);
+      expect(await listed.json()).toEqual([]);
       expect(
         (await app.request(`${endpoint}/anything`, { method: "DELETE" }))
           .status,
-      ).toBe(403);
+      ).toBe(404);
     },
   );
 

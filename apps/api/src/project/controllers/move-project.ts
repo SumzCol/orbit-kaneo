@@ -1,6 +1,8 @@
 import { and, eq, inArray, isNotNull, max, notInArray, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import createActivities from "../../activity/controllers/create-activities";
+import { deleteInaccessibleFeeds } from "../../calendar-feed/prune-calendar-feeds";
+import { remapMovedFeedLabels } from "../../calendar-feed/remap-moved-feed-labels";
 import db from "../../database";
 import {
   assetTable,
@@ -256,6 +258,12 @@ async function moveProject(
       })),
       tx,
     );
+
+    // A feed reads as its owner, and an owner left in the source workspace no
+    // longer reaches the project. Decided here, under the project lock, and
+    // asked on the transaction, which sees the move.
+    await deleteInaccessibleFeeds(tx, id);
+    await remapMovedFeedLabels(tx, id, targetWorkspaceId);
 
     return { movedProject, unassignedTasks: unassigned };
   });

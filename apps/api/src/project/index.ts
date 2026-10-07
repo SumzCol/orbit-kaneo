@@ -84,7 +84,7 @@ const moveProjectRoute = createRoute({
     403: errorResponse("Missing workspace access or permission"),
     404: errorResponse("Project not found in the source workspace"),
     409: errorResponse(
-      "Project key conflict or cross-project task relationships",
+      "Project key conflict, cross-project task relationships, or a calendar feed label that is being deleted in the destination",
     ),
   },
 });

@@ -1751,12 +1751,12 @@
 			"selectLabels": "搜索并选择标签…",
 			"noLabels": "没有找到标签。",
 			"timeZoneHint": "全天日期使用 {{timeZone}}。",
-			"accessHint": "任何拿到订阅链接的人都能读取对应任务的标题、描述和日期。撤销链接即可停止后续访问。",
+			"accessHint": "任何拿到你的订阅链接的人都能读取对应任务的标题、描述和日期。你失去此项目的访问权限后链接会失效；撤销链接可更早停止访问。",
 			"create": "创建订阅",
 			"creating": "正在创建…",
 			"created": "日历订阅已创建。",
 			"createError": "创建日历订阅失败。",
-			"activeFeeds": "已启用的订阅",
+			"activeFeeds": "你的订阅",
 			"subscribeHint": "复制链接，在日历应用里添加为订阅。日历应用刷新后，更新就会显示出来。",
 			"empty": "还没有日历订阅。",
 			"feedUrl": "日历订阅链接",
@@ -1768,7 +1768,7 @@
 			"revokeError": "撤销日历订阅失败。",
 			"loadError": "无法加载日历订阅或标签，请重试。",
 			"deletedLabel": "已删除的标签",
-			"permissionRequired": "管理日历订阅需要项目分享权限。"
+			"permissionRequired": "创建日历订阅需要项目分享权限。你仍可撤销自己的订阅。"
 		},
 		"invitationEmailFailed": "邀请已保存，但邮件发送失败。请检查 SMTP 设置并重新发送邀请。",
 		"billing": {

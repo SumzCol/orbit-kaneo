@@ -41,6 +41,8 @@ import {
   findBillableWorkspaces,
   formatBillableWorkspacesMessage,
 } from "./billing/controllers/find-billable-workspaces";
+import { pruneUserCalendarFeeds } from "./calendar-feed/prune-calendar-feeds";
+import { shouldPruneFeedsAfterAdminUpdate } from "./calendar-feed/should-prune-after-admin-update";
 import db, { schema } from "./database";
 import { authDatabaseAdapter } from "./database/auth-adapter";
 import { publishEvent } from "./events";
@@ -719,6 +721,20 @@ export const auth = betterAuth({
           }
           return clearEmailVerificationOnAdminChange(user, ctx);
         },
+        // An instance administrator reaches every project, including ones in
+        // workspaces they never joined, and their calendar feeds read with
+        // that. Losing the role, or a ban, which /admin/update-user can also
+        // set, ends it; the feeds are deleted rather than left to the fetch
+        // check, which would let the role or an unban revive them.
+        after: async (user, ctx) => {
+          if (
+            (ctx?.path === "/admin/set-role" ||
+              ctx?.path === "/admin/update-user") &&
+            shouldPruneFeedsAfterAdminUpdate(user)
+          ) {
+            await pruneUserCalendarFeeds(user.id);
+          }
+        },
       },
       create: {
         before: async (user, ctx) => {
@@ -880,6 +896,17 @@ export const auth = betterAuth({
       }
     }),
     after: createAuthMiddleware(async (ctx) => {
+      // A ban revokes sessions and API keys, but a feed link carries neither.
+      // The fetch refuses a banned owner's feeds; deleting them keeps an unban
+      // from reviving links that may have been passed on.
+      if (
+        ctx.path === "/admin/ban-user" &&
+        !(ctx.context.returned instanceof APIError) &&
+        typeof ctx.body?.userId === "string"
+      ) {
+        await pruneUserCalendarFeeds(ctx.body.userId);
+      }
+
       if (
         ctx.path === "/organization/list-invitations" ||
         ctx.path === "/organization/get-full-organization"
