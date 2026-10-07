@@ -6,13 +6,13 @@ import {
   taskTable,
   userTable,
 } from "../../database/schema";
-import { visibleProjectCondition } from "../../utils/project-access";
+import { projectAccessCondition } from "../../project-access/project-access-condition";
 import { taskIsCompleted } from "../../task/task-is-completed";
 
 async function getTaskRelations(
   taskId: string,
   workspaceId: string,
-  visibility: { userId: string; seesAllProjects: boolean },
+  userId: string,
 ) {
   const relations = await db
     .select({
@@ -71,13 +71,7 @@ async function getTaskRelations(
         and(
           inArray(taskTable.id, [...taskIds]),
           eq(projectTable.workspaceId, workspaceId),
-          // A relation reaching into a project the caller cannot open must not
-          // leak that task's title through the summary. Dropping the row here
-          // makes the filter below drop the whole relation.
-          visibleProjectCondition(
-            visibility.userId,
-            visibility.seesAllProjects,
-          ),
+          projectAccessCondition(userId, projectTable.id),
         ),
       );
 

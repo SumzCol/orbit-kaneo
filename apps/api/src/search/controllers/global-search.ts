@@ -8,7 +8,8 @@ import {
   workspaceTable,
   workspaceUserTable,
 } from "../../database/schema";
-import { visibleProjectCondition } from "../../utils/project-access";
+import { canAccessProject } from "../../project-access/can-access-project";
+import { projectAccessCondition } from "../../project-access/project-access-condition";
 import { escapeLikePattern } from "../like-pattern";
 import { TASK_SHORT_ID_PATTERN } from "../task-short-id";
 
@@ -26,10 +27,6 @@ type SearchParams = {
   workspaceId?: string;
   projectId?: string;
   limit?: number;
-  // Whether the caller reaches projects they are not a member of. Resolved by
-  // the route against the workspace being searched, so search agrees with what
-  // the sidebar shows.
-  seesAllProjects?: boolean;
 };
 
 type SearchResult = {
@@ -114,7 +111,6 @@ async function globalSearch(params: SearchParams): Promise<{
     workspaceId,
     projectId,
     limit = 20,
-    seesAllProjects = false,
   } = params;
 
   let resolvedUserId = userId;
@@ -143,25 +139,21 @@ async function globalSearch(params: SearchParams): Promise<{
     .map((w) => w.workspaceId)
     .filter(Boolean);
 
-  // An instance administrator reaches every project without belonging to any
-  // workspace, so an empty membership list is not an empty result for them.
-  // The workspace filter below still scopes the search to the one asked for.
-  if (accessibleWorkspaceIds.length === 0 && !seesAllProjects) {
+  if (
+    accessibleWorkspaceIds.length === 0 ||
+    (projectId && !(await canAccessProject(resolvedUserId, projectId)))
+  ) {
     return { results: [], totalCount: 0, searchQuery: query };
   }
 
   const results: SearchResult[] = [];
   const searchPattern = `%${query.toLowerCase()}%`;
 
-  // Every query below reaches its rows through `projectTable`, so folding the
-  // membership rule into the shared workspace filter keeps tasks, projects,
-  // comments and activities of a project the caller cannot open out of all of
-  // them at once.
   const workspaceFilter = and(
     workspaceId
       ? eq(projectTable.workspaceId, workspaceId)
       : inArray(projectTable.workspaceId, accessibleWorkspaceIds),
-    visibleProjectCondition(resolvedUserId, seesAllProjects),
+    projectAccessCondition(resolvedUserId, projectTable.id),
   );
 
   // Check if query matches short-id pattern (e.g. "DEP-23"). `generateProjectSlug`

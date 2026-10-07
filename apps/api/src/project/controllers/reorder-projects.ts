@@ -2,12 +2,13 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import db from "../../database";
 import { projectTable } from "../../database/schema";
-import { visibleProjectCondition } from "../../utils/project-access";
+import { assertProjectAccess } from "../../project-access/assert-project-access";
+import { projectAccessCondition } from "../../project-access/project-access-condition";
 
 async function reorderProjects(
   workspaceId: string,
+  userId: string,
   projects: Array<{ id: string; position: number }>,
-  visibility: { userId: string; seesAllProjects: boolean },
 ) {
   const ids = projects.map((project) => project.id);
   const uniqueIds = new Set(ids);
@@ -17,6 +18,8 @@ async function reorderProjects(
       message: "Duplicate project ids in reorder payload",
     });
   }
+
+  await assertProjectAccess(userId, ids);
 
   return db.transaction(async (tx) => {
     // Serialize ordering writes per workspace so a concurrent create (which
@@ -48,35 +51,6 @@ async function reorderProjects(
     if (foreignId) {
       throw new HTTPException(400, {
         message: `Project ${foreignId} does not belong to this workspace`,
-      });
-    }
-
-    // Renumbering still spans the whole workspace -- hidden projects have to
-    // hold their rank -- but the caller may only name the ones they can see,
-    // and only those come back. Otherwise reorder would be a way to both
-    // enumerate and shuffle projects the caller cannot open.
-    const visibleIds = new Set(
-      (
-        await tx
-          .select({ id: projectTable.id })
-          .from(projectTable)
-          .where(
-            and(
-              eq(projectTable.workspaceId, workspaceId),
-              visibleProjectCondition(
-                visibility.userId,
-                visibility.seesAllProjects,
-              ),
-            ),
-          )
-      ).map((project) => project.id),
-    );
-
-    const hiddenId = ids.find((id) => !visibleIds.has(id));
-
-    if (hiddenId) {
-      throw new HTTPException(403, {
-        message: "You don't have access to this project",
       });
     }
 
@@ -118,7 +92,7 @@ async function reorderProjects(
     return tx.query.projectTable.findMany({
       where: and(
         eq(projectTable.workspaceId, workspaceId),
-        visibleProjectCondition(visibility.userId, visibility.seesAllProjects),
+        projectAccessCondition(userId, projectTable.id),
       ),
       orderBy: [
         asc(projectTable.position),

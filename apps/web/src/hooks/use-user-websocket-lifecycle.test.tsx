@@ -7,29 +7,68 @@ import {
   it,
   vi,
 } from "vite-plus/test";
-import { onProjectAccessSignal } from "@/lib/project-access-grants";
 import { useUserWebSocket } from "./use-user-websocket";
 
-const { client, auth } = vi.hoisted(() => ({
+const { client, auth, navigate, evictProject } = vi.hoisted(() => ({
   client: {
     invalidateQueries: vi.fn(),
+    cancelQueries: vi.fn(),
+    clear: vi.fn(),
+    getQueryCache: () => ({ getAll: () => [] }),
+    getQueryData: vi.fn(),
+    fetchQuery: vi.fn(),
     removeQueries: vi.fn(),
     resetQueries: vi.fn(),
-    getQueryData: vi.fn(),
-    getQueriesData: vi.fn(() => []),
-    setQueriesData: vi.fn(),
   },
-  auth: { userId: "user-a" as string | null },
+  navigate: vi.fn(),
+  evictProject: vi.fn(),
+  auth: {
+    userId: "user-a" as string | null,
+    workspaceId: "workspace",
+    pathname: "",
+    notify: vi.fn(),
+    signOut: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => navigate,
+  useLocation: () =>
+    auth.pathname || `/dashboard/workspace/${auth.workspaceId}`,
 }));
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => client }));
 vi.mock("@/lib/auth-client", () => ({
   authClient: {
+    $store: { notify: auth.notify },
+    signOut: auth.signOut,
     useSession: () => ({
-      data: auth.userId ? { user: { id: auth.userId } } : null,
+      data: auth.userId
+        ? {
+            user: { id: auth.userId },
+            session: { activeOrganizationId: auth.workspaceId },
+          }
+        : null,
     }),
   },
 }));
 vi.mock("@kaneo/libs", () => ({ windowId: "local-test" }));
+vi.mock("@/lib/evict-project-cache", () => ({
+  evictProjectCache: evictProject,
+}));
+const cachedProjects = vi.fn(
+  (_client: unknown, _workspaceId: string): { id: string }[] => [],
+);
+vi.mock("@/lib/collect-cached-projects", () => ({
+  collectCachedProjects: (client: unknown, workspaceId: string) =>
+    cachedProjects(client, workspaceId),
+}));
+function projectAccessChanged(socket: TestSocket) {
+  socket.onmessage?.({
+    data: JSON.stringify({
+      type: "PROJECT_ACCESS_CHANGED",
+      workspaceId: "workspace",
+    }),
+  });
+}
 class TestSocket {
   static OPEN = 1;
   static instances: TestSocket[] = [];
@@ -49,10 +88,6 @@ class TestSocket {
     this.onopen?.();
   }
 }
-function clearClient() {
-  for (const method of Object.values(client)) method.mockClear();
-}
-
 describe("user WebSocket lifecycle", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -60,8 +95,9 @@ describe("user WebSocket lifecycle", () => {
     vi.stubEnv("VITE_API_URL", "http://localhost:1337");
     TestSocket.instances = [];
     auth.userId = "user-a";
-    client.invalidateQueries.mockClear();
-    client.removeQueries.mockClear();
+    auth.workspaceId = "workspace";
+    auth.pathname = "";
+    vi.clearAllMocks();
   });
   afterEach(() => {
     cleanup();
@@ -69,6 +105,39 @@ describe("user WebSocket lifecycle", () => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
+  it.each([
+    "/dashboard/settings/workspace/general",
+    "/dashboard/settings/workspace/roles",
+    "/dashboard/settings/projects/general",
+  ])("redirects a revoked active workspace from %s", (path) => {
+    auth.pathname = path;
+    renderHook(useUserWebSocket);
+    act(() =>
+      TestSocket.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "WORKSPACE_ACCESS_REVOKED",
+          workspaceId: "workspace",
+        }),
+      }),
+    );
+    expect(navigate).toHaveBeenCalledWith({ to: "/dashboard" });
+  });
+  it("clears revoked workspace data from the global user connection", () => {
+    renderHook(() => useUserWebSocket());
+    act(() =>
+      TestSocket.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "WORKSPACE_ACCESS_REVOKED",
+          workspaceId: "workspace",
+          pathname: "",
+        }),
+      }),
+    );
+    expect(client.cancelQueries).toHaveBeenCalledOnce();
+    expect(client.removeQueries).toHaveBeenCalledOnce();
+    expect(navigate).toHaveBeenCalledWith({ to: "/dashboard" });
+  });
+
   it("ignores events from an old account without stopping the new account's keepalive", () => {
     const { rerender, unmount } = renderHook(useUserWebSocket);
     const old = TestSocket.instances[0];
@@ -76,10 +145,8 @@ describe("user WebSocket lifecycle", () => {
     auth.userId = "user-b";
     rerender();
     const current = TestSocket.instances[1];
-    act(() => current.open());
-    // Opening reconciles; what follows is about events from the old socket.
-    clearClient();
     act(() => {
+      current.open();
       old.onclose?.();
       old.onopen?.();
       old.onmessage?.({
@@ -126,318 +193,159 @@ describe("user WebSocket lifecycle", () => {
     unmount();
     expect(vi.getTimerCount()).toBe(0);
   });
-  it("backs off five times without duplicating retries, then keeps trying once a minute", () => {
+  it("keeps retrying through long outages with bounded delays and one timer", () => {
     const { unmount } = renderHook(useUserWebSocket);
-    for (let retry = 0; retry < 5; retry++) {
+    for (const [retry, delay] of [
+      1000, 2000, 4000, 8000, 16000, 30000, 30000, 30000,
+    ].entries()) {
       act(() => {
         const current = TestSocket.instances.at(-1);
         current?.onclose?.();
         current?.onclose?.();
-        vi.advanceTimersByTime(1000 * 2 ** retry);
+        vi.advanceTimersByTime(delay - 1);
       });
+      expect(TestSocket.instances).toHaveLength(retry + 1);
+      expect(vi.getTimerCount()).toBe(1);
+      act(() => vi.advanceTimersByTime(1));
       expect(TestSocket.instances).toHaveLength(retry + 2);
     }
-    // The reconnect is what reconciles access changes missed while down, so
-    // a long outage slows the attempts rather than ending them.
     act(() => {
-      TestSocket.instances.at(-1)?.onclose?.();
-      TestSocket.instances.at(-1)?.onclose?.();
-      vi.advanceTimersByTime(59_999);
+      const socket = TestSocket.instances.at(-1)!;
+      socket.open();
+      socket.onmessage?.({
+        data: JSON.stringify({
+          type: "WORKSPACE_ACCESS_SYNC",
+          workspaceIds: [],
+        }),
+      });
     });
-    expect(TestSocket.instances).toHaveLength(6);
-    act(() => vi.advanceTimersByTime(1));
-    expect(TestSocket.instances).toHaveLength(7);
+    expect(navigate).toHaveBeenCalledWith({ to: "/dashboard" });
     unmount();
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  // The page loads its data over HTTP whether or not the socket is up, so a
-  // first connection that only succeeds after retries may have missed changes.
-  it("reconciles when the first connection succeeds only after a retry", () => {
-    renderHook(useUserWebSocket);
-    act(() => {
-      TestSocket.instances[0].onclose?.();
-      vi.advanceTimersByTime(1000);
+  it("keeps users in their current workspace when an inactive membership is revoked", () => {
+    auth.workspaceId = "other-workspace";
+    renderHook(() => useUserWebSocket());
+    TestSocket.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: "WORKSPACE_ACCESS_REVOKED",
+        workspaceId: "workspace",
+        pathname: "",
+      }),
     });
-    client.resetQueries.mockClear();
-    act(() => TestSocket.instances[1].open());
-
-    expect(client.resetQueries).toHaveBeenCalledWith({ type: "inactive" });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(client.removeQueries).toHaveBeenCalledOnce();
+    expect(auth.notify).toHaveBeenCalledWith("$listOrg");
+    expect(auth.notify).toHaveBeenCalledWith("$activeOrgSignal");
+    expect(auth.notify).toHaveBeenCalledWith("$sessionSignal");
   });
 
-  it("reconciles access on a reconnect after the slow retries", () => {
+  it("refreshes project lists in every tab after a project access change", () => {
     renderHook(useUserWebSocket);
-    act(() => TestSocket.instances[0].open());
-    for (let retry = 0; retry < 5; retry++) {
-      act(() => {
-        TestSocket.instances.at(-1)?.onclose?.();
-        vi.advanceTimersByTime(1000 * 2 ** retry);
-      });
-    }
-    act(() => {
-      TestSocket.instances.at(-1)?.onclose?.();
-      vi.advanceTimersByTime(60_000);
-    });
-    client.resetQueries.mockClear();
-    act(() => TestSocket.instances.at(-1)?.open());
+    act(() => projectAccessChanged(TestSocket.instances[0]));
+    for (const queryKey of [
+      ["projects", "workspace"],
+      ["assigned-tasks", "workspace"],
+      ["search", { workspaceId: "workspace" }],
+      ["workspace-activity", "workspace"],
+      ["notifications"],
+    ])
+      expect(client.invalidateQueries).toHaveBeenCalledWith({ queryKey });
+    expect(client.fetchQuery).not.toHaveBeenCalled();
+    expect(evictProject).not.toHaveBeenCalled();
+    expect(client.removeQueries).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+  });
 
-    expect(client.resetQueries).toHaveBeenCalledWith({ type: "inactive" });
+  it("evicts cached data for projects that left the refreshed list", async () => {
+    cachedProjects.mockReturnValueOnce([{ id: "kept" }, { id: "removed" }]);
+    client.fetchQuery.mockResolvedValueOnce([{ id: "kept" }, { id: "added" }]);
+    renderHook(useUserWebSocket);
+    await act(async () => projectAccessChanged(TestSocket.instances[0]));
+    expect(cachedProjects).toHaveBeenCalledWith(client, "workspace");
+    expect(client.fetchQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ["projects", "workspace", "including-archived"],
+      }),
+    );
+    expect(evictProject).toHaveBeenCalledOnce();
+    expect(evictProject).toHaveBeenCalledWith(client, "removed");
+    expect(client.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["notifications"],
+    });
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("keeps project caches when the project list refresh fails", async () => {
+    cachedProjects.mockReturnValueOnce([{ id: "project" }]);
+    client.fetchQuery.mockRejectedValueOnce(new Error("Network unavailable"));
+    renderHook(useUserWebSocket);
+    await act(async () => projectAccessChanged(TestSocket.instances[0]));
+    expect(client.fetchQuery).toHaveBeenCalledOnce();
+    expect(evictProject).not.toHaveBeenCalled();
+  });
+
+  it("ignores a project list refresh that finishes after the session ends", async () => {
+    let finish!: (projects: { id: string }[]) => void;
+    cachedProjects.mockReturnValueOnce([{ id: "project" }]);
+    client.fetchQuery.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const { unmount } = renderHook(useUserWebSocket);
+    act(() => projectAccessChanged(TestSocket.instances[0]));
+    unmount();
+    await act(async () => finish([]));
+    expect(evictProject).not.toHaveBeenCalled();
+  });
+
+  it("reconciles cached projects when a reconnect snapshot arrives", async () => {
+    cachedProjects.mockReturnValueOnce([{ id: "kept" }, { id: "revoked" }]);
+    client.fetchQuery.mockResolvedValueOnce([{ id: "kept" }]);
+    renderHook(useUserWebSocket);
+    await act(async () =>
+      TestSocket.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "WORKSPACE_ACCESS_SYNC",
+          workspaceIds: ["workspace"],
+        }),
+      }),
+    );
+    expect(cachedProjects).toHaveBeenCalledWith(client, "workspace");
+    expect(evictProject).toHaveBeenCalledWith(client, "revoked");
+    expect(evictProject).toHaveBeenCalledOnce();
+  });
+
+  it("redirects after a reconnect snapshot reveals a missed workspace revocation", () => {
+    renderHook(useUserWebSocket);
+    act(() =>
+      TestSocket.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "WORKSPACE_ACCESS_SYNC",
+          workspaceIds: ["other"],
+        }),
+      }),
+    );
+    expect(navigate).toHaveBeenCalledWith({ to: "/dashboard" });
+    expect(client.removeQueries).toHaveBeenCalledOnce();
+    expect(auth.notify).toHaveBeenCalledWith("$listOrg");
+    expect(auth.notify).toHaveBeenCalledWith("$activeOrgSignal");
   });
 });
 
-describe("project access changes on the user socket", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.stubGlobal("WebSocket", TestSocket);
-    vi.stubEnv("VITE_API_URL", "http://localhost:1337");
-    TestSocket.instances = [];
-    auth.userId = "user-a";
-    client.invalidateQueries.mockClear();
-    client.removeQueries.mockClear();
-    client.resetQueries.mockClear();
-  });
-  afterEach(() => {
-    cleanup();
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-  });
-
-  function receive(message: Record<string, unknown>) {
-    renderHook(() => useUserWebSocket());
-    const [socket] = TestSocket.instances;
-    act(() => socket.open());
-    // Opening reconciles too; only what the message does is under test.
-    clearClient();
-    act(() => socket.onmessage?.({ data: JSON.stringify(message) }));
-    // The workspace-wide refresh runs once per burst, a moment later.
-    act(() => vi.advanceTimersByTime(100));
-  }
-
-  // Every session gets this, so the sidebar is the thing to fix. Without it
-  // a project someone was added to, or removed from, stays as it was in every
-  // tab that does not have that board open.
-  it("refreshes the project list when access is granted", () => {
-    receive({
-      type: "PROJECT_ACCESS_CHANGED",
-      projectId: "project-1",
-      hasAccess: true,
-    });
-
-    expect(client.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["projects"],
-    });
-    // An inactive search only marked stale would reopen without the project.
-    expect(client.resetQueries).toHaveBeenCalledWith({
-      queryKey: ["search"],
-    });
-  });
-
-  // Workspace labels are filtered by visibility, so they change with access.
-  it("resets workspace labels when access changes", () => {
-    receive({
-      type: "PROJECT_ACCESS_CHANGED",
-      projectId: "project-1",
-      hasAccess: false,
-    });
-
-    expect(client.resetQueries).toHaveBeenCalledWith({ queryKey: ["labels"] });
-  });
-
-  // Queries do not refetch on mount here, so another workspace's list that
-  // was only marked stale would be shown as it was on the next switch.
-  it("refetches project lists nothing is showing", () => {
-    receive({
-      type: "PROJECT_ACCESS_CHANGED",
-      projectId: "project-1",
-      hasAccess: false,
-    });
-
-    const call = client.invalidateQueries.mock.calls.find(
-      ([filters]) =>
-        (filters as { refetchType?: string })?.refetchType === "all",
-    );
-    expect(call).toBeDefined();
-    const { predicate } = (call as unknown[])[0] as {
-      predicate: (query: { queryKey: unknown[] }) => boolean;
-    };
-    expect(predicate({ queryKey: ["projects", "workspace-2"] })).toBe(true);
-    // Not the details, which would refetch every project ever opened.
-    expect(
-      predicate({ queryKey: ["projects", "workspace-2", "project-1"] }),
-    ).toBe(false);
-  });
-
-  it("also drops the project's cached board when access ends", () => {
-    receive({
-      type: "PROJECT_ACCESS_CHANGED",
-      projectId: "project-1",
-      hasAccess: false,
-    });
-
-    expect(client.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["projects"],
-    });
-    // The detail is cached as ["projects", workspaceId, projectId], with a
-    // workspace the message does not carry, so it is removed by predicate.
-    // Checked against that real key rather than against the arguments alone.
-    const predicates = client.resetQueries.mock.calls
-      .map(([filters]) => (filters as { predicate?: unknown })?.predicate)
-      .filter(
-        (predicate): predicate is (query: { queryKey: unknown[] }) => boolean =>
-          typeof predicate === "function",
-      );
-    const removesKey = (queryKey: unknown[]) =>
-      predicates.some((predicate) => predicate({ queryKey }));
-    expect(removesKey(["tasks", "project-1"])).toBe(true);
-    expect(removesKey(["projects", "workspace-1", "project-1"])).toBe(true);
-    expect(removesKey(["projects", "workspace-1"])).toBe(false);
-    expect(removesKey(["projects", "workspace-1", "project-2"])).toBe(false);
-    // Queries do not refetch on mount here, so cached search hits from the
-    // project would otherwise stay on screen; a mounted search keeps a
-    // removed query's results, so it is reset.
-    expect(client.resetQueries).toHaveBeenCalledWith({
-      queryKey: ["search"],
-    });
-  });
-
-  // A board left open since its access was revoked has a socket that stopped
-  // retrying and a board query that failed. The project list refresh reaches
-  // neither, so both are woken directly.
-  it("wakes that project's board when access is granted", () => {
-    const granted = vi.fn();
-    const stop = onProjectAccessSignal("project-1", granted);
-
-    receive({
-      type: "PROJECT_ACCESS_CHANGED",
-      projectId: "project-1",
-      hasAccess: true,
-    });
-    stop();
-
-    // Besides the probe the first connect sends to every board.
-    expect(
-      granted.mock.calls.filter(([kind]) => kind === "grant"),
-    ).toHaveLength(1);
-    expect(client.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["tasks", "project-1"],
-    });
-  });
-
-  it("does not wake the board when access ends", () => {
-    const granted = vi.fn();
-    const stop = onProjectAccessSignal("project-1", granted);
-
-    receive({
-      type: "PROJECT_ACCESS_CHANGED",
-      projectId: "project-1",
-      hasAccess: false,
-    });
-    stop();
-
-    expect(granted).not.toHaveBeenCalledWith("grant");
-  });
-
-  // Leaving a workspace sends one message per project. Each drops its own
-  // project's caches at once, but the refetch of every workspace list runs
-  // once for the burst rather than once per project in every tab.
-  it("refreshes workspace lists once for a burst of access changes", () => {
-    renderHook(() => useUserWebSocket());
-    const [socket] = TestSocket.instances;
-    act(() => socket.open());
-    clearClient();
-    act(() => {
-      for (let i = 0; i < 20; i++) {
-        socket.onmessage?.({
-          data: JSON.stringify({
-            type: "PROJECT_ACCESS_CHANGED",
-            projectId: `project-${i}`,
-            hasAccess: false,
-          }),
-        });
-      }
-    });
-    act(() => vi.advanceTimersByTime(100));
-
-    const listRefetches = client.invalidateQueries.mock.calls.filter(
-      ([filters]) =>
-        (filters as { refetchType?: string })?.refetchType === "all",
-    );
-    expect(listRefetches).toHaveLength(1);
-  });
-
-  // A board whose own socket is down has no 4403 coming, so it is told.
-  it("tells the board when access ends", () => {
-    const signal = vi.fn();
-    const stop = onProjectAccessSignal("project-1", signal);
-
-    receive({
-      type: "PROJECT_ACCESS_CHANGED",
-      projectId: "project-1",
-      hasAccess: false,
-    });
-    stop();
-
-    expect(
-      signal.mock.calls.filter(([kind]) => kind === "revoke"),
-    ).toHaveLength(1);
-  });
-
-  // Nothing replays a message sent while the socket was down, so a reconnect
-  // refreshes what such a message would have fixed.
-  // Messages sent before the socket registers are lost on the first open as
-  // much as after a drop, so both reconcile.
-  it("refreshes the project list and drops search on the first connect and on a reconnect", () => {
-    renderHook(() => useUserWebSocket());
-    act(() => TestSocket.instances[0].open());
-    expect(client.resetQueries).toHaveBeenCalledWith({ queryKey: ["search"] });
-    clearClient();
-
-    act(() => {
-      TestSocket.instances[0].onclose?.();
-      vi.advanceTimersByTime(1000);
-    });
-    act(() => TestSocket.instances[1].open());
-
-    expect(client.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["projects"],
-    });
-    expect(client.resetQueries).toHaveBeenCalledWith({
-      queryKey: ["search"],
-    });
-    // Project details, which an invalidation alone would leave showable.
-    const [filters] =
-      client.resetQueries.mock.calls.find(
-        ([candidate]) =>
-          typeof (candidate as { predicate?: unknown })?.predicate ===
-          "function",
-      ) ?? [];
-    const resets = (queryKey: unknown[]) =>
-      (
-        filters as { predicate: (q: { queryKey: unknown[] }) => boolean }
-      ).predicate({ queryKey });
-    expect(resets(["projects", "workspace-1", "project-1"])).toBe(true);
-    expect(resets(["projects", "workspace-1"])).toBe(false);
-    expect(resets(["tasks", "project-1"])).toBe(false);
-  });
-
-  // A grant missed while the socket was down would leave a board stopped by
-  // 4403 for good, so each one is asked to try once.
-  it("probes boards on the first connect and on a reconnect", () => {
-    const signal = vi.fn();
-    const stop = onProjectAccessSignal("project-1", signal);
-    renderHook(() => useUserWebSocket());
-    act(() => TestSocket.instances[0].open());
-    expect(signal).toHaveBeenCalledExactlyOnceWith("probe");
-    signal.mockClear();
-
-    act(() => {
-      TestSocket.instances[0].onclose?.();
-      vi.advanceTimersByTime(1000);
-    });
-    act(() => TestSocket.instances[1].open());
-    stop();
-
-    expect(signal).toHaveBeenCalledExactlyOnceWith("probe");
-  });
+it("clears all private caches and signs out after account-wide revocation", async () => {
+  vi.stubGlobal("WebSocket", TestSocket);
+  auth.userId = "user-a";
+  renderHook(useUserWebSocket);
+  const socket = TestSocket.instances.at(-1)!;
+  socket.onmessage?.({ data: JSON.stringify({ type: "USER_ACCESS_REVOKED" }) });
+  socket.onclose?.();
+  await Promise.resolve();
+  expect(client.clear).toHaveBeenCalled();
+  expect(auth.signOut).toHaveBeenCalled();
+  expect(navigate).toHaveBeenCalledWith({ to: "/auth/sign-in" });
+  cleanup();
+  vi.unstubAllGlobals();
 });

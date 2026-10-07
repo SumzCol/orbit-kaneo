@@ -1,3 +1,4 @@
+import { withVerifiedStorageObject } from "../storage/cleanup-queue";
 import { eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { requireEntitlement } from "../billing/require-entitlement-middleware";
@@ -24,7 +25,6 @@ import {
   validateTaskAssetUploadInput,
   verifyTaskAssetUpload,
 } from "../storage/s3";
-import { canAccessProjectInWorkspace } from "../utils/project-access";
 import { normalizeApiServerUrl } from "../utils/openapi-spec";
 import {
   hasWorkspacePermission,
@@ -40,12 +40,17 @@ import createTask from "./controllers/create-task";
 import deleteTask from "./controllers/delete-task";
 import duplicateTask from "./controllers/duplicate-task";
 import exportTasks from "./controllers/export-tasks";
+import getAssignedTasks from "./controllers/get-assigned-tasks";
 import getTaskByTicketId from "./controllers/get-task-by-ticket-id";
 import getTask from "./controllers/get-task";
 import getTasks from "./controllers/get-tasks";
 import importTasks from "./controllers/import-tasks";
 import moveTask from "./controllers/move-task";
 import reorderTasks from "./controllers/reorder-tasks";
+import {
+  stageTaskAssetUpload,
+  finalizeStagedTaskAsset,
+} from "./controllers/stage-task-asset";
 import {
   requireBulkTaskEntitlement,
   requireBulkTaskPermission,
@@ -63,6 +68,7 @@ import {
   getDescriptionPage,
 } from "./description-pages";
 import {
+  assignedTasksSchema,
   boardSchema,
   bulkResultSchema,
   descriptionMatchesSchema,
@@ -70,12 +76,14 @@ import {
   finalizedAssetSchema,
   imageUploadSchema,
   moveTaskResultSchema,
+  taskByTicketIdSchema,
   taskExportSchema,
   taskImportResultSchema,
   taskSchema,
   taskWithAssigneeSchema,
 } from "./response";
 import {
+  assignedTasksQuery,
   bulkUpdateBody,
   createTaskBody,
   descriptionMatchesQuery,
@@ -83,6 +91,8 @@ import {
   duplicateTaskBody,
   finalizeImageUploadBody,
   imageUploadBody,
+  stagedImageUploadBody,
+  finalizeStagedImageUploadBody,
   importTasksBody,
   listTasksQuery,
   moveTaskBody,
@@ -100,6 +110,28 @@ import {
   updateTitleBody,
 } from "./schema";
 
+const listAssignedTasksRoute = createRoute({
+  method: "get",
+  operationId: "listAssignedTasks",
+  path: "/assigned",
+  tags: ["Tasks"],
+  summary: "List my assigned tasks",
+  description:
+    "Get the open tasks assigned to the caller across a workspace's active projects. Completed and archived tasks are excluded. Ordered by due date (undated last), then priority. At most 100 tasks are returned; total counts all of them. Set countOnly=true to return just that total without loading task rows or labels.",
+  middleware: [
+    workspaceAccess.fromQuery(),
+    requireWorkspacePermission({ project: ["read"], task: ["read"] }),
+  ] as const,
+  request: { query: assignedTasksQuery },
+  responses: {
+    200: jsonResponse("Open tasks assigned to the caller", assignedTasksSchema),
+    400: errorResponse("Invalid workspace ID or query parameters"),
+    403: errorResponse(
+      "No workspace access, or missing project:read or task:read permission",
+    ),
+  },
+});
+
 const listTasksRoute = createRoute({
   method: "get",
   operationId: "listTasks",
@@ -116,9 +148,7 @@ const listTasksRoute = createRoute({
     400: errorResponse(
       "Unknown project, or its workspace could not be determined",
     ),
-    403: errorResponse(
-      "No access to the project's workspace, or no access to the project",
-    ),
+    403: errorResponse("No access to the project's workspace"),
   },
 });
 
@@ -147,10 +177,68 @@ const bulkUpdateTasksRoute = createRoute({
       "Invalid body, or the tasks span more than one workspace",
     ),
     403: errorResponse(
-      "No workspace access, or missing the permission the operation needs, or no access to the project",
+      "No workspace access, or missing the permission the operation needs",
     ),
     404: errorResponse("No tasks found"),
     409: errorResponse("Tasks changed projects; retry the operation"),
+  },
+});
+
+const stagedUploadRoute = createRoute({
+  method: "post",
+  operationId: "stageTaskAssetUpload",
+  path: "/draft-upload/{projectId}",
+  tags: ["Tasks"],
+  summary: "Stage a task attachment",
+  description:
+    "Upload an attachment before submitting a task. Staged assets are private to the uploader and expire after 24 hours.",
+  middleware: [
+    workspaceAccess.fromProject("projectId"),
+    requireWorkspacePermission({ task: ["create"] }),
+    requireEntitlement,
+  ] as const,
+  request: {
+    params: projectIdParam,
+    body: {
+      required: true,
+      content: { "application/json": { schema: stagedImageUploadBody } },
+    },
+  },
+  responses: {
+    200: jsonResponse("Presigned upload", imageUploadSchema),
+    400: errorResponse("Invalid upload"),
+    403: errorResponse("Missing task:create permission"),
+    404: errorResponse("Project not found"),
+    503: errorResponse("Storage unavailable"),
+  },
+});
+const finalizeStagedUploadRoute = createRoute({
+  method: "post",
+  operationId: "finalizeStagedTaskAsset",
+  path: "/draft-upload/{projectId}/finalize",
+  tags: ["Tasks"],
+  summary: "Finalize a staged task attachment",
+  middleware: [
+    workspaceAccess.fromProject("projectId"),
+    requireWorkspacePermission({ task: ["create"] }),
+    requireEntitlement,
+  ] as const,
+  request: {
+    params: projectIdParam,
+    body: {
+      required: true,
+      content: {
+        "application/json": { schema: finalizeStagedImageUploadBody },
+      },
+    },
+  },
+  responses: {
+    200: jsonResponse("Staged attachment", finalizedAssetSchema),
+    400: errorResponse("Invalid upload"),
+    403: errorResponse("Missing task:create permission"),
+    404: errorResponse("Project not found"),
+    409: errorResponse("Upload already attached"),
+    503: errorResponse("Storage unavailable"),
   },
 });
 
@@ -181,9 +269,7 @@ const reorderTasksRoute = createRoute({
         .array(),
     ),
     400: errorResponse("Invalid positions or column"),
-    403: errorResponse(
-      "Missing task:update permission, or no access to the project",
-    ),
+    403: errorResponse("Missing task:update permission"),
     404: errorResponse("Tasks do not belong to the project"),
     409: errorResponse(
       "Board changed or task moved; refresh before reordering",
@@ -214,7 +300,7 @@ const createTaskRoute = createRoute({
     200: jsonResponse("The created task", taskSchema),
     400: errorResponse("Invalid body, or unknown project"),
     403: errorResponse(
-      "No workspace access, or missing task:create permission, or no access to the project",
+      "No workspace access, or missing task:create permission",
     ),
   },
 });
@@ -244,7 +330,7 @@ const duplicateTaskRoute = createRoute({
     400: errorResponse("Invalid task fields or request"),
     401: errorResponse("Unauthorized"),
     403: errorResponse(
-      "No workspace access, missing task:create, or missing task:update when copying parent links, or no access to the project",
+      "No workspace access, missing task:create, or missing task:update when copying parent links",
     ),
     404: errorResponse("Task or project not found"),
     409: errorResponse("Task column has reached its capacity"),
@@ -270,9 +356,7 @@ const getTaskRoute = createRoute({
     400: errorResponse(
       "Unknown task, or its workspace could not be determined",
     ),
-    403: errorResponse(
-      "No access to the task's workspace, or no access to the project",
-    ),
+    403: errorResponse("No access to the task's workspace"),
   },
 });
 
@@ -283,10 +367,10 @@ const getTaskByTicketIdRoute = createRoute({
   tags: ["Tasks"],
   summary: "Get task by ticket ID",
   description:
-    "Get a single task by its project key and number, such as KAN-12. If the ticket ID matches multiple accessible tasks, provide workspaceId or projectId to select one.",
+    "Get a single task by its project key and number, such as KAN-12. A match in an active project takes precedence, then the most recently archived project. If the ticket ID still matches multiple accessible tasks, narrow the lookup to a workspace with workspaceId or workspaceSlug, or to a single project with projectId.",
   request: { params: ticketIdParam, query: ticketIdQuery },
   responses: {
-    200: jsonResponse("Task details", taskWithAssigneeSchema),
+    200: jsonResponse("Task details", taskByTicketIdSchema),
     400: errorResponse("Invalid ticket ID"),
     404: errorResponse("No accessible task has this ticket ID"),
     409: errorResponse("Ticket ID matches multiple accessible tasks"),
@@ -302,11 +386,7 @@ const moveTaskRoute = createRoute({
   description:
     "Move a task to another project, optionally into a named column. Both projects must be in the same workspace.",
   middleware: [
-    // The destination is authorized alongside the task: reaching a task you
-    // can see must not let you file it into a project you cannot.
-    workspaceAccess.fromTask("id", [
-      { type: "projectFromBody", key: "destinationProjectId" },
-    ]),
+    workspaceAccess.fromTask(),
     requireWorkspacePermission({ task: ["update"] }),
     requireEntitlement,
   ] as const,
@@ -324,7 +404,7 @@ const moveTaskRoute = createRoute({
     ),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, missing task:update permission, or no access to the source or destination project",
+      "No workspace access, or missing task:update permission",
     ),
     404: errorResponse("Task or destination project not found"),
     409: errorResponse("Task or project moved concurrently; retry the move"),
@@ -356,7 +436,7 @@ const updateTaskRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update or task:assign permission, or no access to the project",
+      "No workspace access, or missing task:update or task:assign permission",
     ),
   },
 });
@@ -376,9 +456,7 @@ const exportTasksRoute = createRoute({
     400: errorResponse(
       "Unknown project, or its workspace could not be determined",
     ),
-    403: errorResponse(
-      "No access to the project's workspace, or no access to the project",
-    ),
+    403: errorResponse("No access to the project's workspace"),
   },
 });
 
@@ -406,7 +484,7 @@ const importTasksRoute = createRoute({
     200: jsonResponse("Per-task import outcome", taskImportResultSchema),
     400: errorResponse("Invalid body, or unknown project"),
     403: errorResponse(
-      "No workspace access, or missing task:create permission, or no access to the project",
+      "No workspace access, or missing task:create permission",
     ),
   },
 });
@@ -429,8 +507,9 @@ const deleteTaskRoute = createRoute({
     400: errorResponse(
       "Unknown task, or its workspace could not be determined",
     ),
+    409: errorResponse("Task changed projects; retry the operation"),
     403: errorResponse(
-      "No workspace access, or missing task:delete permission, or no access to the project",
+      "No workspace access, or missing task:delete permission",
     ),
   },
 });
@@ -458,7 +537,7 @@ const updateTaskStatusRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission, or no access to the project",
+      "No workspace access, or missing task:update permission",
     ),
   },
 });
@@ -486,7 +565,7 @@ const updateTaskPriorityRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid priority, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission, or no access to the project",
+      "No workspace access, or missing task:update permission",
     ),
   },
 });
@@ -515,7 +594,7 @@ const updateTaskAssigneeRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:assign permission, or no access to the project",
+      "No workspace access, or missing task:assign permission",
     ),
     404: errorResponse("Assignee is not a member of the workspace"),
   },
@@ -544,7 +623,7 @@ const updateTaskDueDateRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid date, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission, or no access to the project",
+      "No workspace access, or missing task:update permission",
     ),
   },
 });
@@ -572,7 +651,7 @@ const updateTaskTitleRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission, or no access to the project",
+      "No workspace access, or missing task:update permission",
     ),
   },
 });
@@ -601,7 +680,7 @@ const createTaskImageUploadRoute = createRoute({
     200: jsonResponse("The presigned upload", imageUploadSchema),
     400: errorResponse("Unsupported content type, or the file is too large"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission, or no access to the project",
+      "No workspace access, or missing task:update permission",
     ),
     404: errorResponse("Task not found"),
     503: errorResponse("Image uploads are not configured on this instance"),
@@ -634,7 +713,7 @@ const finalizeTaskImageUploadRoute = createRoute({
       "Invalid upload, or the key does not belong to this task",
     ),
     403: errorResponse(
-      "No workspace access, or missing task:update permission, or no access to the project",
+      "No workspace access, or missing task:update permission",
     ),
     404: errorResponse("Task not found"),
   },
@@ -663,7 +742,7 @@ const updateTaskDescriptionRoute = createRoute({
     200: jsonResponse("The updated task", taskSchema),
     400: errorResponse("Invalid body, or unknown task"),
     403: errorResponse(
-      "No workspace access, or missing task:update permission, or no access to the project",
+      "No workspace access, or missing task:update permission",
     ),
   },
 });
@@ -679,7 +758,7 @@ const descriptionPageRoute = createRoute({
   responses: {
     200: jsonResponse("Description page", descriptionPageSchema),
     400: errorResponse("Invalid offset or version"),
-    403: errorResponse("No workspace access, or no access to the project"),
+    403: errorResponse("No workspace access"),
     404: errorResponse("Task not found"),
     409: errorResponse("Description changed; reload from offset zero"),
     503: errorResponse("Description request timed out"),
@@ -696,7 +775,7 @@ const descriptionMatchesRoute = createRoute({
   responses: {
     200: jsonResponse("Matching task IDs", descriptionMatchesSchema),
     400: errorResponse("Invalid search query or cursor"),
-    403: errorResponse("No workspace access, or no access to the project"),
+    403: errorResponse("No workspace access"),
     503: errorResponse("Description search timed out"),
   },
 });
@@ -719,11 +798,23 @@ const task = apiRouter<BaseVariables & { workspaceId: string }>()
       200,
     );
   })
+  // Registered ahead of the `/{id}` routes, which would otherwise claim it.
+  .openapi(listAssignedTasksRoute, async (c) => {
+    const { workspaceId, countOnly } = c.req.valid("query");
+    return c.json(
+      await getAssignedTasks(
+        workspaceId,
+        c.get("userId"),
+        countOnly === "true",
+      ),
+      200,
+    );
+  })
   .openapi(listTasksRoute, async (c) => {
     const { projectId } = c.req.valid("param");
     const filters = c.req.valid("query") || {};
 
-    const tasks = await getTasks(projectId, filters);
+    const tasks = await getTasks(projectId, filters, c.get("userId"));
 
     return c.json(tasks, 200);
   })
@@ -754,6 +845,27 @@ const task = apiRouter<BaseVariables & { workspaceId: string }>()
 
     return c.json(result, 200);
   })
+  .openapi(stagedUploadRoute, async (c) =>
+    c.json(
+      await stageTaskAssetUpload(
+        c.req.valid("param").projectId,
+        c.get("userId"),
+        c.req.valid("json"),
+      ),
+      200,
+    ),
+  )
+  .openapi(finalizeStagedUploadRoute, async (c) => {
+    const asset = await finalizeStagedTaskAsset(
+      c.req.valid("param").projectId,
+      c.get("userId"),
+      c.req.valid("json"),
+    );
+    const base = normalizeApiServerUrl(
+      process.env.KANEO_API_URL || new URL(c.req.url).origin,
+    );
+    return c.json({ id: asset.id, url: `${base}/asset/${asset.id}` }, 200);
+  })
   .openapi(reorderTasksRoute, async (c) => {
     const { projectId, tasks, expectedTasks } = c.req.valid("json");
     return c.json(
@@ -772,6 +884,7 @@ const task = apiRouter<BaseVariables & { workspaceId: string }>()
       status,
       userId,
       customFields,
+      draftAssetIds,
     } = c.req.valid("json");
 
     const parsedStartDate =
@@ -796,6 +909,7 @@ const task = apiRouter<BaseVariables & { workspaceId: string }>()
       priority,
       status,
       customFields,
+      draftAssetIds,
     });
 
     return c.json(task, 200);
@@ -815,27 +929,19 @@ const task = apiRouter<BaseVariables & { workspaceId: string }>()
   })
   .openapi(getTaskByTicketIdRoute, async (c) => {
     const { ticketId } = c.req.valid("param");
-    const { workspaceId, projectId } = c.req.valid("query");
     return c.json(
-      await getTaskByTicketId(
-        ticketId,
-        c.get("userId"),
-        (candidateProjectId, candidateWorkspaceId) =>
-          canAccessProjectInWorkspace(
-            c,
-            candidateProjectId,
-            candidateWorkspaceId,
-          ),
-        workspaceId,
-        projectId,
-      ),
+      await getTaskByTicketId(ticketId, c.get("userId"), c.req.valid("query")),
       200,
     );
   })
   .openapi(getTaskRoute, async (c) => {
     const { id } = c.req.valid("param");
 
-    const task = await getTask(id, c.req.valid("query").view === "board");
+    const task = await getTask(
+      id,
+      c.req.valid("query").view === "board",
+      c.get("userId"),
+    );
 
     return c.json(task, 200);
   })
@@ -1073,69 +1179,76 @@ const task = apiRouter<BaseVariables & { workspaceId: string }>()
       });
     }
 
-    let uploaded: Awaited<ReturnType<typeof verifyTaskAssetUpload>>;
-    try {
-      uploaded = await verifyTaskAssetUpload(normalizedKey, {
-        size,
-        contentType,
-      });
-    } catch (error) {
-      throw new HTTPException(
-        error instanceof InvalidUploadedAssetError ? 400 : 503,
-        {
-          message:
-            error instanceof InvalidUploadedAssetError
-              ? error.message
-              : "Unable to verify uploaded object.",
-        },
-      );
-    }
-
-    const [existingAsset] = await db
-      .select({ id: assetTable.id })
-      .from(assetTable)
-      .where(eq(assetTable.objectKey, normalizedKey))
-      .limit(1);
-
-    const [asset] = existingAsset
-      ? await db
-          .update(assetTable)
-          .set({
-            workspaceId: taskContext.workspaceId,
-            projectId: taskContext.projectId,
-            taskId: taskContext.taskId,
-            filename,
-            mimeType: uploaded.contentType,
-            size: uploaded.size,
-            kind: isImageContentType(uploaded.contentType)
-              ? "image"
-              : "attachment",
-            surface,
-            createdBy: userId || null,
-          })
-          .where(eq(assetTable.id, existingAsset.id))
-          .returning({
-            id: assetTable.id,
-          })
-      : await db
-          .insert(assetTable)
-          .values({
-            workspaceId: taskContext.workspaceId,
-            projectId: taskContext.projectId,
-            taskId: taskContext.taskId,
-            objectKey: normalizedKey,
-            filename,
-            mimeType: uploaded.contentType,
-            size: uploaded.size,
-            kind: isImageContentType(uploaded.contentType)
-              ? "image"
-              : "attachment",
-            surface,
-            createdBy: userId || null,
-          })
-          .returning({
-            id: assetTable.id,
+    const asset = await withVerifiedStorageObject(
+      normalizedKey,
+      async () => {
+        try {
+          return await verifyTaskAssetUpload(normalizedKey, {
+            size,
+            contentType,
           });
+        } catch (error) {
+          throw new HTTPException(
+            error instanceof InvalidUploadedAssetError ? 400 : 503,
+            {
+              message:
+                error instanceof InvalidUploadedAssetError
+                  ? error.message
+                  : "Unable to verify uploaded object.",
+            },
+          );
+        }
+      },
+      async (db, uploaded) => {
+        const [existingAsset] = await db
+          .select({ id: assetTable.id })
+          .from(assetTable)
+          .where(eq(assetTable.objectKey, normalizedKey))
+          .limit(1);
+
+        const [saved] = existingAsset
+          ? await db
+              .update(assetTable)
+              .set({
+                workspaceId: taskContext.workspaceId,
+                projectId: taskContext.projectId,
+                taskId: taskContext.taskId,
+                filename,
+                mimeType: uploaded.contentType,
+                size: uploaded.size,
+                kind: isImageContentType(uploaded.contentType)
+                  ? "image"
+                  : "attachment",
+                surface,
+                createdBy: userId || null,
+              })
+              .where(eq(assetTable.id, existingAsset.id))
+              .returning({
+                id: assetTable.id,
+              })
+          : await db
+              .insert(assetTable)
+              .values({
+                workspaceId: taskContext.workspaceId,
+                projectId: taskContext.projectId,
+                taskId: taskContext.taskId,
+                objectKey: normalizedKey,
+                filename,
+                mimeType: uploaded.contentType,
+                size: uploaded.size,
+                kind: isImageContentType(uploaded.contentType)
+                  ? "image"
+                  : "attachment",
+                surface,
+                createdBy: userId || null,
+              })
+              .returning({
+                id: assetTable.id,
+              });
+
+        return saved;
+      },
+    );
 
     if (!asset) {
       throw new HTTPException(500, {

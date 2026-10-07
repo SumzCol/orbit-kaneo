@@ -275,6 +275,11 @@ export const invitationTable = pgTable(
     inviterId: text("inviter_id")
       .notNull()
       .references(() => userTable.id, { onDelete: "cascade" }),
+    projectAccess: text("project_access").default("all").notNull(),
+    projectIds: text("project_ids")
+      .array()
+      .default(sql`'{}'::text[]`)
+      .notNull(),
   },
   (table) => [
     index("invitation_workspaceId_idx").on(table.workspaceId),
@@ -335,6 +340,9 @@ export const projectTable = pgTable(
     backgroundVersion: text("background_version"),
   },
   (table) => [
+    index("project_background_object_key_idx")
+      .on(table.backgroundObjectKey)
+      .where(sql`${table.backgroundObjectKey} is not null`),
     unique("project_workspace_id_id_unique").on(table.workspaceId, table.id),
     index("project_workspaceId_position_idx").on(
       table.workspaceId,
@@ -343,50 +351,60 @@ export const projectTable = pgTable(
   ],
 );
 
-// Who can see a project. Workspace membership alone does not grant access to a
-// project: only its members reach it, plus whoever administers the workspace.
-export const projectMemberTable = pgTable(
-  "project_member",
+export const workspaceMemberAccessTable = pgTable(
+  "workspace_member_access",
   {
     id: text("id")
       .$defaultFn(() => createId())
       .primaryKey(),
-    projectId: text("project_id")
+    workspaceId: text("workspace_id")
       .notNull()
-      .references(() => projectTable.id, {
-        onDelete: "cascade",
-        onUpdate: "cascade",
-      }),
+      .references(() => workspaceTable.id, { onDelete: "cascade" }),
     userId: text("user_id")
       .notNull()
-      .references(() => userTable.id, {
-        onDelete: "cascade",
-        onUpdate: "cascade",
-      }),
-    // The workspace membership this project membership was granted under. A
-    // project membership is only ever a narrowing of one specific workspace
-    // membership, and has to die with it: matching on workspace and user
-    // alone let a stale row come back to life when the same person was
-    // re-added, because the new membership satisfied the match too.
-    //
-    // Set null rather than cascade on delete, so that `afterRemoveMember` still
-    // finds the rows to revoke and announce after Better Auth has deleted the
-    // membership. A null link never matches, so the row is inert from that
-    // moment whether or not the cleanup runs.
-    workspaceMemberId: text("workspace_member_id").references(
-      () => workspaceUserTable.id,
-      { onDelete: "set null", onUpdate: "cascade" },
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    projectAccess: text("project_access").default("all").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    unique("workspace_member_access_workspace_user_unique").on(
+      table.workspaceId,
+      table.userId,
     ),
+    index("workspace_member_access_userId_idx").on(table.userId),
+  ],
+);
+
+export const workspaceMemberProjectTable = pgTable(
+  "workspace_member_project",
+  {
+    id: text("id")
+      .$defaultFn(() => createId())
+      .primaryKey(),
+    workspaceId: text("workspace_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [
-    unique("project_member_project_user_unique").on(
-      table.projectId,
+    foreignKey({
+      columns: [table.workspaceId, table.projectId],
+      foreignColumns: [projectTable.workspaceId, projectTable.id],
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    unique("workspace_member_project_workspace_user_project_unique").on(
+      table.workspaceId,
       table.userId,
+      table.projectId,
     ),
-    index("project_member_projectId_idx").on(table.projectId),
-    index("project_member_userId_idx").on(table.userId),
-    index("project_member_workspaceMemberId_idx").on(table.workspaceMemberId),
+    index("workspace_member_project_projectId_idx").on(table.projectId),
   ],
 );
 
@@ -461,12 +479,23 @@ export const calendarFeedTable = pgTable(
         onDelete: "cascade",
         onUpdate: "cascade",
       }),
+    // The member the link was made for. A feed reads as its owner, so it
+    // stops working when they lose access to the project.
+    userId: text("user_id")
+      .notNull()
+      .references(() => userTable.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     token: text("token").notNull().unique(),
     labelIds: jsonb("label_ids").$type<string[]>().notNull(),
     timeZone: text("time_zone").notNull().default("UTC"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
-  (table) => [index("calendar_feed_project_id_idx").on(table.projectId)],
+  (table) => [
+    index("calendar_feed_project_id_idx").on(table.projectId),
+    index("calendar_feed_user_id_idx").on(table.userId),
+  ],
 );
 
 export const taskTable = pgTable(
@@ -646,6 +675,7 @@ export const activityTable = pgTable(
   (table) => [
     index("activity_task_id_idx").on(table.taskId),
     index("activity_userId_idx").on(table.userId),
+    index("activity_createdAt_idx").on(table.createdAt),
     unique("activity_task_external_source_external_url_unique").on(
       table.taskId,
       table.externalSource,
@@ -698,6 +728,11 @@ export const assetTable = pgTable(
     index("asset_taskId_idx").on(table.taskId),
     index("asset_activityId_idx").on(table.activityId),
     index("asset_createdBy_idx").on(table.createdBy),
+    index("asset_draft_expiry_idx")
+      .on(table.createdAt, table.id)
+      .where(
+        sql`${table.taskId} is null and ${table.surface} in ('draft', 'draft-pending')`,
+      ),
   ],
 );
 
@@ -1337,3 +1372,17 @@ export const customFieldValueTable = pgTable(
     ),
   ],
 );
+
+// These records outlive their original owner so failed object deletion can retry.
+export const storageCleanupTable = pgTable("storage_cleanup", {
+  objectKey: text("object_key").primaryKey(),
+  lastAttemptAt: timestamp("last_attempt_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const dataMigrationTable = pgTable("data_migration", {
+  id: text("id").primaryKey(),
+  completedAt: timestamp("completed_at", { mode: "date" })
+    .defaultNow()
+    .notNull(),
+});

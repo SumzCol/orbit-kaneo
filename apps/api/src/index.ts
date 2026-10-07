@@ -1,3 +1,5 @@
+import integrationSync from "./integration-sync";
+import { syncWorkspaceAccess } from "./ws/workspace-access";
 import { drainPasswordResetDeliveries } from "./utils/password-reset-delivery";
 import "./instrument";
 
@@ -45,6 +47,7 @@ import label from "./label";
 import mattermostIntegration from "./mattermost-integration";
 import mcpRoutes, { mcpWellKnownRoutes } from "./mcp";
 import { migrateColumns } from "./migrations/column-migration";
+import { migrateProjectMemberAccess } from "./migrations/project-member-access-migration";
 import notification from "./notification";
 import notificationPreferences from "./notification-preferences";
 import oauth from "./oauth";
@@ -52,6 +55,7 @@ import { createRoute, errorResponse, jsonResponse, z } from "./openapi";
 import { initializePlugins } from "./plugins";
 import { migrateGitHubIntegration } from "./plugins/github/migration";
 import project from "./project";
+import { assertProjectAccess } from "./project-access/assert-project-access";
 import { getPublicProject } from "./project/controllers/get-public-project";
 import { initializeScheduler, shutdownScheduler } from "./scheduler";
 import search from "./search";
@@ -81,7 +85,6 @@ import { migrateNotificationPreferencesSchema } from "./utils/migrate-notificati
 import { migrateSessionColumn } from "./utils/migrate-session-column";
 import { migrateWorkspaceUserEmail } from "./utils/migrate-workspace-user-email";
 import { normalizeApiServerUrl } from "./utils/openapi-spec";
-import { canAccessProject } from "./utils/project-access";
 import { seedDefaultWorkspaceRoles } from "./utils/seed-default-workspace-roles";
 import { drainSignInEmails } from "./utils/sign-in-email-tasks";
 import { validateWorkspaceAccess } from "./utils/validate-workspace-access";
@@ -397,7 +400,10 @@ export function createApp() {
 
   api.use("/auth/*", async (c, next) => {
     const apiKeyHeader = c.req.header("x-api-key")?.trim();
-    if (apiKeyHeader && !(await verifyApiKey(apiKeyHeader))) {
+    if (
+      apiKeyHeader &&
+      !(await verifyApiKey(apiKeyHeader, { consume: false }))
+    ) {
       throw new HTTPException(401, { message: "Unauthorized" });
     }
     return next();
@@ -430,7 +436,7 @@ export function createApp() {
       tags: ["Assets"],
       summary: "Download asset",
       description:
-        "Download an uploaded asset. Readable without signing in only when it belongs to a public project; otherwise only by the project's own members and by workspace and instance administrators, who reach every project. Image types are served inline, everything else as an attachment.",
+        "Download an uploaded asset. Readable without signing in only when it belongs to a public project; image types are served inline, everything else as an attachment.",
       security: [],
       request: { params: z.object({ id: z.string() }) },
       responses: {
@@ -452,6 +458,7 @@ export function createApp() {
           mimeType: schema.assetTable.mimeType,
           filename: schema.assetTable.filename,
           surface: schema.assetTable.surface,
+          createdBy: schema.assetTable.createdBy,
           workspaceId: schema.assetTable.workspaceId,
           projectId: schema.assetTable.projectId,
           isPublic: schema.projectTable.isPublic,
@@ -685,7 +692,7 @@ export function createApp() {
         return auth.handler(new Request(c.req.raw, { headers }));
       }
 
-      if (!(await verifyApiKey(bearerToken))) {
+      if (!(await verifyApiKey(bearerToken, { consume: false }))) {
         throw new HTTPException(401, { message: "Unauthorized" });
       }
 
@@ -746,6 +753,7 @@ export function createApp() {
     notificationPreferences,
   );
   const searchApi = api.route("/search", search);
+  const integrationSyncApi = api.route("/integration-sync", integrationSync);
   const githubIntegrationApi = api.route(
     "/github-integration",
     githubIntegration,
@@ -798,15 +806,6 @@ export function createApp() {
     "/ws/user",
     upgradeWebSocket(async (c) => {
       assertWebSocketOrigin(c.req.raw.headers);
-      try {
-        await authenticateApiRequest(c);
-      } catch (error) {
-        if (error instanceof HTTPException) {
-          throw error;
-        }
-        console.error("API authentication failed:", error);
-        throw new HTTPException(500, { message: "Internal Server Error" });
-      }
 
       const userId = c.get("userId");
       let conn: ReturnType<typeof addUserConnection> | null = null;
@@ -815,6 +814,7 @@ export function createApp() {
         onOpen(_evt, ws) {
           if (userId) {
             conn = addUserConnection(userId, ws);
+            void syncWorkspaceAccess(userId, ws);
           }
         },
         onMessage: handleWebSocketMessage,
@@ -833,16 +833,6 @@ export function createApp() {
       assertWebSocketOrigin(c.req.raw.headers);
       const projectId = c.req.param("projectId");
 
-      try {
-        await authenticateApiRequest(c);
-      } catch (error) {
-        if (error instanceof HTTPException) {
-          throw error;
-        }
-        console.error("API authentication failed:", error);
-        throw new HTTPException(500, { message: "Internal Server Error" });
-      }
-
       const userId = c.get("userId");
 
       let workspaceId: string | undefined;
@@ -858,18 +848,8 @@ export function createApp() {
         }
 
         await validateWorkspaceAccess(userId, project.workspaceId);
+        await assertProjectAccess(userId, projectId);
         workspaceId = project.workspaceId;
-
-        // A project's realtime stream is as restricted as its board.
-        // `canAccessProject` resolves workspace permissions from the context,
-        // so the workspace has to be on it first.
-        c.set("workspaceId", project.workspaceId);
-
-        if (!(await canAccessProject(c, projectId))) {
-          throw new HTTPException(403, {
-            message: "You don't have access to this project",
-          });
-        }
       }
 
       const windowId = c.req.query("windowId");
@@ -912,6 +892,7 @@ export function createApp() {
     discordIntegrationApi,
     externalLinkApi,
     genericWebhookIntegrationApi,
+    integrationSyncApi,
     githubIntegrationApi,
     giteaIntegrationApi,
     gitlabIntegrationApi,
@@ -970,6 +951,7 @@ export async function runStartupTasks() {
   await migrateNotificationPreferencesSchema();
   await migrateGitHubIntegration();
   await migrateColumns();
+  await migrateProjectMemberAccess();
   await seedDefaultWorkspaceRoles();
 
   initializePlugins();
@@ -1043,6 +1025,7 @@ const {
   discordIntegrationApi,
   externalLinkApi,
   genericWebhookIntegrationApi,
+  integrationSyncApi,
   githubIntegrationApi,
   giteaIntegrationApi,
   gitlabIntegrationApi,
@@ -1094,6 +1077,7 @@ export type AppType =
   | typeof notificationApi
   | typeof notificationPreferencesApi
   | typeof searchApi
+  | typeof integrationSyncApi
   | typeof githubIntegrationApi
   | typeof giteaIntegrationApi
   | typeof gitlabIntegrationApi

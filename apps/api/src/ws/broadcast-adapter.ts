@@ -5,20 +5,15 @@ export type ProjectBroadcastMessage = {
   tasks?: Array<{ id: string; position: number; status?: string }>;
   sourceTaskId?: string;
   targetTaskId?: string;
-  /** Only set on PROJECT_ACCESS_REVOKED: whose connections to close. */
-  userId?: string;
-  /**
-   * Only set on PROJECT_MOVED: who lost access in the same move. They need the
-   * revocation code rather than the move's, and sending it separately would
-   * race the move close on every peer.
-   */
-  revokedUserIds?: string[];
+  linksChanged?: boolean;
+  taskTitleChanged?: boolean;
 };
 
 export type BroadcastMessage = {
   projectId: string;
   message: ProjectBroadcastMessage;
   excludeInitiatorId?: string;
+  authorizationBatch?: string;
 };
 
 export type UserBroadcastMessage = {
@@ -43,7 +38,10 @@ export type BroadcastAdapter = {
     handler: (msg: BroadcastMessage) => void | Promise<void>,
   ): Promise<void>;
 
-  subscribeToUser(handler: (msg: UserBroadcast) => void): Promise<void>;
+  subscribeToUser(
+    handler: (msg: UserBroadcast) => void | Promise<void>,
+    onRecovery?: () => Promise<void>,
+  ): Promise<void>;
 
   /** Cleanup on shutdown */
   shutdown(): Promise<void>;

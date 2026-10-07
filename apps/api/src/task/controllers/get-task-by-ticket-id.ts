@@ -1,30 +1,36 @@
-import { and, eq, ilike, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import db from "../../database";
 import {
   projectTable,
   taskTable,
   userTable,
+  workspaceTable,
   workspaceUserTable,
 } from "../../database/schema";
-import { escapeLikePattern } from "../../search/like-pattern";
-import { TASK_SHORT_ID_PATTERN } from "../../search/task-short-id";
+import {
+  isSameProjectKey,
+  mayMatchProjectKey,
+} from "../../project/project-key";
+import { projectAccessCondition } from "../../project-access/project-access-condition";
+import { TICKET_ID_PATTERN } from "../ticket-id";
 import { hasInstanceAdminRole } from "../../utils/instance-admin-role";
 import getTask from "./get-task";
 
 export default async function getTaskByTicketId(
   ticketId: string,
   userId: string,
-  // Decided by the caller, which has the request: the check has to see the
-  // API key's scope, not only the user behind it.
-  canAccess: (projectId: string, workspaceId: string) => Promise<boolean>,
-  workspaceId?: string,
-  projectId?: string,
+  {
+    workspaceId,
+    workspaceSlug,
+    projectId,
+  }: { workspaceId?: string; workspaceSlug?: string; projectId?: string } = {},
 ) {
-  const match = ticketId.normalize("NFKC").match(TASK_SHORT_ID_PATTERN);
+  const match = ticketId.normalize("NFKC").match(TICKET_ID_PATTERN);
+  const projectKey = match?.[1];
   const number = Number(match?.[2]);
   if (
-    !match?.[1] ||
+    !projectKey ||
     !Number.isSafeInteger(number) ||
     number < 1 ||
     number > 2_147_483_647
@@ -43,51 +49,64 @@ export default async function getTaskByTicketId(
     .from(workspaceUserTable)
     .where(eq(workspaceUserTable.userId, userId));
 
-  const matches = await db
+  let slugWorkspaceIds: string[] | undefined;
+  if (workspaceSlug) {
+    const slugMatches = await db
+      .select({ id: workspaceTable.id, slug: workspaceTable.slug })
+      .from(workspaceTable)
+      .where(sql`lower(${workspaceTable.slug}) = lower(${workspaceSlug})`);
+    const exactMatch = slugMatches.find(
+      (workspace) => workspace.slug === workspaceSlug,
+    );
+    slugWorkspaceIds = exactMatch
+      ? [exactMatch.id]
+      : slugMatches.map((workspace) => workspace.id);
+    if (slugWorkspaceIds.length === 0) {
+      throw new HTTPException(404, { message: "Task not found" });
+    }
+  }
+
+  const candidates = await db
     .select({
       id: taskTable.id,
-      projectId: taskTable.projectId,
       workspaceId: projectTable.workspaceId,
+      slug: projectTable.slug,
+      archivedAt: projectTable.archivedAt,
     })
     .from(taskTable)
     .innerJoin(projectTable, eq(taskTable.projectId, projectTable.id))
     .where(
       and(
-        ilike(projectTable.slug, escapeLikePattern(match[1])),
         eq(taskTable.number, number),
+        mayMatchProjectKey(projectKey),
         workspaceId ? eq(projectTable.workspaceId, workspaceId) : undefined,
+        slugWorkspaceIds
+          ? inArray(projectTable.workspaceId, slugWorkspaceIds)
+          : undefined,
         projectId ? eq(projectTable.id, projectId) : undefined,
         hasInstanceAdminRole(user?.role)
           ? undefined
           : inArray(projectTable.workspaceId, memberWorkspaces),
+        projectAccessCondition(userId, projectTable.id),
       ),
     );
-  // Deliberately unbounded. Any cap can truncate to a set of hidden matches
-  // and answer 404 while a visible one sits just past the limit, and the
-  // rows are already narrowed to one slug, one number and the workspaces
-  // this caller belongs to -- at most one task per project that shares the
-  // slug, which is what the 409 below exists to report.
 
-  // This route resolves a task from a slug and a number rather than an id, so
-  // there is no project for the access middleware to check before the lookup.
-  // The rule is applied to the result instead: a project the caller is not on
-  // answers exactly like a ticket that does not exist.
-  const visible: typeof matches = [];
-  for (const candidate of matches) {
-    if (await canAccess(candidate.projectId, candidate.workspaceId)) {
-      visible.push(candidate);
-    }
-  }
-
-  const matchedTask = visible[0];
+  const rank = (candidate: { archivedAt: Date | null }) =>
+    candidate.archivedAt?.getTime() ?? Number.POSITIVE_INFINITY;
+  const [matchedTask, nextMatch] = candidates
+    .filter((candidate) => isSameProjectKey(candidate.slug, projectKey))
+    .sort((a, b) => (rank(a) === rank(b) ? 0 : rank(a) > rank(b) ? -1 : 1));
   if (!matchedTask) {
     throw new HTTPException(404, { message: "Task not found" });
   }
-  if (visible.length > 1) {
+  if (nextMatch && rank(nextMatch) === rank(matchedTask)) {
     throw new HTTPException(409, {
       message: "Task ticket ID matches multiple accessible tasks",
     });
   }
 
-  return getTask(matchedTask.id);
+  return {
+    ...(await getTask(matchedTask.id)),
+    workspaceId: matchedTask.workspaceId,
+  };
 }

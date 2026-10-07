@@ -1,3 +1,4 @@
+import { revokeUserConnections, revokeWorkspaceConnections } from "./ws";
 import { apiKey } from "@better-auth/api-key";
 import {
   isSmtpConfigured,
@@ -40,16 +41,20 @@ import {
   findBillableWorkspaces,
   formatBillableWorkspacesMessage,
 } from "./billing/controllers/find-billable-workspaces";
-import { syncWorkspaceSeats } from "./billing/controllers/sync-seats";
+import { pruneUserCalendarFeeds } from "./calendar-feed/prune-calendar-feeds";
+import { shouldPruneFeedsAfterAdminUpdate } from "./calendar-feed/should-prune-after-admin-update";
 import db, { schema } from "./database";
 import { authDatabaseAdapter } from "./database/auth-adapter";
 import { publishEvent } from "./events";
-import revokeWorkspaceProjectMemberships from "./project/controllers/revoke-workspace-project-memberships";
-import {
-  rememberRoleReach,
-  revalidateAfterMemberRoleChange,
-  revalidateAfterRoleUpdate,
-} from "./project/controllers/role-update-access";
+import { applyInvitationProjectAccess } from "./project-access/apply-invitation-project-access";
+import { resolveInvitationProjectAccess } from "./project-access/resolve-invitation-project-access";
+import { clearMemberProjectAccess } from "./project-access/clear-member-project-access";
+import { isOwnerRole } from "./project-access/is-owner-role";
+import { publishMemberProjects } from "./project-access/publish-member-projects";
+import { handleMemberAdded } from "./workspace-members/handle-member-added";
+import { handleMemberRemoved } from "./workspace-members/handle-member-removed";
+import { handleOwnerPromoted } from "./workspace-members/handle-owner-promoted";
+import { hideInaccessibleInvitationProjects } from "./project-access/hide-inaccessible-invitation-projects";
 import clearEmailVerificationOnAdminChange from "./user/controllers/clear-email-verification-on-admin-change";
 import deleteAccountData from "./user/controllers/delete-account-data";
 import prepareAdminUserRemoval from "./user/controllers/prepare-admin-user-removal";
@@ -61,12 +66,16 @@ import {
 } from "./utils/check-registration-allowed";
 import { checkWorkspaceName } from "./utils/check-workspace-name";
 import { mapCustomOAuthProfileToUser } from "./utils/custom-oauth-profile";
+import { resolveFileSecret } from "./utils/file-secret";
 import { generateDemoName } from "./utils/generate-demo-name";
 import { getDefaultCookieAttributes } from "./utils/get-default-cookie-attributes";
 import { getInvitationEmailSubject } from "./utils/get-invitation-email-subject";
 import { getWorkspaceInvitationEmailCopy } from "./utils/get-workspace-invitation-email-copy";
 import { getGithubSsoOAuthCredentials } from "./utils/github-sso-env";
-import { hasInstanceAdminRole } from "./utils/instance-admin-role";
+import {
+  hasInstanceAdminRole,
+  instanceAdminRoleSql,
+} from "./utils/instance-admin-role";
 import {
   hasRegisteredUsers,
   promoteInitialAdministrator,
@@ -141,6 +150,7 @@ function getLocaleKey(locale?: string | null) {
   if (normalized?.startsWith("de")) return "de";
   if (normalized?.startsWith("vi")) return "vi";
   if (normalized?.startsWith("ja")) return "ja";
+  if (normalized === "zh-tw") return "zh-tw";
   return "en";
 }
 
@@ -187,6 +197,14 @@ function getAuthEmailCopy(locale?: string | null) {
     };
   }
 
+  if (localeKey === "zh-tw") {
+    return {
+      magicLinkSubject: "Kaneo 登入連結",
+      otpSubject: "Kaneo 驗證碼",
+      passwordResetSubject: "重設 Kaneo 密碼",
+    };
+  }
+
   return {
     magicLinkSubject: "Login for Kaneo",
     otpSubject: "Authentication code for Kaneo",
@@ -211,6 +229,8 @@ function getDeviceAuthVerificationUri(): string {
   const base = clientUrl.replace(/\/$/, "");
   return `${base}/device`;
 }
+
+const deletedWorkspaceMembers = new WeakMap<object, string[]>();
 
 export const auth = betterAuth({
   baseURL: baseURLWithoutPath,
@@ -399,6 +419,20 @@ export const auth = betterAuth({
           fields: {
             organizationId: "workspaceId",
           },
+          additionalFields: {
+            projectAccess: {
+              type: "string",
+              input: true,
+              required: false,
+              defaultValue: "all",
+            },
+            projectIds: {
+              type: "string[]",
+              input: true,
+              required: false,
+              defaultValue: [],
+            },
+          },
         },
         organizationRole: {
           modelName: "workspace_role",
@@ -489,7 +523,7 @@ export const auth = betterAuth({
             ownerId: user.id,
           });
         },
-        beforeDeleteOrganization: async ({ organization }) => {
+        beforeDeleteOrganization: async ({ organization }, ctx) => {
           const billable = await findBillableWorkspaces([organization.id]);
           if (billable.length > 0) {
             throw new APIError("CONFLICT", {
@@ -498,60 +532,68 @@ export const auth = betterAuth({
               ),
             });
           }
+          if (ctx) {
+            const members = await db
+              .select({ userId: schema.workspaceUserTable.userId })
+              .from(schema.workspaceUserTable)
+              .where(
+                eq(schema.workspaceUserTable.workspaceId, organization.id),
+              );
+            const admins = await db
+              .select({ userId: schema.userTable.id })
+              .from(schema.userTable)
+              .where(instanceAdminRoleSql(schema.userTable.role));
+            deletedWorkspaceMembers.set(ctx.context, [
+              ...new Set(
+                [...members, ...admins].map((member) => member.userId),
+              ),
+            ]);
+          }
+        },
+        afterDeleteOrganization: async ({ organization }, ctx) => {
+          const userIds = ctx
+            ? (deletedWorkspaceMembers.get(ctx.context) ?? [])
+            : [];
+          if (ctx) deletedWorkspaceMembers.delete(ctx.context);
+          await Promise.all(
+            userIds.map((userId) =>
+              revokeWorkspaceConnections(userId, organization.id, {
+                force: true,
+              }),
+            ),
+          );
+        },
+        beforeCreateInvitation: async ({ invitation }) => {
+          const access = await resolveInvitationProjectAccess(invitation);
+          return { data: access };
+        },
+        beforeAcceptInvitation: async ({ invitation, user }) => {
+          await applyInvitationProjectAccess(invitation, user.id);
+        },
+        afterAcceptInvitation: async ({ member }) => {
+          await publishMemberProjects(
+            member.organizationId,
+            member.userId,
+          ).catch((error) => {
+            console.error("Project member refresh failed:", error);
+          });
+        },
+        afterUpdateMemberRole: async ({ member }) => {
+          if (isOwnerRole(member.role)) {
+            await handleOwnerPromoted(member.organizationId, member.userId);
+          }
         },
         afterAddMember: async ({ member }) => {
           if (member?.organizationId) {
-            void syncWorkspaceSeats(member.organizationId).catch((error) => {
-              console.error("Seat sync after member add failed:", error);
-            });
+            await handleMemberAdded(member.organizationId, member.userId);
           }
         },
-        // A role that reached every project did so without project rows, so
-        // moving someone off it ends access nothing else would notice until
-        // the sweep, and their other tabs would keep the projects listed.
-        afterUpdateMemberRole: async ({
-          member,
-          previousRole,
-          organization,
-        }) => {
-          if (member?.userId && previousRole && organization?.id) {
-            await revalidateAfterMemberRoleChange(
-              organization.id,
-              member.userId,
-              previousRole,
-            );
-          }
-        },
-        afterRemoveMember: async ({ member }) => {
+        afterRemoveMember: async ({ member, user }) => {
           if (member?.organizationId) {
-            // Awaited, unlike the seat sync: this is a revocation, and the
-            // project rows outlive the workspace membership that justified
-            // them.
-            //
-            // The failure below is logged rather than rethrown because it is
-            // not what enforces the revocation. Deleting the membership nulls
-            // each project row's link to it, and a null link never matches,
-            // so a row this misses grants nothing -- including after the user
-            // is re-added, which creates a new membership the old row does
-            // not point at. Rethrowing would fail the member removal itself
-            // over cleanup that has already stopped mattering.
-            if (member.userId) {
-              try {
-                await revokeWorkspaceProjectMemberships(
-                  member.organizationId,
-                  member.userId,
-                  member.role,
-                );
-              } catch (error) {
-                console.error(
-                  "Failed to revoke project memberships after member remove:",
-                  error,
-                );
-              }
-            }
-
-            void syncWorkspaceSeats(member.organizationId).catch((error) => {
-              console.error("Seat sync after member remove failed:", error);
+            await handleMemberRemoved({
+              workspaceId: member.organizationId,
+              userId: member.userId,
+              userRole: user.role,
             });
           }
         },
@@ -594,7 +636,7 @@ export const auth = betterAuth({
         {
           providerId: "custom",
           clientId: process.env.CUSTOM_OAUTH_CLIENT_ID || "",
-          clientSecret: process.env.CUSTOM_OAUTH_CLIENT_SECRET,
+          clientSecret: resolveFileSecret("CUSTOM_OAUTH_CLIENT_SECRET"),
           authorizationUrl: process.env.CUSTOM_OAUTH_AUTHORIZATION_URL || "",
           tokenUrl: process.env.CUSTOM_OAUTH_TOKEN_URL || "",
           userInfoUrl: process.env.CUSTOM_OAUTH_USER_INFO_URL || "",
@@ -651,6 +693,19 @@ export const auth = betterAuth({
   },
   databaseHooks: {
     user: {
+      delete: {
+        after: async (user, ctx) => {
+          // Anonymous linking deletes the old identity after issuing a new
+          // session. The replacement account must retain its authentication.
+          if (
+            (user as Partial<UserWithAnonymous>).isAnonymous &&
+            ctx?.context.newSession &&
+            ctx.context.newSession.user.id !== user.id
+          )
+            return;
+          await revokeUserConnections(user.id);
+        },
+      },
       update: {
         before: async (user, ctx) => {
           if (
@@ -665,6 +720,20 @@ export const auth = betterAuth({
             });
           }
           return clearEmailVerificationOnAdminChange(user, ctx);
+        },
+        // An instance administrator reaches every project, including ones in
+        // workspaces they never joined, and their calendar feeds read with
+        // that. Losing the role, or a ban, which /admin/update-user can also
+        // set, ends it; the feeds are deleted rather than left to the fetch
+        // check, which would let the role or an unban revive them.
+        after: async (user, ctx) => {
+          if (
+            (ctx?.path === "/admin/set-role" ||
+              ctx?.path === "/admin/update-user") &&
+            shouldPruneFeedsAfterAdminUpdate(user)
+          ) {
+            await pruneUserCalendarFeeds(user.id);
+          }
         },
       },
       create: {
@@ -700,10 +769,6 @@ export const auth = betterAuth({
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path === "/admin/remove-user") {
         await prepareAdminUserRemoval(ctx);
-      }
-
-      if (ctx.path === "/organization/update-role") {
-        await rememberRoleReach(ctx);
       }
 
       if (ctx.path === "/organization/invite-member") {
@@ -831,10 +896,58 @@ export const auth = betterAuth({
       }
     }),
     after: createAuthMiddleware(async (ctx) => {
-      // Role edits run through Better Auth with no lifecycle hook of their
-      // own; the before hook above recorded what the role used to reach.
-      if (ctx.path === "/organization/update-role") {
-        await revalidateAfterRoleUpdate(ctx);
+      // A ban revokes sessions and API keys, but a feed link carries neither.
+      // The fetch refuses a banned owner's feeds; deleting them keeps an unban
+      // from reviving links that may have been passed on.
+      if (
+        ctx.path === "/admin/ban-user" &&
+        !(ctx.context.returned instanceof APIError) &&
+        typeof ctx.body?.userId === "string"
+      ) {
+        await pruneUserCalendarFeeds(ctx.body.userId);
+      }
+
+      if (
+        ctx.path === "/organization/list-invitations" ||
+        ctx.path === "/organization/get-full-organization"
+      ) {
+        const viewer = await getSessionFromCtx(ctx);
+        const returned = ctx.context.returned as
+          | { invitations?: unknown }
+          | unknown[]
+          | null;
+        if (viewer)
+          await hideInaccessibleInvitationProjects(
+            viewer.user.id,
+            Array.isArray(returned) ? returned : returned?.invitations,
+          );
+      }
+
+      if (ctx.path === "/organization/leave") {
+        // The successful endpoint returns the removed member. No post-delete
+        // query may prevent revocation after membership has already committed.
+        const removed = ctx.context.returned as
+          | { userId?: string; organizationId?: string }
+          | undefined;
+        if (
+          typeof removed?.userId === "string" &&
+          typeof removed.organizationId === "string" &&
+          removed.organizationId === ctx.body?.organizationId
+        ) {
+          await clearMemberProjectAccess(
+            removed.organizationId,
+            removed.userId,
+          ).catch((error) => {
+            console.error("Project access cleanup failed:", error);
+          });
+          await revokeWorkspaceConnections(
+            removed.userId,
+            removed.organizationId,
+            {
+              role: ctx.context.session?.user.role ?? null,
+            },
+          );
+        }
       }
 
       if (ctx.path.startsWith("/sign-up") || ctx.path.startsWith("/sign-in")) {

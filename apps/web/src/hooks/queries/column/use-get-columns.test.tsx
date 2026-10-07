@@ -40,9 +40,9 @@ describe("useGetColumns", () => {
     expect(optionOf(client)).toBe(false);
   });
 
-  it("takes the option when one is given", async () => {
+  it("refetches on mount when asked to", async () => {
     const client = clientWithDefault();
-    renderWithClient(client, { refetchOnMount: true });
-    await waitFor(() => expect(optionOf(client)).toBe(true));
+    renderWithClient(client, { refreshOnMount: true });
+    await waitFor(() => expect(optionOf(client)).toBe("always"));
   });
 });

@@ -16,7 +16,6 @@ import {
   invitationTableRelations,
   labelTableRelations,
   notificationTableRelations,
-  projectMemberTableRelations,
   projectTableRelations,
   sessionTableRelations,
   taskRelationTableRelations,
@@ -37,6 +36,8 @@ import {
 } from "./relations";
 import { resolveDatabaseConnectionString } from "./resolve-database-url";
 import {
+  dataMigrationTable,
+  storageCleanupTable,
   accountTable,
   activityTable,
   apikeyTable,
@@ -58,7 +59,6 @@ import {
   labelTable,
   mcpOauthStateTable,
   notificationTable,
-  projectMemberTable,
   projectTable,
   sessionTable,
   taskRelationTable,
@@ -77,6 +77,8 @@ import {
   workflowRuleTable,
   workspaceBillingTable,
   workspaceRoleTable,
+  workspaceMemberAccessTable,
+  workspaceMemberProjectTable,
   workspaceTable,
   workspaceUserTable,
 } from "./schema";
@@ -84,6 +86,8 @@ import {
 config();
 
 export const schema = {
+  dataMigrationTable,
+  storageCleanupTable,
   accountTable,
   assetTable,
   activityTable,
@@ -104,7 +108,6 @@ export const schema = {
   labelTable,
   mcpOauthStateTable,
   notificationTable,
-  projectMemberTable,
   projectTable,
   sessionTable,
   taskRelationTable,
@@ -122,6 +125,8 @@ export const schema = {
   verificationTable,
   workflowRuleTable,
   workspaceRoleTable,
+  workspaceMemberAccessTable,
+  workspaceMemberProjectTable,
   workspaceTable,
   workspaceUserTable,
   accountTableRelations,
@@ -136,7 +141,6 @@ export const schema = {
   invitationTableRelations,
   labelTableRelations,
   notificationTableRelations,
-  projectMemberTableRelations,
   projectTableRelations,
   sessionTableRelations,
   taskRelationTableRelations,

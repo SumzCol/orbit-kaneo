@@ -7,7 +7,7 @@ import { isInstanceAdmin } from "./is-instance-admin";
 
 type PermissionMap = Record<string, string[]>;
 
-export function builtInRoleStatements(
+function builtInRoleStatements(
   role: string,
 ): Record<string, readonly string[]> | null {
   if (role in builtInRoles) {
@@ -50,11 +50,9 @@ function parsePermissionStatements(
   return result;
 }
 
-export async function customRoleStatements(
+async function customRoleStatements(
   workspaceId: string,
   role: string,
-  // A caller inside a transaction passes it, so the read does not take a
-  // second pooled connection while the transaction holds one.
   database: Pick<typeof db, "select"> = db,
 ): Promise<Record<string, readonly string[]> | null> {
   const [row] = await database
@@ -73,7 +71,7 @@ export async function customRoleStatements(
   return parsePermissionStatements(row.permission);
 }
 
-export function satisfies(
+function satisfies(
   statements: Record<string, readonly string[]>,
   required: PermissionMap,
 ): boolean {
@@ -85,6 +83,18 @@ export function satisfies(
     }
   }
   return true;
+}
+
+export async function roleHasWorkspacePermission(
+  workspaceId: string,
+  role: string,
+  permissions: PermissionMap,
+  database: Pick<typeof db, "select"> = db,
+) {
+  const statements =
+    (await customRoleStatements(workspaceId, role, database)) ??
+    builtInRoleStatements(role);
+  return Boolean(statements && satisfies(statements, permissions));
 }
 
 export async function hasWorkspacePermission(
@@ -160,6 +170,26 @@ export function requireWorkspacePermission(permissions: PermissionMap) {
       throw new HTTPException(403, { message: "Insufficient permissions" });
     }
 
+    return next();
+  };
+}
+
+/**
+ * Holds an API key to its scope without asking anything of the user's role.
+ *
+ * For routes whose access a role does not decide -- a caller's own resources,
+ * reachable with project access alone -- but which a scoped key should still
+ * only reach when its scope says so. A key with no scope recorded is
+ * unrestricted, as in `requireWorkspacePermission`; a browser session passes.
+ */
+export function requireApiKeyScope(permissions: PermissionMap) {
+  return async (c: Context, next: Next) => {
+    const apiKey = c.get("apiKey") as
+      | { permissions?: Record<string, string[]> | null }
+      | undefined;
+    if (apiKey?.permissions && !satisfies(apiKey.permissions, permissions)) {
+      throw new HTTPException(403, { message: "Insufficient API key scope" });
+    }
     return next();
   };
 }
