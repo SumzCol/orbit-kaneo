@@ -3021,6 +3021,7 @@
 			"selectedProjectsDescription": "Only access the projects you choose.",
 			"projectsLabel": "Projects",
 			"noProjects": "No projects in this workspace yet.",
+			"noAccessibleProjects": "No projects you can access.",
 			"archived": "Archived",
 			"noneSelected": "No projects selected. They won't see any project until one is granted.",
 			"noProjectAccess": "No projects",

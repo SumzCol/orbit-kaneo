@@ -12433,6 +12433,9 @@
 						"noProjects": {
 							"type": "string"
 						},
+						"noAccessibleProjects": {
+							"type": "string"
+						},
 						"archived": {
 							"type": "string"
 						},
@@ -12498,6 +12501,7 @@
 						"selectedProjectsDescription",
 						"projectsLabel",
 						"noProjects",
+						"noAccessibleProjects",
 						"archived",
 						"noneSelected",
 						"noProjectAccess",

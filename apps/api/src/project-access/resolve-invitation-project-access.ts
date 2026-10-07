@@ -17,7 +17,8 @@ export async function resolveInvitationProjectAccess(
     projectAccess:
       invitation.projectAccess ??
       (isOwnerRole(invitation.role) ? "all" : "selected"),
-    projectIds: invitation.projectIds,
+    // Project IDs only count alongside an explicit choice.
+    projectIds: invitation.projectAccess == null ? [] : invitation.projectIds,
   });
 
   if (!resolution.ok) {

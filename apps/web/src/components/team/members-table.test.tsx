@@ -444,4 +444,24 @@ describe("MembersTable project access", () => {
       screen.getByText("team:projectAccess.noVisibleProjectAccess"),
     ).toBeVisible();
   });
+
+  it("treats a manager whose own access is still loading as limited", () => {
+    myProjectAccess.mockReturnValue(
+      undefined as unknown as { projectAccess: string; projectIds: string[] },
+    );
+    projectAccessEntries.mockReturnValue([
+      { ...restrictedEntry, projectIds: [] },
+    ]);
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[members[2]]}
+      />,
+    );
+
+    expect(
+      screen.getByText("team:projectAccess.noVisibleProjectAccess"),
+    ).toBeVisible();
+  });
 });

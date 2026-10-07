@@ -361,7 +361,7 @@
 					"sent_one": "Invitation sent",
 					"sent_other": "{{count}} invitations sent",
 					"skip": "Skip for now",
-					"subtitle": "They'll get an email with a link to join {{name}}. You can invite more people later from Members.",
+					"subtitle": "They'll get an email with a link to join {{name}}. They start with no projects; give them access from Members, where you can also invite more people.",
 					"title": "Invite your teammates"
 				},
 				"plan": {
@@ -832,7 +832,8 @@
 			"noProjectAccess": "No projects",
 			"noneSelectedLimited": "None of the projects you can see are selected. Access to projects you can't see stays as it is.",
 			"noVisibleProjectAccess": "No projects you can see",
-			"projectsUnavailable": "Couldn't load projects. Close this and try again."
+			"projectsUnavailable": "Couldn't load projects. Close this and try again.",
+			"noAccessibleProjects": "No projects you can access."
 		}
 	},
 	"publicProject": {

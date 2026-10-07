@@ -109,7 +109,12 @@ function ProjectAccessFields({
               </p>
             ) : !projects.length ? (
               <p className="text-muted-foreground text-sm">
-                {t("team:projectAccess.noProjects")}
+                {/* A limited editor only receives projects they can open. */}
+                {t(
+                  allowAll
+                    ? "team:projectAccess.noProjects"
+                    : "team:projectAccess.noAccessibleProjects",
+                )}
               </p>
             ) : (
               projects.map((project) => (

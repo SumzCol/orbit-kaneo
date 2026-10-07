@@ -358,7 +358,7 @@
 					"sending": "正在发送…",
 					"sent_other": "已发送 {{count}} 个邀请",
 					"skip": "暂时跳过",
-					"subtitle": "他们会收到一封邮件，里面有加入 {{name}} 的链接。之后还可以随时在成员页面继续邀请。",
+					"subtitle": "他们会收到一封邮件，里面有加入 {{name}} 的链接。他们加入后默认看不到任何项目；请在成员页面为他们授予项目访问权限，也可以在那里继续邀请。",
 					"title": "邀请你的团队成员"
 				},
 				"plan": {
@@ -3013,7 +3013,8 @@
 			"noProjectAccess": "No projects",
 			"noneSelectedLimited": "None of the projects you can see are selected. Access to projects you can't see stays as it is.",
 			"noVisibleProjectAccess": "No projects you can see",
-			"projectsUnavailable": "Couldn't load projects. Close this and try again."
+			"projectsUnavailable": "Couldn't load projects. Close this and try again.",
+			"noAccessibleProjects": "No projects you can access."
 		}
 	},
 	"publicProject": {

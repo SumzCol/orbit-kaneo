@@ -133,10 +133,9 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
     canManageProjectAccess,
   );
   const myAccess = useGetMyProjectAccess(workspaceId, canManageProjectAccess);
-  // Unknown counts as limited, as in the edit dialog: the access list is
-  // redacted for the caller either way.
-  const managerLimited =
-    myAccess.isError || myAccess.data?.projectAccess === "selected";
+  // Unknown (loading or failed) counts as limited: the access list is
+  // redacted for the caller, and only a known "all" may grant everything.
+  const managerLimited = myAccess.data?.projectAccess !== "all";
   const columnCount = canManageProjectAccess ? 5 : 4;
 
   const describeAccess = (access: ProjectAccessValue) =>

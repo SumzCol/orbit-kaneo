@@ -358,7 +358,7 @@
 					"sending": "寄送中...",
 					"sent_other": "已寄出 {{count}} 份邀請",
 					"skip": "暫時略過",
-					"subtitle": "對方會收到一封附有加入 {{name}} 連結的電子郵件。之後也能在「成員」頁面邀請更多人。",
+					"subtitle": "對方會收到一封附有加入 {{name}} 連結的電子郵件。他們加入後預設看不到任何專案；請在「成員」頁面授予專案存取權，也能在那裡邀請更多人。",
 					"title": "邀請你的隊友"
 				},
 				"plan": {
@@ -3013,7 +3013,8 @@
 			"noProjectAccess": "No projects",
 			"noneSelectedLimited": "None of the projects you can see are selected. Access to projects you can't see stays as it is.",
 			"noVisibleProjectAccess": "No projects you can see",
-			"projectsUnavailable": "Couldn't load projects. Close this and try again."
+			"projectsUnavailable": "Couldn't load projects. Close this and try again.",
+			"noAccessibleProjects": "No projects you can access."
 		}
 	},
 	"publicProject": {

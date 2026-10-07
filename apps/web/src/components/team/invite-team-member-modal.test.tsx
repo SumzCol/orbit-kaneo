@@ -195,6 +195,29 @@ describe("invitation project access", () => {
     ).toBeDisabled();
   });
 
+  it("tells a limited inviter they can't access any project", async () => {
+    myAccess.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { projectAccess: "selected", projectIds: [] },
+    });
+    projectsResult.mockReturnValue({ data: [], isLoading: false });
+    render(<InviteTeamMemberModal open onClose={vi.fn()} />, { wrapper });
+
+    // Other projects exist; they're just not ones this inviter can open.
+    expect(
+      screen.getByText("team:projectAccess.noAccessibleProjects"),
+    ).toBeVisible();
+    expect(
+      screen.queryByText("team:projectAccess.noProjects"),
+    ).not.toBeInTheDocument();
+    myAccess.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { projectAccess: "all", projectIds: [] },
+    });
+  });
+
   it("starts a limited inviter on selected projects", async () => {
     myAccess.mockReturnValue({
       isPending: false,
