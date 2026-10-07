@@ -1,3 +1,4 @@
+import { DEFAULT_PROJECT_ACCESS } from "../project-access/default-project-access";
 import { PROJECT_ACCESS_MODES } from "../project-access/project-access-mode";
 import { z } from "../openapi";
 
@@ -23,5 +24,12 @@ export const updateMemberProjectAccessBody = z.object({
   projectIds: z.array(z.string()).default([]).openapi({
     description:
       'Projects the member can access when projectAccess is "selected".',
+  }),
+});
+
+export const updateDefaultProjectAccessBody = z.object({
+  defaultProjectAccess: z.enum(DEFAULT_PROJECT_ACCESS).openapi({
+    description:
+      '"all" gives new members every project. "none" gives them no projects until someone grants one.',
   }),
 });

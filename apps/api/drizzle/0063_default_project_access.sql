@@ -1,0 +1,1 @@
+ALTER TABLE "workspace" ADD COLUMN "default_project_access" text DEFAULT 'all' NOT NULL;

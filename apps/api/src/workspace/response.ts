@@ -1,3 +1,4 @@
+import { DEFAULT_PROJECT_ACCESS } from "../project-access/default-project-access";
 import { PROJECT_ACCESS_MODES } from "../project-access/project-access-mode";
 import { z } from "../openapi";
 
@@ -30,3 +31,12 @@ export const memberProjectAccessListSchema = z
     description:
       "Members limited to selected projects. Members not listed can access every project. Project IDs only include projects the caller can access.",
   });
+
+export const defaultProjectAccessSchema = z
+  .object({
+    defaultProjectAccess: z.enum(DEFAULT_PROJECT_ACCESS).openapi({
+      description:
+        "Project access for members added without an invitation, and the access the invite dialog starts from. Invitations created through the API without projectAccess still give every project.",
+    }),
+  })
+  .openapi("DefaultProjectAccess");

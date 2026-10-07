@@ -12499,6 +12499,42 @@
 						"updateSuccess",
 						"updateError"
 					]
+				},
+				"defaultProjectAccess": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"label": {
+							"type": "string"
+						},
+						"description": {
+							"type": "string"
+						},
+						"unavailable": {
+							"type": "string"
+						},
+						"all": {
+							"type": "string"
+						},
+						"none": {
+							"type": "string"
+						},
+						"updateSuccess": {
+							"type": "string"
+						},
+						"updateError": {
+							"type": "string"
+						}
+					},
+					"required": [
+						"label",
+						"description",
+						"unavailable",
+						"all",
+						"none",
+						"updateSuccess",
+						"updateError"
+					]
 				}
 			},
 			"required": [
@@ -12507,7 +12543,8 @@
 				"invitations",
 				"inviteModal",
 				"membersTable",
-				"projectAccess"
+				"projectAccess",
+				"defaultProjectAccess"
 			]
 		},
 		"publicProject": {

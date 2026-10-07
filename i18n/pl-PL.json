@@ -830,6 +830,15 @@
 			"allProjectsUnavailable": "Your own access is limited, so you can only give access to selected projects.",
 			"noneSelected": "No projects selected. They won't see any project until one is granted.",
 			"noProjectAccess": "No projects"
+		},
+		"defaultProjectAccess": {
+			"all": "All projects",
+			"description": "Applies to people added to the workspace and is where the invite dialog starts. Existing members keep their access.",
+			"label": "Project access for new members",
+			"none": "No projects",
+			"unavailable": "Your own access is limited, so you can't change this.",
+			"updateError": "Failed to update the default project access",
+			"updateSuccess": "Default project access updated"
 		}
 	},
 	"publicProject": {

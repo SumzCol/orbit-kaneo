@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import db from "../../database";
 import { userTable, workspaceUserTable } from "../../database/schema";
+import { applyDefaultProjectAccess } from "../../project-access/apply-default-project-access";
 import { clearMemberProjectAccess } from "../../project-access/clear-member-project-access";
 import { handleMemberAdded } from "../../workspace-members/handle-member-added";
 import { isAssignableWorkspaceRole } from "../is-assignable-workspace-role";
@@ -41,6 +42,7 @@ async function addWorkspaceMember(request: {
     await tx
       .insert(workspaceUserTable)
       .values({ workspaceId, userId, role, joinedAt: new Date() });
+    await applyDefaultProjectAccess(tx, { workspaceId, userId, role });
   });
 
   await handleMemberAdded(workspaceId, userId);

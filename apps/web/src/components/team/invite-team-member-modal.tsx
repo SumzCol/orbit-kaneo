@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { z } from "zod/v4";
 import useInviteWorkspaceUser from "@/hooks/mutations/workspace-user/use-invite-workspace-user";
 import useGetProjects from "@/hooks/queries/project/use-get-projects";
+import useGetDefaultProjectAccess from "@/hooks/queries/workspace-users/use-get-default-project-access";
 import useGetMyProjectAccess from "@/hooks/queries/workspace-users/use-get-my-project-access";
 import useActiveWorkspace from "@/hooks/queries/workspace/use-active-workspace";
 import { useWorkspacePermission } from "@/hooks/use-workspace-permission";
@@ -62,15 +63,19 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
     email: string;
   } | null>(null);
   const myAccess = useGetMyProjectAccess(workspaceId ?? "", open);
-  const isMyAccessPending = myAccess.isPending;
   const inviterLimited =
     myAccess.isError || myAccess.data?.projectAccess === "selected";
   const [chosenAccess, setProjectAccess] = useState<ProjectAccessValue | null>(
     null,
   );
+  const defaultAccess = useGetDefaultProjectAccess(workspaceId ?? "", open);
+  // The selection starts from both, so the form waits for both.
+  const isAccessPending = myAccess.isPending || defaultAccess.isPending;
   const projectAccess =
     chosenAccess ??
-    (inviterLimited ? SELECTED_PROJECTS_ACCESS : ALL_PROJECTS_ACCESS);
+    (inviterLimited || defaultAccess.data?.defaultProjectAccess === "none"
+      ? SELECTED_PROJECTS_ACCESS
+      : ALL_PROJECTS_ACCESS);
   const { data: projects, isLoading: isLoadingProjects } = useGetProjects({
     workspaceId: workspaceId ?? "",
     includeArchived: true,
@@ -207,7 +212,7 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
                   onChange={setProjectAccess}
                   projects={projects}
                   isLoadingProjects={isLoadingProjects}
-                  disabled={form.formState.isSubmitting || isMyAccessPending}
+                  disabled={form.formState.isSubmitting || isAccessPending}
                 />
               </DialogPanel>
 
@@ -220,7 +225,7 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={!workspaceId || !canInvite || isMyAccessPending}
+                  disabled={!workspaceId || !canInvite || isAccessPending}
                 >
                   {t("team:inviteModal.sendInvitation")}
                 </Button>

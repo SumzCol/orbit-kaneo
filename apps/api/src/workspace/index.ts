@@ -5,18 +5,22 @@ import {
   errorResponse,
   jsonResponse,
 } from "../openapi";
+import { getDefaultProjectAccess } from "../project-access/get-default-project-access";
 import { listWorkspaceProjectAccess } from "../project-access/list-workspace-project-access";
 import { requireWorkspacePermission } from "../utils/require-workspace-permission";
 import { workspaceAccess } from "../utils/workspace-access-middleware";
 import getMyProjectAccessCtrl from "./controllers/get-my-project-access";
 import getWorkspaceMembersCtrl from "./controllers/get-workspace-members";
+import updateDefaultProjectAccessCtrl from "./controllers/update-default-project-access";
 import updateMemberProjectAccessCtrl from "./controllers/update-member-project-access";
 import {
+  defaultProjectAccessSchema,
   memberProjectAccessListSchema,
   memberProjectAccessSchema,
   workspaceMemberListSchema,
 } from "./response";
 import {
+  updateDefaultProjectAccessBody,
   updateMemberProjectAccessBody,
   workspaceIdParam,
   workspaceMemberParam,
@@ -116,6 +120,53 @@ const updateMemberProjectAccessRoute = createRoute({
   },
 });
 
+const getDefaultProjectAccessRoute = createRoute({
+  method: "get",
+  operationId: "getDefaultProjectAccess",
+  path: "/{workspaceId}/project-access/default",
+  tags: ["Workspaces"],
+  summary: "Get the default project access",
+  description:
+    "The project access new members get when no invitation chooses it, and the access the invite dialog starts from.",
+  middleware: [workspaceAccess.fromParam("workspaceId")] as const,
+  request: { params: workspaceIdParam },
+  responses: {
+    200: jsonResponse("Default project access", defaultProjectAccessSchema),
+    400: errorResponse("Workspace ID could not be determined"),
+    403: errorResponse("No access to the workspace"),
+  },
+});
+
+const updateDefaultProjectAccessRoute = createRoute({
+  method: "put",
+  operationId: "updateDefaultProjectAccess",
+  path: "/{workspaceId}/project-access/default",
+  tags: ["Workspaces"],
+  summary: "Update the default project access",
+  description:
+    "Choose whether new members start with every project or with none. It applies to members added without an invitation, and is what the invite dialog starts from; existing members keep their access.",
+  middleware: [
+    workspaceAccess.fromParam("workspaceId"),
+    requireWorkspacePermission({ member: ["update"] }),
+  ] as const,
+  request: {
+    params: workspaceIdParam,
+    body: {
+      required: true,
+      content: {
+        "application/json": { schema: updateDefaultProjectAccessBody },
+      },
+    },
+  },
+  responses: {
+    200: jsonResponse("Default project access", defaultProjectAccessSchema),
+    400: errorResponse("Invalid body"),
+    403: errorResponse(
+      "Missing member:update permission, or the caller's own project access is limited",
+    ),
+  },
+});
+
 const workspace = apiRouter<BaseVariables & { workspaceId: string }>()
   .openapi(getWorkspaceMembersRoute, async (c) =>
     c.json(
@@ -123,6 +174,26 @@ const workspace = apiRouter<BaseVariables & { workspaceId: string }>()
         workspaceId: c.get("workspaceId"),
         userId: c.get("userId"),
         projectId: c.req.valid("query").projectId,
+      }),
+      200,
+    ),
+  )
+  .openapi(getDefaultProjectAccessRoute, async (c) =>
+    c.json(
+      {
+        defaultProjectAccess: await getDefaultProjectAccess(
+          c.get("workspaceId"),
+        ),
+      },
+      200,
+    ),
+  )
+  .openapi(updateDefaultProjectAccessRoute, async (c) =>
+    c.json(
+      await updateDefaultProjectAccessCtrl({
+        workspaceId: c.get("workspaceId"),
+        actorId: c.get("userId"),
+        defaultProjectAccess: c.req.valid("json").defaultProjectAccess,
       }),
       200,
     ),

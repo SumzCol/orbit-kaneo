@@ -58,6 +58,14 @@ const myAccess = vi.fn(() => ({
 vi.mock("@/hooks/queries/workspace-users/use-get-my-project-access", () => ({
   default: () => myAccess(),
 }));
+const defaultAccess = vi.fn(() => ({
+  isPending: false,
+  data: { defaultProjectAccess: "all" as "all" | "none" },
+}));
+vi.mock(
+  "@/hooks/queries/workspace-users/use-get-default-project-access",
+  () => ({ default: () => defaultAccess() }),
+);
 vi.mock("@/lib/toast", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("./invitation-link-field", () => ({ default: () => null }));
 function wrapper({ children }: PropsWithChildren) {
@@ -152,6 +160,31 @@ describe("invitation project access", () => {
         expect.objectContaining({ projectAccess: "all", projectIds: [] }),
       ),
     );
+  });
+
+  it("starts from no projects when that is the workspace default", async () => {
+    defaultAccess.mockReturnValue({
+      isPending: false,
+      data: { defaultProjectAccess: "none" },
+    });
+    render(<InviteTeamMemberModal open onClose={vi.fn()} />, { wrapper });
+    await fillEmail();
+
+    expect(
+      screen.getByRole("radio", {
+        name: /team:projectAccess.selectedProjects/,
+      }),
+    ).toHaveAttribute("aria-checked", "true");
+    submit();
+    await waitFor(() =>
+      expect(inviteMember).toHaveBeenCalledWith(
+        expect.objectContaining({ projectAccess: "selected", projectIds: [] }),
+      ),
+    );
+    defaultAccess.mockReturnValue({
+      isPending: false,
+      data: { defaultProjectAccess: "all" },
+    });
   });
 
   it("starts a limited inviter on selected projects", async () => {

@@ -149,6 +149,9 @@ export const workspaceTable = pgTable("workspace", {
   metadata: text("metadata"),
   description: text("description"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull(),
+  // What a member gets when they join without an invitation choosing for
+  // them: "all" projects, or "none" until someone grants one.
+  defaultProjectAccess: text("default_project_access").default("all").notNull(),
 });
 
 export const workspaceUserTable = pgTable(

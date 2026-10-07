@@ -48,6 +48,7 @@ import { authDatabaseAdapter } from "./database/auth-adapter";
 import { publishEvent } from "./events";
 import { applyInvitationProjectAccess } from "./project-access/apply-invitation-project-access";
 import { resolveInvitationProjectAccess } from "./project-access/resolve-invitation-project-access";
+import { applyDefaultProjectAccess } from "./project-access/apply-default-project-access";
 import { clearMemberProjectAccess } from "./project-access/clear-member-project-access";
 import { isOwnerRole } from "./project-access/is-owner-role";
 import { publishMemberProjects } from "./project-access/publish-member-projects";
@@ -585,6 +586,14 @@ export const auth = betterAuth({
         },
         afterAddMember: async ({ member }) => {
           if (member?.organizationId) {
+            // Server-side additions have no invitation to choose access.
+            await applyDefaultProjectAccess(db, {
+              workspaceId: member.organizationId,
+              userId: member.userId,
+              role: member.role,
+            }).catch((error) => {
+              console.error("Default project access failed:", error);
+            });
             await handleMemberAdded(member.organizationId, member.userId);
           }
         },

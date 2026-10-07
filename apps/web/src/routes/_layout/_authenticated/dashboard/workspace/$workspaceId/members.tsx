@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import WorkspaceLayout from "@/components/common/workspace-layout";
 import PageTitle from "@/components/page-title";
+import DefaultProjectAccessSetting from "@/components/team/default-project-access-setting";
 import InviteTeamMemberModal from "@/components/team/invite-team-member-modal";
 import MembersTable from "@/components/team/members-table";
 import { Button } from "@/components/ui/button";
@@ -20,8 +21,9 @@ function RouteComponent() {
   const { t } = useTranslation();
   const { workspaceId } = Route.useParams();
   const { data: workspace } = useGetFullWorkspace({ workspaceId });
-  const { canInviteUsers } = useWorkspacePermission();
+  const { canInviteUsers, canUpdateMembers } = useWorkspacePermission();
   const canInvite = Boolean(canInviteUsers());
+  const canManageProjectAccess = Boolean(canUpdateMembers());
   const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   return (
@@ -43,6 +45,11 @@ function RouteComponent() {
           ) : null
         }
       >
+        {canManageProjectAccess ? (
+          <div className="mb-4">
+            <DefaultProjectAccessSetting workspaceId={workspaceId} />
+          </div>
+        ) : null}
         <MembersTable
           workspaceId={workspaceId}
           users={workspace?.members ?? []}

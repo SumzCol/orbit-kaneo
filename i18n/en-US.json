@@ -3032,6 +3032,15 @@
 			"save": "Save",
 			"updateSuccess": "Project access updated",
 			"updateError": "Failed to update project access"
+		},
+		"defaultProjectAccess": {
+			"label": "Project access for new members",
+			"description": "Applies to people added to the workspace and is where the invite dialog starts. Existing members keep their access.",
+			"unavailable": "Your own access is limited, so you can't change this.",
+			"all": "All projects",
+			"none": "No projects",
+			"updateSuccess": "Default project access updated",
+			"updateError": "Failed to update the default project access"
 		}
 	},
 	"publicProject": {

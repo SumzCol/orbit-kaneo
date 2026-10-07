@@ -4424,6 +4424,22 @@
           "role"
         ]
       },
+      "DefaultProjectAccess": {
+        "type": "object",
+        "properties": {
+          "defaultProjectAccess": {
+            "type": "string",
+            "enum": [
+              "all",
+              "none"
+            ],
+            "description": "Project access for members added without an invitation, and the access the invite dialog starts from. Invitations created through the API without projectAccess still give every project."
+          }
+        },
+        "required": [
+          "defaultProjectAccess"
+        ]
+      },
       "MemberProjectAccess": {
         "type": "object",
         "properties": {
@@ -19327,6 +19343,137 @@
           },
           "404": {
             "description": "Project not found in this workspace",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/{workspaceId}/project-access/default": {
+      "get": {
+        "operationId": "getDefaultProjectAccess",
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Get the default project access",
+        "description": "The project access new members get when no invitation chooses it, and the access the invite dialog starts from.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "workspaceId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default project access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultProjectAccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Workspace ID could not be determined",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "No access to the workspace",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateDefaultProjectAccess",
+        "tags": [
+          "Workspaces"
+        ],
+        "summary": "Update the default project access",
+        "description": "Choose whether new members start with every project or with none. It applies to members added without an invitation, and is what the invite dialog starts from; existing members keep their access.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "workspaceId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "defaultProjectAccess": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "none"
+                    ],
+                    "description": "\"all\" gives new members every project. \"none\" gives them no projects until someone grants one."
+                  }
+                },
+                "required": [
+                  "defaultProjectAccess"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default project access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultProjectAccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Missing member:update permission, or the caller's own project access is limited",
             "content": {
               "text/plain": {
                 "schema": {

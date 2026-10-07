@@ -9,7 +9,7 @@ Membership belongs to a workspace. Make sure the workspace name at the top of th
 
 1. Open **Members** in the workspace sidebar.
 2. Choose **Invite member** and enter their email address.
-3. Under **Project access**, keep **All projects** or choose **Selected projects** and pick the projects they need. See [Limit a member to selected projects](#limit-a-member-to-selected-projects).
+3. Under **Project access**, keep the workspace default or choose the projects they need. Leave every project unticked to add them with no projects until you grant one. See [Limit a member to selected projects](#limit-a-member-to-selected-projects).
 4. Create the invitation, then copy the link shown in the dialog.
 5. Share the link with that person. With SMTP configured, the instance can also send an invitation email.
 
@@ -49,7 +49,7 @@ By default, members can open every project in the workspace, including projects 
 
 1. Open **Members** in the workspace sidebar.
 2. In the **Projects** column, choose the member's current access, for example **All projects**.
-3. Choose **Selected projects**, tick the projects they should see, and choose **Save**.
+3. Choose **Selected projects**, tick the projects they should see, and choose **Save**. Untick every project to keep them out of all projects until you grant one.
 
 If a limited member opens a link to another project, they see **You don't have access to this project** and can ask a workspace admin for access.
 
@@ -63,6 +63,10 @@ Some rules keep this predictable:
 - You need permission to change roles, and you can't change your own project access.
 - If your own access is limited, you can only give others access to projects you can open, and you can't give anyone **All projects** or limit someone who has it. Projects you can't open stay as they are on the member you edit.
 - Tasks can only be assigned to people who can see the project. Limiting someone unassigns them from tasks in the projects they lose, and moving a task into a project its assignee can't see unassigns it.
+
+### Choose what new members start with
+
+Above the members list, **Project access for new members** sets where new people start: **All projects**, or **No projects** until someone grants one. The invite dialog starts from it, and people an instance administrator adds to the workspace get it. Existing members keep their access. Only someone who can open every project can change it.
 
 Project access set on an invitation applies when the person accepts it. To change it before then, cancel the invitation and invite them again.
 
