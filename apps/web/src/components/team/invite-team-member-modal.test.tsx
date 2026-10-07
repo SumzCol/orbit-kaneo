@@ -146,9 +146,29 @@ describe("invitation project access", () => {
     );
   }
 
-  it("invites with access to every project by default", async () => {
+  it("starts on selected projects with none ticked", async () => {
     render(<InviteTeamMemberModal open onClose={vi.fn()} />, { wrapper });
     await fillEmail();
+
+    expect(
+      screen.getByRole("radio", {
+        name: /team:projectAccess.selectedProjects/,
+      }),
+    ).toHaveAttribute("aria-checked", "true");
+    submit();
+    await waitFor(() =>
+      expect(inviteMember).toHaveBeenCalledWith(
+        expect.objectContaining({ projectAccess: "selected", projectIds: [] }),
+      ),
+    );
+  });
+
+  it("still invites with access to every project when chosen", async () => {
+    render(<InviteTeamMemberModal open onClose={vi.fn()} />, { wrapper });
+    await fillEmail();
+    fireEvent.click(
+      screen.getByRole("radio", { name: /team:projectAccess.allProjects/ }),
+    );
     submit();
     await waitFor(() =>
       expect(inviteMember).toHaveBeenCalledWith(

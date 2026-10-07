@@ -533,7 +533,7 @@ export function organizationRoutes(registry: OpenAPIHono["openAPIRegistry"]) {
               teamId: z.union([z.string(), z.array(z.string())]).optional(),
               projectAccess: z.enum(["all", "selected"]).optional().openapi({
                 description:
-                  '"all" (the default) gives access to every project. "selected" limits the new member to projectIds once they accept.',
+                  '"all" gives access to every project, including future ones. "selected" limits the new member to projectIds once they accept. Left out, the invitation gives no projects, except to an owner.',
               }),
               projectIds: z.array(z.string()).optional().openapi({
                 description:

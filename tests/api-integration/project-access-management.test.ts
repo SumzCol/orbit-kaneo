@@ -417,7 +417,8 @@ describe("invitations with project access", () => {
     );
   });
 
-  it("gives every project to an invitation without a selection", async () => {
+  // Orbit: upstream gives every project here.
+  it("gives no projects to an invitation without a selection", async () => {
     const ctx = await createInvitationWorkspace();
 
     const invited = await ctx.ownerRequest("/auth/organization/invite-member", {
@@ -429,7 +430,15 @@ describe("invitations with project access", () => {
       },
     });
     expect(invited.status).toBe(200);
-    const invitation = (await invited.json()) as { id: string };
+    const invitation = (await invited.json()) as {
+      id: string;
+      projectAccess: string;
+      projectIds: string[];
+    };
+    expect(invitation).toMatchObject({
+      projectAccess: "selected",
+      projectIds: [],
+    });
 
     const invitee = await signUpWithSession(ctx.app, {
       email: "teammate@example.com",
@@ -448,7 +457,7 @@ describe("invitations with project access", () => {
     const projects = await inviteeRequest(
       `/project?workspaceId=${ctx.workspaceId}`,
     );
-    expect(await projects.json()).toHaveLength(2);
+    expect(await projects.json()).toHaveLength(0);
   });
 
   it("rejects an invitation for projects outside the workspace", async () => {

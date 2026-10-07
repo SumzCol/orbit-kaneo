@@ -31,7 +31,6 @@ import {
 import { Input } from "../ui/input";
 import InvitationLinkField from "./invitation-link-field";
 import {
-  ALL_PROJECTS_ACCESS,
   type ProjectAccessValue,
   SELECTED_PROJECTS_ACCESS,
 } from "./project-access/project-access-value";
@@ -68,9 +67,8 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
   const [chosenAccess, setProjectAccess] = useState<ProjectAccessValue | null>(
     null,
   );
-  const projectAccess =
-    chosenAccess ??
-    (inviterLimited ? SELECTED_PROJECTS_ACCESS : ALL_PROJECTS_ACCESS);
+  // New people start with no projects; the inviter ticks what they need.
+  const projectAccess = chosenAccess ?? SELECTED_PROJECTS_ACCESS;
   const { data: projects, isLoading: isLoadingProjects } = useGetProjects({
     workspaceId: workspaceId ?? "",
     includeArchived: true,

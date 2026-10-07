@@ -354,7 +354,7 @@
 				"continue": "Continue",
 				"invite": {
 					"title": "Invite your teammates",
-					"subtitle": "They'll get an email with a link to join {{name}}. You can invite more people later from Members.",
+					"subtitle": "They'll get an email with a link to join {{name}}. They start with no projects; give them access from Members, where you can also invite more people.",
 					"emailLabel": "Teammate email {{index}}",
 					"emailPlaceholder": "teammate@company.com",
 					"addAnother": "Add another",
