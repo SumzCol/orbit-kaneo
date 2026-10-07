@@ -258,6 +258,32 @@ describe("managing member project access", () => {
     expect(activities.map((activity) => activity.type)).toContain("unassigned");
   });
 
+  it("keeps a member out of every project with an empty selection", async () => {
+    const ctx = await createRestrictedWorkspace();
+    const member = await addWorkspaceMember(ctx.workspace.id);
+    mockAuthenticatedSession(ctx.owner);
+
+    const restricted = await putMemberProjectAccess(
+      projectAccessApi(),
+      ctx.workspace.id,
+      member.id,
+      { projectAccess: "selected", projectIds: [] },
+    );
+    expect(restricted.status).toBe(200);
+    expect(await restricted.json()).toEqual({
+      userId: member.id,
+      projectAccess: "selected",
+      projectIds: [],
+    });
+
+    mockAuthenticatedSession(member);
+    const request = projectAccessApi();
+    const projects = await request(`/project?workspaceId=${ctx.workspace.id}`);
+    expect(projects.status).toBe(200);
+    expect(await projects.json()).toEqual([]);
+    expect((await request(`/project/${ctx.alpha.id}`)).status).toBe(403);
+  });
+
   it("rejects projects from another workspace", async () => {
     const ctx = await createRestrictedWorkspace();
     const other = await createRestrictedWorkspace();

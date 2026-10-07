@@ -3045,13 +3045,14 @@
 			"projectCount_other": "{{count}} projects",
 			"projectsLabel": "Projects",
 			"save": "Save",
-			"selectAtLeastOne": "Choose at least one project.",
 			"selectedProjects": "Selected projects",
 			"selectedProjectsDescription": "Only access the projects you choose.",
 			"updateError": "Failed to update project access",
 			"updateSuccess": "Project access updated",
 			"archived": "Archived",
-			"allProjectsUnavailable": "Your own access is limited, so you can only give access to selected projects."
+			"allProjectsUnavailable": "Your own access is limited, so you can only give access to selected projects.",
+			"noneSelected": "No projects selected. They won't see any project until one is granted.",
+			"noProjectAccess": "No projects"
 		}
 	},
 	"publicProject": {

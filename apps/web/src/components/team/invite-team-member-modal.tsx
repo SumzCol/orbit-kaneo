@@ -35,7 +35,6 @@ import {
   type ProjectAccessValue,
   SELECTED_PROJECTS_ACCESS,
 } from "./project-access/project-access-value";
-import { isProjectAccessComplete } from "./project-access/is-project-access-complete";
 import { toProjectAccessRequest } from "./project-access/to-project-access-request";
 import ProjectAccessFields from "./project-access-fields";
 
@@ -72,7 +71,6 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
   const projectAccess =
     chosenAccess ??
     (inviterLimited ? SELECTED_PROJECTS_ACCESS : ALL_PROJECTS_ACCESS);
-  const [showProjectAccessError, setShowProjectAccessError] = useState(false);
   const { data: projects, isLoading: isLoadingProjects } = useGetProjects({
     workspaceId: workspaceId ?? "",
     includeArchived: true,
@@ -102,10 +100,6 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
       projectAccess,
       (projects ?? []).map((project) => project.id),
     );
-    if (!isProjectAccessComplete(access)) {
-      setShowProjectAccessError(true);
-      return;
-    }
     try {
       const invitation = await mutateAsync({
         email,
@@ -151,7 +145,6 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
     setCreatedInvitation(null);
     form.reset();
     setProjectAccess(null);
-    setShowProjectAccessError(false);
   };
 
   return (
@@ -211,18 +204,10 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
                 <ProjectAccessFields
                   allowAll={!inviterLimited}
                   value={projectAccess}
-                  onChange={(next) => {
-                    setProjectAccess(next);
-                    setShowProjectAccessError(false);
-                  }}
+                  onChange={setProjectAccess}
                   projects={projects}
                   isLoadingProjects={isLoadingProjects}
                   disabled={form.formState.isSubmitting || isMyAccessPending}
-                  error={
-                    showProjectAccessError
-                      ? t("team:projectAccess.selectAtLeastOne")
-                      : undefined
-                  }
                 />
               </DialogPanel>
 

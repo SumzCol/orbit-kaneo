@@ -12436,7 +12436,10 @@
 						"archived": {
 							"type": "string"
 						},
-						"selectAtLeastOne": {
+						"noneSelected": {
+							"type": "string"
+						},
+						"noProjectAccess": {
 							"type": "string"
 						},
 						"projectCount_one": {
@@ -12487,7 +12490,8 @@
 						"projectsLabel",
 						"noProjects",
 						"archived",
-						"selectAtLeastOne",
+						"noneSelected",
+						"noProjectAccess",
 						"editAria",
 						"dialogTitle",
 						"dialogDescription",

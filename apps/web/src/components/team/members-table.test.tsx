@@ -309,7 +309,8 @@ describe("MembersTable project access", () => {
     );
   });
 
-  it("asks for a project instead of saving an empty selection", async () => {
+  it("saves an empty selection, keeping the member out of every project", async () => {
+    updateProjectAccess.mockResolvedValue({});
     render(
       <MembersTable
         workspaceId="workspace-1"
@@ -322,13 +323,20 @@ describe("MembersTable project access", () => {
       screen.getByRole("button", { name: "team:projectAccess.editAria" }),
     );
     fireEvent.click(await screen.findByRole("checkbox", { name: "Alpha" }));
+    expect(
+      await screen.findByText("team:projectAccess.noneSelected"),
+    ).toBeVisible();
     fireEvent.click(
       screen.getByRole("button", { name: "team:projectAccess.save" }),
     );
 
-    expect(
-      await screen.findByText("team:projectAccess.selectAtLeastOne"),
-    ).toBeVisible();
-    expect(updateProjectAccess).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(updateProjectAccess).toHaveBeenCalledWith({
+        workspaceId: "workspace-1",
+        userId: "restricted-user",
+        projectAccess: "selected",
+        projectIds: [],
+      }),
+    );
   });
 });

@@ -142,9 +142,11 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
   const describeAccess = (access: ProjectAccessValue) =>
     access.projectAccess === "all"
       ? t("team:projectAccess.allProjects")
-      : t("team:projectAccess.projectCount", {
-          count: access.projectIds.length,
-        });
+      : access.projectIds.length === 0
+        ? t("team:projectAccess.noProjectAccess")
+        : t("team:projectAccess.projectCount", {
+            count: access.projectIds.length,
+          });
 
   const customRoles = allWorkspaceRoles.filter(
     (role) => !RESERVED_ROLE_NAMES.has(role.role),

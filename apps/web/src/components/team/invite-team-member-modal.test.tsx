@@ -200,7 +200,7 @@ describe("invitation project access", () => {
     });
   });
 
-  it("requires a project before inviting with selected access", async () => {
+  it("invites with selected access and no projects yet", async () => {
     render(<InviteTeamMemberModal open onClose={vi.fn()} />, { wrapper });
     await fillEmail();
     fireEvent.click(
@@ -208,19 +208,15 @@ describe("invitation project access", () => {
         name: /team:projectAccess.selectedProjects/,
       }),
     );
-    submit();
     expect(
-      await screen.findByText("team:projectAccess.selectAtLeastOne"),
+      await screen.findByText("team:projectAccess.noneSelected"),
     ).toBeVisible();
-    expect(inviteMember).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("checkbox", { name: "Beta" }));
     submit();
     await waitFor(() =>
       expect(inviteMember).toHaveBeenCalledWith(
         expect.objectContaining({
           projectAccess: "selected",
-          projectIds: ["project-b"],
+          projectIds: [],
         }),
       ),
     );
