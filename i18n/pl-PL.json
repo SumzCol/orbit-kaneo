@@ -361,7 +361,7 @@
 					"sent_one": "Invitation sent",
 					"sent_other": "{{count}} invitations sent",
 					"skip": "Skip for now",
-					"subtitle": "They'll get an email with a link to join {{name}}. You can invite more people later from Members.",
+					"subtitle": "They'll get an email with a link to join {{name}}. They start with no projects; give them access from Members, where you can also invite more people.",
 					"title": "Invite your teammates"
 				},
 				"plan": {
@@ -822,13 +822,18 @@
 			"projectCount_other": "{{count}} projects",
 			"projectsLabel": "Projects",
 			"save": "Save",
-			"selectAtLeastOne": "Choose at least one project.",
 			"selectedProjects": "Selected projects",
 			"selectedProjectsDescription": "Only access the projects you choose.",
 			"updateError": "Failed to update project access",
 			"updateSuccess": "Project access updated",
 			"archived": "Archived",
-			"allProjectsUnavailable": "Your own access is limited, so you can only give access to selected projects."
+			"allProjectsUnavailable": "Your own access is limited, so you can only give access to selected projects.",
+			"noneSelected": "No projects selected. They won't see any project until one is granted.",
+			"noProjectAccess": "No projects",
+			"noneSelectedLimited": "None of the projects you can see are selected. Access to projects you can't see stays as it is.",
+			"noVisibleProjectAccess": "No projects you can see",
+			"projectsUnavailable": "Couldn't load projects. Close this and try again.",
+			"noAccessibleProjects": "No projects you can access."
 		}
 	},
 	"publicProject": {

@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
-import { Field, FieldError } from "@/components/ui/field";
+import { Field, FieldDescription } from "@/components/ui/field";
 import { Fieldset, FieldsetLegend } from "@/components/ui/fieldset";
 import { Label } from "@/components/ui/label";
 import { Radio, RadioGroup } from "@/components/ui/radio-group";
@@ -18,7 +18,9 @@ type Props = {
   isLoadingProjects?: boolean;
   disabled?: boolean;
   allowAll?: boolean;
-  error?: string;
+  // The editor can't see every project, so access to the ones they can't
+  // see is kept whatever is ticked here.
+  keepsHiddenAccess?: boolean;
 };
 
 function ProjectAccessFields({
@@ -28,7 +30,7 @@ function ProjectAccessFields({
   isLoadingProjects = false,
   disabled = false,
   allowAll = true,
-  error,
+  keepsHiddenAccess = false,
 }: Props) {
   const { t } = useTranslation();
 
@@ -80,7 +82,7 @@ function ProjectAccessFields({
       </Fieldset>
 
       {value.projectAccess === "selected" ? (
-        <Field className="ps-7" invalid={Boolean(error)}>
+        <Field className="ps-7">
           <Fieldset
             className="max-w-none gap-3"
             render={
@@ -101,9 +103,18 @@ function ProjectAccessFields({
                 <Skeleton className="h-4 w-2/3" />
                 <Skeleton className="h-4 w-1/2" />
               </>
-            ) : !projects?.length ? (
+            ) : !projects ? (
+              <p className="text-destructive text-sm">
+                {t("team:projectAccess.projectsUnavailable")}
+              </p>
+            ) : !projects.length ? (
               <p className="text-muted-foreground text-sm">
-                {t("team:projectAccess.noProjects")}
+                {/* A limited editor only receives projects they can open. */}
+                {t(
+                  allowAll
+                    ? "team:projectAccess.noProjects"
+                    : "team:projectAccess.noAccessibleProjects",
+                )}
               </p>
             ) : (
               projects.map((project) => (
@@ -119,7 +130,17 @@ function ProjectAccessFields({
               ))
             )}
           </Fieldset>
-          {error ? <FieldError match>{error}</FieldError> : null}
+          {/* Allowed: someone can be kept out of every project until one
+              is granted, which is how a restricted newcomer starts. */}
+          {projects && value.projectIds.length === 0 ? (
+            <FieldDescription>
+              {t(
+                keepsHiddenAccess
+                  ? "team:projectAccess.noneSelectedLimited"
+                  : "team:projectAccess.noneSelected",
+              )}
+            </FieldDescription>
+          ) : null}
         </Field>
       ) : null}
     </div>

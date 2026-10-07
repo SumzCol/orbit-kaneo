@@ -12433,10 +12433,25 @@
 						"noProjects": {
 							"type": "string"
 						},
+						"noAccessibleProjects": {
+							"type": "string"
+						},
 						"archived": {
 							"type": "string"
 						},
-						"selectAtLeastOne": {
+						"noneSelected": {
+							"type": "string"
+						},
+						"noProjectAccess": {
+							"type": "string"
+						},
+						"noVisibleProjectAccess": {
+							"type": "string"
+						},
+						"noneSelectedLimited": {
+							"type": "string"
+						},
+						"projectsUnavailable": {
 							"type": "string"
 						},
 						"projectCount_one": {
@@ -12486,8 +12501,13 @@
 						"selectedProjectsDescription",
 						"projectsLabel",
 						"noProjects",
+						"noAccessibleProjects",
 						"archived",
-						"selectAtLeastOne",
+						"noneSelected",
+						"noProjectAccess",
+						"noVisibleProjectAccess",
+						"noneSelectedLimited",
+						"projectsUnavailable",
 						"editAria",
 						"dialogTitle",
 						"dialogDescription",

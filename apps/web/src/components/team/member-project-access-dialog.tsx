@@ -15,7 +15,6 @@ import {
   DialogPopup,
   DialogTitle,
 } from "../ui/dialog";
-import { isProjectAccessComplete } from "./project-access/is-project-access-complete";
 import { type ProjectAccessValue } from "./project-access/project-access-value";
 import { toProjectAccessRequest } from "./project-access/to-project-access-request";
 import ProjectAccessFields from "./project-access-fields";
@@ -37,11 +36,12 @@ function MemberProjectAccessDialog({
 }: Props) {
   const { t } = useTranslation();
   const [value, setValue] = useState(access);
-  const [showError, setShowError] = useState(false);
   const [wasOpen, setWasOpen] = useState(open);
+  // Only while open, so reopening after a failed load fetches again.
   const { data: projects, isLoading: isLoadingProjects } = useGetProjects({
     workspaceId,
     includeArchived: true,
+    enabled: open,
   });
   const myAccess = useGetMyProjectAccess(workspaceId, open);
   const managerLimited =
@@ -52,20 +52,19 @@ function MemberProjectAccessDialog({
     setWasOpen(open);
     if (open) {
       setValue(access);
-      setShowError(false);
     }
   }
 
+  // Without the list, the selection can't be checked against real projects,
+  // and filtering against nothing would save it empty.
+  const projectsUnavailable = value.projectAccess === "selected" && !projects;
+
   const handleSave = async () => {
-    if (!member) return;
+    if (!member || projectsUnavailable) return;
     const request = toProjectAccessRequest(
       value,
       (projects ?? []).map((project) => project.id),
     );
-    if (!isProjectAccessComplete(request)) {
-      setShowError(true);
-      return;
-    }
     try {
       await mutateAsync({ workspaceId, userId: member.userId, ...request });
       toast.success(t("team:projectAccess.updateSuccess"));
@@ -94,16 +93,11 @@ function MemberProjectAccessDialog({
           <ProjectAccessFields
             allowAll={!managerLimited}
             value={value}
-            onChange={(next) => {
-              setValue(next);
-              setShowError(false);
-            }}
+            onChange={setValue}
             projects={projects}
             isLoadingProjects={isLoadingProjects}
             disabled={isPending || myAccess.isPending}
-            error={
-              showError ? t("team:projectAccess.selectAtLeastOne") : undefined
-            }
+            keepsHiddenAccess={managerLimited}
           />
         </DialogPanel>
         <DialogFooter>
@@ -115,7 +109,12 @@ function MemberProjectAccessDialog({
           <Button
             size="sm"
             type="button"
-            disabled={isPending || isLoadingProjects || myAccess.isPending}
+            disabled={
+              isPending ||
+              isLoadingProjects ||
+              projectsUnavailable ||
+              myAccess.isPending
+            }
             onClick={handleSave}
           >
             {t("team:projectAccess.save")}

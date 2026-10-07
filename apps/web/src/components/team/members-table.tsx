@@ -132,19 +132,25 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
     workspaceId,
     canManageProjectAccess,
   );
-  const { data: myAccess } = useGetMyProjectAccess(
-    workspaceId,
-    canManageProjectAccess,
-  );
-  const managerLimited = myAccess?.projectAccess === "selected";
+  const myAccess = useGetMyProjectAccess(workspaceId, canManageProjectAccess);
+  // Unknown (loading or failed) counts as limited: the access list is
+  // redacted for the caller, and only a known "all" may grant everything.
+  const managerLimited = myAccess.data?.projectAccess !== "all";
   const columnCount = canManageProjectAccess ? 5 : 4;
 
   const describeAccess = (access: ProjectAccessValue) =>
     access.projectAccess === "all"
       ? t("team:projectAccess.allProjects")
-      : t("team:projectAccess.projectCount", {
-          count: access.projectIds.length,
-        });
+      : access.projectIds.length === 0
+        ? // A limited manager only sees grants for projects they can see.
+          t(
+            managerLimited
+              ? "team:projectAccess.noVisibleProjectAccess"
+              : "team:projectAccess.noProjectAccess",
+          )
+        : t("team:projectAccess.projectCount", {
+            count: access.projectIds.length,
+          });
 
   const customRoles = allWorkspaceRoles.filter(
     (role) => !RESERVED_ROLE_NAMES.has(role.role),

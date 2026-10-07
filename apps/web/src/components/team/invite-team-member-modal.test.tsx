@@ -41,14 +41,16 @@ vi.mock("@/hooks/queries/workspace/use-active-workspace", () => ({
 vi.mock("@/hooks/use-workspace-permission", () => ({
   useWorkspacePermission: () => ({ canInviteUsers: () => true }),
 }));
+const loadedProjects = {
+  data: [
+    { id: "project-a", name: "Alpha" },
+    { id: "project-b", name: "Beta" },
+  ] as { id: string; name: string }[] | undefined,
+  isLoading: false,
+};
+const projectsResult = vi.fn(() => loadedProjects);
 vi.mock("@/hooks/queries/project/use-get-projects", () => ({
-  default: () => ({
-    data: [
-      { id: "project-a", name: "Alpha" },
-      { id: "project-b", name: "Beta" },
-    ],
-    isLoading: false,
-  }),
+  default: () => projectsResult(),
 }));
 const myAccess = vi.fn(() => ({
   isPending: false,
@@ -67,6 +69,7 @@ function wrapper({ children }: PropsWithChildren) {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  projectsResult.mockReturnValue(loadedProjects);
   inviteMember.mockResolvedValue({
     data: null,
     error: { code: "INVITATION_EMAIL_FAILED", message: "Upstream failure" },
@@ -143,15 +146,76 @@ describe("invitation project access", () => {
     );
   }
 
-  it("invites with access to every project by default", async () => {
+  it("starts on selected projects with none ticked", async () => {
     render(<InviteTeamMemberModal open onClose={vi.fn()} />, { wrapper });
     await fillEmail();
+
+    expect(
+      screen.getByRole("radio", {
+        name: /team:projectAccess.selectedProjects/,
+      }),
+    ).toHaveAttribute("aria-checked", "true");
+    submit();
+    await waitFor(() =>
+      expect(inviteMember).toHaveBeenCalledWith(
+        expect.objectContaining({ projectAccess: "selected", projectIds: [] }),
+      ),
+    );
+  });
+
+  it("still invites with access to every project when chosen", async () => {
+    render(<InviteTeamMemberModal open onClose={vi.fn()} />, { wrapper });
+    await fillEmail();
+    fireEvent.click(
+      screen.getByRole("radio", { name: /team:projectAccess.allProjects/ }),
+    );
     submit();
     await waitFor(() =>
       expect(inviteMember).toHaveBeenCalledWith(
         expect.objectContaining({ projectAccess: "all", projectIds: [] }),
       ),
     );
+  });
+
+  it("won't invite with selected access while the projects can't be loaded", async () => {
+    projectsResult.mockReturnValue({ data: undefined, isLoading: false });
+    render(<InviteTeamMemberModal open onClose={vi.fn()} />, { wrapper });
+    await fillEmail();
+    fireEvent.click(
+      screen.getByRole("radio", {
+        name: /team:projectAccess.selectedProjects/,
+      }),
+    );
+
+    expect(
+      screen.getByText("team:projectAccess.projectsUnavailable"),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "team:inviteModal.sendInvitation" }),
+    ).toBeDisabled();
+  });
+
+  it("tells a limited inviter they can't access any project", async () => {
+    myAccess.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { projectAccess: "selected", projectIds: [] },
+    });
+    projectsResult.mockReturnValue({ data: [], isLoading: false });
+    render(<InviteTeamMemberModal open onClose={vi.fn()} />, { wrapper });
+
+    // Other projects exist; they're just not ones this inviter can open.
+    expect(
+      screen.getByText("team:projectAccess.noAccessibleProjects"),
+    ).toBeVisible();
+    expect(
+      screen.queryByText("team:projectAccess.noProjects"),
+    ).not.toBeInTheDocument();
+    myAccess.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { projectAccess: "all", projectIds: [] },
+    });
   });
 
   it("starts a limited inviter on selected projects", async () => {
@@ -200,7 +264,7 @@ describe("invitation project access", () => {
     });
   });
 
-  it("requires a project before inviting with selected access", async () => {
+  it("invites with selected access and no projects yet", async () => {
     render(<InviteTeamMemberModal open onClose={vi.fn()} />, { wrapper });
     await fillEmail();
     fireEvent.click(
@@ -208,19 +272,15 @@ describe("invitation project access", () => {
         name: /team:projectAccess.selectedProjects/,
       }),
     );
-    submit();
     expect(
-      await screen.findByText("team:projectAccess.selectAtLeastOne"),
+      await screen.findByText("team:projectAccess.noneSelected"),
     ).toBeVisible();
-    expect(inviteMember).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("checkbox", { name: "Beta" }));
     submit();
     await waitFor(() =>
       expect(inviteMember).toHaveBeenCalledWith(
         expect.objectContaining({
           projectAccess: "selected",
-          projectIds: ["project-b"],
+          projectIds: [],
         }),
       ),
     );

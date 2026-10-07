@@ -258,6 +258,32 @@ describe("managing member project access", () => {
     expect(activities.map((activity) => activity.type)).toContain("unassigned");
   });
 
+  it("keeps a member out of every project with an empty selection", async () => {
+    const ctx = await createRestrictedWorkspace();
+    const member = await addWorkspaceMember(ctx.workspace.id);
+    mockAuthenticatedSession(ctx.owner);
+
+    const restricted = await putMemberProjectAccess(
+      projectAccessApi(),
+      ctx.workspace.id,
+      member.id,
+      { projectAccess: "selected", projectIds: [] },
+    );
+    expect(restricted.status).toBe(200);
+    expect(await restricted.json()).toEqual({
+      userId: member.id,
+      projectAccess: "selected",
+      projectIds: [],
+    });
+
+    mockAuthenticatedSession(member);
+    const request = projectAccessApi();
+    const projects = await request(`/project?workspaceId=${ctx.workspace.id}`);
+    expect(projects.status).toBe(200);
+    expect(await projects.json()).toEqual([]);
+    expect((await request(`/project/${ctx.alpha.id}`)).status).toBe(403);
+  });
+
   it("rejects projects from another workspace", async () => {
     const ctx = await createRestrictedWorkspace();
     const other = await createRestrictedWorkspace();
@@ -391,7 +417,8 @@ describe("invitations with project access", () => {
     );
   });
 
-  it("gives every project to an invitation without a selection", async () => {
+  // Orbit: upstream gives every project here.
+  it("gives no projects to an invitation without a selection", async () => {
     const ctx = await createInvitationWorkspace();
 
     const invited = await ctx.ownerRequest("/auth/organization/invite-member", {
@@ -403,7 +430,15 @@ describe("invitations with project access", () => {
       },
     });
     expect(invited.status).toBe(200);
-    const invitation = (await invited.json()) as { id: string };
+    const invitation = (await invited.json()) as {
+      id: string;
+      projectAccess: string;
+      projectIds: string[];
+    };
+    expect(invitation).toMatchObject({
+      projectAccess: "selected",
+      projectIds: [],
+    });
 
     const invitee = await signUpWithSession(ctx.app, {
       email: "teammate@example.com",
@@ -422,7 +457,46 @@ describe("invitations with project access", () => {
     const projects = await inviteeRequest(
       `/project?workspaceId=${ctx.workspaceId}`,
     );
-    expect(await projects.json()).toHaveLength(2);
+    expect(await projects.json()).toHaveLength(0);
+  });
+
+  it("ignores project IDs sent without a project access choice", async () => {
+    const ctx = await createInvitationWorkspace();
+
+    const invited = await ctx.ownerRequest("/auth/organization/invite-member", {
+      method: "POST",
+      body: {
+        organizationId: ctx.workspaceId,
+        email: "teammate@example.com",
+        role: "member",
+        projectIds: [ctx.alpha.id],
+      },
+    });
+
+    expect(invited.status).toBe(200);
+    expect(await invited.json()).toMatchObject({
+      projectAccess: "selected",
+      projectIds: [],
+    });
+  });
+
+  it("gives every project to an owner invitation without a selection", async () => {
+    const ctx = await createInvitationWorkspace();
+
+    const invited = await ctx.ownerRequest("/auth/organization/invite-member", {
+      method: "POST",
+      body: {
+        organizationId: ctx.workspaceId,
+        email: "co-owner@example.com",
+        role: "owner",
+      },
+    });
+
+    expect(invited.status).toBe(200);
+    expect(await invited.json()).toMatchObject({
+      projectAccess: "all",
+      projectIds: [],
+    });
   });
 
   it("rejects an invitation for projects outside the workspace", async () => {
