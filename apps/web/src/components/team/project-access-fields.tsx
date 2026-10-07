@@ -18,6 +18,9 @@ type Props = {
   isLoadingProjects?: boolean;
   disabled?: boolean;
   allowAll?: boolean;
+  // The editor can't see every project, so access to the ones they can't
+  // see is kept whatever is ticked here.
+  keepsHiddenAccess?: boolean;
 };
 
 function ProjectAccessFields({
@@ -27,6 +30,7 @@ function ProjectAccessFields({
   isLoadingProjects = false,
   disabled = false,
   allowAll = true,
+  keepsHiddenAccess = false,
 }: Props) {
   const { t } = useTranslation();
 
@@ -99,7 +103,11 @@ function ProjectAccessFields({
                 <Skeleton className="h-4 w-2/3" />
                 <Skeleton className="h-4 w-1/2" />
               </>
-            ) : !projects?.length ? (
+            ) : !projects ? (
+              <p className="text-destructive text-sm">
+                {t("team:projectAccess.projectsUnavailable")}
+              </p>
+            ) : !projects.length ? (
               <p className="text-muted-foreground text-sm">
                 {t("team:projectAccess.noProjects")}
               </p>
@@ -119,9 +127,13 @@ function ProjectAccessFields({
           </Fieldset>
           {/* Allowed: someone can be kept out of every project until one
               is granted, which is how a restricted newcomer starts. */}
-          {!isLoadingProjects && value.projectIds.length === 0 ? (
+          {projects && value.projectIds.length === 0 ? (
             <FieldDescription>
-              {t("team:projectAccess.noneSelected")}
+              {t(
+                keepsHiddenAccess
+                  ? "team:projectAccess.noneSelectedLimited"
+                  : "team:projectAccess.noneSelected",
+              )}
             </FieldDescription>
           ) : null}
         </Field>

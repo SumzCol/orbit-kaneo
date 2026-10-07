@@ -41,14 +41,16 @@ vi.mock("@/hooks/queries/workspace/use-active-workspace", () => ({
 vi.mock("@/hooks/use-workspace-permission", () => ({
   useWorkspacePermission: () => ({ canInviteUsers: () => true }),
 }));
+const loadedProjects = {
+  data: [
+    { id: "project-a", name: "Alpha" },
+    { id: "project-b", name: "Beta" },
+  ] as { id: string; name: string }[] | undefined,
+  isLoading: false,
+};
+const projectsResult = vi.fn(() => loadedProjects);
 vi.mock("@/hooks/queries/project/use-get-projects", () => ({
-  default: () => ({
-    data: [
-      { id: "project-a", name: "Alpha" },
-      { id: "project-b", name: "Beta" },
-    ],
-    isLoading: false,
-  }),
+  default: () => projectsResult(),
 }));
 const myAccess = vi.fn(() => ({
   isPending: false,
@@ -67,6 +69,7 @@ function wrapper({ children }: PropsWithChildren) {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  projectsResult.mockReturnValue(loadedProjects);
   inviteMember.mockResolvedValue({
     data: null,
     error: { code: "INVITATION_EMAIL_FAILED", message: "Upstream failure" },
@@ -152,6 +155,24 @@ describe("invitation project access", () => {
         expect.objectContaining({ projectAccess: "all", projectIds: [] }),
       ),
     );
+  });
+
+  it("won't invite with selected access while the projects can't be loaded", async () => {
+    projectsResult.mockReturnValue({ data: undefined, isLoading: false });
+    render(<InviteTeamMemberModal open onClose={vi.fn()} />, { wrapper });
+    await fillEmail();
+    fireEvent.click(
+      screen.getByRole("radio", {
+        name: /team:projectAccess.selectedProjects/,
+      }),
+    );
+
+    expect(
+      screen.getByText("team:projectAccess.projectsUnavailable"),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "team:inviteModal.sendInvitation" }),
+    ).toBeDisabled();
   });
 
   it("starts a limited inviter on selected projects", async () => {

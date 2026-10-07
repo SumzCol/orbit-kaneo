@@ -77,6 +77,11 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
     enabled: open,
   });
 
+  // Without the list, a selection would be filtered against nothing and
+  // send an invitation for no projects.
+  const projectsUnavailable =
+    projectAccess.projectAccess === "selected" && !projects;
+
   const form = useForm<TeamMemberFormValues>({
     resolver: standardSchemaResolver(teamMemberSchema),
     defaultValues: {
@@ -96,6 +101,7 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
       toast.error(t("team:inviteModal.error"));
       return;
     }
+    if (projectsUnavailable) return;
     const access = toProjectAccessRequest(
       projectAccess,
       (projects ?? []).map((project) => project.id),
@@ -220,7 +226,12 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={!workspaceId || !canInvite || isMyAccessPending}
+                  disabled={
+                    !workspaceId ||
+                    !canInvite ||
+                    isMyAccessPending ||
+                    projectsUnavailable
+                  }
                 >
                   {t("team:inviteModal.sendInvitation")}
                 </Button>

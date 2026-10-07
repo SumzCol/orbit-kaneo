@@ -53,8 +53,12 @@ function MemberProjectAccessDialog({
     }
   }
 
+  // Without the list, the selection can't be checked against real projects,
+  // and filtering against nothing would save it empty.
+  const projectsUnavailable = value.projectAccess === "selected" && !projects;
+
   const handleSave = async () => {
-    if (!member) return;
+    if (!member || projectsUnavailable) return;
     const request = toProjectAccessRequest(
       value,
       (projects ?? []).map((project) => project.id),
@@ -91,6 +95,7 @@ function MemberProjectAccessDialog({
             projects={projects}
             isLoadingProjects={isLoadingProjects}
             disabled={isPending || myAccess.isPending}
+            keepsHiddenAccess={managerLimited}
           />
         </DialogPanel>
         <DialogFooter>
@@ -102,7 +107,12 @@ function MemberProjectAccessDialog({
           <Button
             size="sm"
             type="button"
-            disabled={isPending || isLoadingProjects || myAccess.isPending}
+            disabled={
+              isPending ||
+              isLoadingProjects ||
+              projectsUnavailable ||
+              myAccess.isPending
+            }
             onClick={handleSave}
           >
             {t("team:projectAccess.save")}

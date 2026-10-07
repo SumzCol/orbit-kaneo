@@ -12442,6 +12442,15 @@
 						"noProjectAccess": {
 							"type": "string"
 						},
+						"noVisibleProjectAccess": {
+							"type": "string"
+						},
+						"noneSelectedLimited": {
+							"type": "string"
+						},
+						"projectsUnavailable": {
+							"type": "string"
+						},
 						"projectCount_one": {
 							"type": "string"
 						},
@@ -12492,6 +12501,9 @@
 						"archived",
 						"noneSelected",
 						"noProjectAccess",
+						"noVisibleProjectAccess",
+						"noneSelectedLimited",
+						"projectsUnavailable",
 						"editAria",
 						"dialogTitle",
 						"dialogDescription",

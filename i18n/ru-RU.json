@@ -3129,7 +3129,10 @@
 			"archived": "Archived",
 			"allProjectsUnavailable": "Your own access is limited, so you can only give access to selected projects.",
 			"noneSelected": "No projects selected. They won't see any project until one is granted.",
-			"noProjectAccess": "No projects"
+			"noProjectAccess": "No projects",
+			"noneSelectedLimited": "None of the projects you can see are selected. Access to projects you can't see stays as it is.",
+			"noVisibleProjectAccess": "No projects you can see",
+			"projectsUnavailable": "Couldn't load projects. Close this and try again."
 		}
 	},
 	"publicProject": {

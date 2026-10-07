@@ -71,19 +71,16 @@ vi.mock(
   }),
 );
 
+const restrictedEntry = {
+  userId: "restricted-user",
+  projectAccess: "selected",
+  projectIds: ["project-a"],
+};
+const projectAccessEntries = vi.fn(() => [restrictedEntry]);
+
 vi.mock(
   "@/hooks/queries/workspace-users/use-get-workspace-project-access",
-  () => ({
-    default: () => ({
-      data: [
-        {
-          userId: "restricted-user",
-          projectAccess: "selected",
-          projectIds: ["project-a"],
-        },
-      ],
-    }),
-  }),
+  () => ({ default: () => ({ data: projectAccessEntries() }) }),
 );
 
 const myProjectAccess = vi.fn(() => ({
@@ -95,14 +92,17 @@ vi.mock("@/hooks/queries/workspace-users/use-get-my-project-access", () => ({
   default: () => ({ data: myProjectAccess() }),
 }));
 
+const loadedProjects = {
+  data: [
+    { id: "project-a", name: "Alpha" },
+    { id: "project-b", name: "Beta" },
+  ] as { id: string; name: string }[] | undefined,
+  isLoading: false,
+};
+const projectsResult = vi.fn(() => loadedProjects);
+
 vi.mock("@/hooks/queries/project/use-get-projects", () => ({
-  default: () => ({
-    data: [
-      { id: "project-a", name: "Alpha" },
-      { id: "project-b", name: "Beta" },
-    ],
-    isLoading: false,
-  }),
+  default: () => projectsResult(),
 }));
 
 const canInviteUsers = vi.fn(() => true);
@@ -122,6 +122,9 @@ vi.mock("../providers/auth-provider/hooks/use-auth", () => ({
 
 beforeEach(() => {
   canInviteUsers.mockReturnValue(true);
+  projectsResult.mockReturnValue(loadedProjects);
+  projectAccessEntries.mockReturnValue([restrictedEntry]);
+  myProjectAccess.mockReturnValue({ projectAccess: "all", projectIds: [] });
 });
 
 afterEach(() => {
@@ -338,5 +341,56 @@ describe("MembersTable project access", () => {
         projectIds: [],
       }),
     );
+  });
+
+  it("won't save a selection while the projects can't be loaded", async () => {
+    // A failed query: no data, and no longer loading.
+    projectsResult.mockReturnValue({ data: undefined, isLoading: false });
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[members[2]]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "team:projectAccess.editAria" }),
+    );
+
+    expect(
+      await screen.findByText("team:projectAccess.projectsUnavailable"),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "team:projectAccess.save" }),
+    ).toBeDisabled();
+  });
+
+  it("only claims no projects a limited manager can see", async () => {
+    myProjectAccess.mockReturnValue({
+      projectAccess: "selected",
+      projectIds: ["project-a"],
+    });
+    // The member may still hold grants the manager can't see.
+    projectAccessEntries.mockReturnValue([
+      { ...restrictedEntry, projectIds: [] },
+    ]);
+    render(
+      <MembersTable
+        workspaceId="workspace-1"
+        invitations={[]}
+        users={[members[2]]}
+      />,
+    );
+
+    expect(
+      screen.getByText("team:projectAccess.noVisibleProjectAccess"),
+    ).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "team:projectAccess.editAria" }),
+    );
+    expect(
+      await screen.findByText("team:projectAccess.noneSelectedLimited"),
+    ).toBeVisible();
   });
 });
