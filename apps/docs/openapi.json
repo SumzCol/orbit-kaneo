@@ -4433,7 +4433,7 @@
               "all",
               "none"
             ],
-            "description": "Project access for members added without an invitation, and the access the invite dialog starts from. Invitations created through the API without projectAccess still give every project."
+            "description": "Project access for new members: those added without an invitation, invitations that leave projectAccess out, and the invite dialog's starting choice."
           }
         },
         "required": [
@@ -19414,7 +19414,7 @@
           "Workspaces"
         ],
         "summary": "Update the default project access",
-        "description": "Choose whether new members start with every project or with none. It applies to members added without an invitation, and is what the invite dialog starts from; existing members keep their access.",
+        "description": "Choose whether new members start with every project or with none. It applies to members added without an invitation and to invitations that leave projectAccess out, and is what the invite dialog starts from; existing members keep their access.",
         "parameters": [
           {
             "schema": {

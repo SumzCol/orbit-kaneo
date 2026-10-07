@@ -36,7 +36,7 @@ export const defaultProjectAccessSchema = z
   .object({
     defaultProjectAccess: z.enum(DEFAULT_PROJECT_ACCESS).openapi({
       description:
-        "Project access for members added without an invitation, and the access the invite dialog starts from. Invitations created through the API without projectAccess still give every project.",
+        "Project access for new members: those added without an invitation, invitations that leave projectAccess out, and the invite dialog's starting choice.",
     }),
   })
   .openapi("DefaultProjectAccess");

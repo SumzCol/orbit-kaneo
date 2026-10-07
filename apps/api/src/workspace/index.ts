@@ -144,7 +144,7 @@ const updateDefaultProjectAccessRoute = createRoute({
   tags: ["Workspaces"],
   summary: "Update the default project access",
   description:
-    "Choose whether new members start with every project or with none. It applies to members added without an invitation, and is what the invite dialog starts from; existing members keep their access.",
+    "Choose whether new members start with every project or with none. It applies to members added without an invitation and to invitations that leave projectAccess out, and is what the invite dialog starts from; existing members keep their access.",
   middleware: [
     workspaceAccess.fromParam("workspaceId"),
     requireWorkspacePermission({ member: ["update"] }),

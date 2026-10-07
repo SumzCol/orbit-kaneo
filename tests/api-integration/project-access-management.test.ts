@@ -451,6 +451,29 @@ describe("invitations with project access", () => {
     expect(await projects.json()).toHaveLength(2);
   });
 
+  it("follows the workspace default for an invitation without a selection", async () => {
+    const ctx = await createInvitationWorkspace();
+    const updated = await ctx.ownerRequest(
+      `/workspace/${ctx.workspaceId}/project-access/default`,
+      { method: "PUT", body: { defaultProjectAccess: "none" } },
+    );
+    expect(updated.status).toBe(200);
+
+    const invited = await ctx.ownerRequest("/auth/organization/invite-member", {
+      method: "POST",
+      body: {
+        organizationId: ctx.workspaceId,
+        email: "teammate@example.com",
+        role: "member",
+      },
+    });
+    expect(invited.status).toBe(200);
+    expect(await invited.json()).toMatchObject({
+      projectAccess: "selected",
+      projectIds: [],
+    });
+  });
+
   it("rejects an invitation for projects outside the workspace", async () => {
     const ctx = await createInvitationWorkspace();
     const other = await createRestrictedWorkspace();
