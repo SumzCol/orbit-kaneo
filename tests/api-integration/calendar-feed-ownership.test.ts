@@ -664,6 +664,65 @@ describe("a feed kept across a move", () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toContain("Ship the moved release");
   });
+
+  // An empty label list means every scheduled task. A feed whose labels were
+  // all deleted must not end up with one after a move, or it would widen.
+  it("does not widen a feed whose labels were all deleted", async () => {
+    const source = await createWorkspaceMember({ role: "owner" });
+    const target = await createWorkspaceMember({ role: "owner" });
+    await db.insert(schema.workspaceUserTable).values({
+      workspaceId: target.workspace.id,
+      userId: source.user.id,
+      role: "owner",
+      joinedAt: new Date(),
+    });
+    const { project } = await createProjectFixture({
+      workspaceId: source.workspace.id,
+    });
+    const [kept, deleted] = await db
+      .insert(schema.labelTable)
+      .values([
+        { name: "Release", color: "gray", workspaceId: source.workspace.id },
+        { name: "Retired", color: "gray", workspaceId: source.workspace.id },
+      ])
+      .returning();
+    await db.insert(schema.taskTable).values({
+      title: "Unlabelled scheduled task",
+      projectId: project.id,
+      number: 1,
+      dueDate: new Date("2026-11-01T12:00:00Z"),
+    });
+    const feeds = await db
+      .insert(calendarFeedTable)
+      .values(
+        [kept.id, deleted.id].map((labelId) => ({
+          projectId: project.id,
+          userId: source.user.id,
+          labelIds: [labelId],
+          timeZone: "UTC",
+          token: randomBytes(32).toString("hex"),
+        })),
+      )
+      .returning();
+    // The live label's feed is what makes the move remap at all.
+    await db
+      .delete(schema.labelTable)
+      .where(eq(schema.labelTable.id, deleted.id));
+
+    await moveProject(
+      project.id,
+      source.workspace.id,
+      target.workspace.id,
+      source.user.id,
+    );
+
+    const { app } = createApp();
+    const response = await app.request(
+      `/api/calendar-feed/${feeds[1].token}/calendar.ics`,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).not.toContain("Unlabelled scheduled task");
+  });
 });
 
 describe("a role that can share but not read projects", () => {
