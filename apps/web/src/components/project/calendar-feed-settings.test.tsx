@@ -31,6 +31,7 @@ vi.mock("@/lib/auth-client", () => ({
     }),
   },
 }));
+let labelsUnavailable = false;
 vi.mock("@/lib/i18n", () => ({ i18n: { t: (key: string) => key } }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -44,13 +45,15 @@ vi.mock("@/hooks/use-workspace-permission", () => ({
 }));
 vi.mock("@/hooks/queries/label/use-get-labels-by-workspace", () => ({
   default: () => ({
-    data: [
-      { id: "task-copy", name: "Release", taskId: "task-1" },
-      { id: "release", name: "Release", taskId: null },
-      { id: "maintenance", name: "Maintenance", taskId: null },
-    ],
+    data: labelsUnavailable
+      ? []
+      : [
+          { id: "task-copy", name: "Release", taskId: "task-1" },
+          { id: "release", name: "Release", taskId: null },
+          { id: "maintenance", name: "Maintenance", taskId: null },
+        ],
     isLoading: false,
-    isError: false,
+    isError: labelsUnavailable,
   }),
 }));
 vi.mock("@/fetchers/calendar-feed", () => ({
@@ -91,6 +94,7 @@ describe("CalendarFeedSettings", () => {
     });
     canShare = true;
     sessionUserId = "user-1";
+    labelsUnavailable = false;
     vi.mocked(getCalendarFeeds).mockResolvedValue([]);
     vi.mocked(createCalendarFeed).mockResolvedValue(feed);
     vi.mocked(revokeCalendarFeed).mockResolvedValue({ success: true });
@@ -113,7 +117,7 @@ describe("CalendarFeedSettings", () => {
     const create = screen.getByRole("button", {
       name: "settings:calendarFeeds.create",
     });
-    expect(create).toBeDisabled();
+    expect(create).toBeEnabled();
     const input = screen.getByRole("combobox");
     fireEvent.change(input, { target: { value: "Release" } });
     fireEvent.keyDown(input, { key: "ArrowDown" });
@@ -136,11 +140,40 @@ describe("CalendarFeedSettings", () => {
         Intl.DateTimeFormat().resolvedOptions().timeZone,
       ),
     );
-    await waitFor(() => expect(create).toBeDisabled());
+    await waitFor(() => expect(create).toBeEnabled());
+    expect(screen.queryByLabelText("Release")).not.toBeInTheDocument();
     expect(toast.success).toHaveBeenCalledWith(
       "settings:calendarFeeds.created",
     );
   });
+
+  it.each([false, true])(
+    "creates an unfiltered feed without selecting labels (labels unavailable: %s)",
+    async (unavailable) => {
+      labelsUnavailable = unavailable;
+      const unfilteredFeed = { ...feed, labelIds: [] };
+      vi.mocked(createCalendarFeed).mockResolvedValue(unfilteredFeed);
+      vi.mocked(getCalendarFeeds)
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([unfilteredFeed]);
+      renderSettings();
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "settings:calendarFeeds.create",
+        }),
+      );
+      await waitFor(() =>
+        expect(createCalendarFeed).toHaveBeenCalledWith(
+          "project-1",
+          [],
+          Intl.DateTimeFormat().resolvedOptions().timeZone,
+        ),
+      );
+      expect(
+        await screen.findByText("settings:calendarFeeds.allScheduledTasks"),
+      ).toBeInTheDocument();
+    },
+  );
 
   it("copies a subscription URL and revokes the selected feed", async () => {
     vi.mocked(getCalendarFeeds).mockResolvedValue([feed]);

@@ -90,6 +90,10 @@ export async function remapMovedFeedLabels(
         }),
       ),
     ];
+    // An empty list now means every scheduled task. A feed whose labels were
+    // all deleted keeps its old ids instead, which match nothing here, so a
+    // move never widens it.
+    if (remapped.length === 0) continue;
     await database
       .update(calendarFeedTable)
       .set({ labelIds: remapped })
