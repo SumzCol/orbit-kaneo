@@ -481,6 +481,7 @@ describe("API integration: project analytics", () => {
 
     const response = await fetchSummary(project.id);
 
-    expect([400, 403]).toContain(response.status);
+    // Outside the workspace, the project is reported as not found.
+    expect(response.status).toBe(404);
   });
 });

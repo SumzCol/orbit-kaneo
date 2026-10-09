@@ -20339,16 +20339,6 @@
               }
             }
           },
-          "400": {
-            "description": "Unknown project, or its workspace could not be determined",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Missing or invalid credentials",
             "content": {
@@ -20360,7 +20350,17 @@
             }
           },
           "403": {
-            "description": "No workspace access, or missing task:read permission",
+            "description": "No access to the project, or missing task:read permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -20419,7 +20419,7 @@
             }
           },
           "400": {
-            "description": "Unknown project, an unknown grouping, or a workspace that could not be determined",
+            "description": "Unknown grouping",
             "content": {
               "application/json": {
                 "schema": {
@@ -20439,7 +20439,17 @@
             }
           },
           "403": {
-            "description": "No workspace access, or missing task:read permission",
+            "description": "No access to the project, or missing task:read permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -20486,16 +20496,6 @@
               }
             }
           },
-          "400": {
-            "description": "Unknown project, or its workspace could not be determined",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
           "401": {
             "description": "Missing or invalid credentials",
             "content": {
@@ -20507,7 +20507,17 @@
             }
           },
           "403": {
-            "description": "No workspace access, or missing task:read permission",
+            "description": "No access to the project, or missing task:read permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
             "content": {
               "application/json": {
                 "schema": {

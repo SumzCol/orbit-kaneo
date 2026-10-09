@@ -27,10 +27,10 @@ const getProjectSummaryRoute = createRoute({
   request: { params: projectIdParam },
   responses: {
     200: jsonResponse("The project's headline counts", projectSummarySchema),
-    400: errorResponse(
-      "Unknown project, or its workspace could not be determined",
+    403: errorResponse(
+      "No access to the project, or missing task:read permission",
     ),
-    403: errorResponse("No workspace access, or missing task:read permission"),
+    404: errorResponse("Project not found"),
   },
 });
 
@@ -52,10 +52,11 @@ const getProjectBreakdownRoute = createRoute({
       "Counts for the requested grouping",
       projectBreakdownSchema,
     ),
-    400: errorResponse(
-      "Unknown project, an unknown grouping, or a workspace that could not be determined",
+    400: errorResponse("Unknown grouping"),
+    403: errorResponse(
+      "No access to the project, or missing task:read permission",
     ),
-    403: errorResponse("No workspace access, or missing task:read permission"),
+    404: errorResponse("Project not found"),
   },
 });
 
