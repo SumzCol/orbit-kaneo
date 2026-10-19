@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
 import createColumn from "../../apps/api/src/column/controllers/create-column";
 import { createApp } from "../../apps/api/src/index";
+import { DEFAULT_PROJECT_COLUMNS } from "../../apps/api/src/project/controllers/insert-project";
 import { mockAuthenticatedSession } from "./helpers/auth";
 import { resetTestDatabase } from "./helpers/database";
 import {
@@ -77,13 +78,14 @@ describe("column slugs", () => {
     expect(await first.json()).toMatchObject({
       name: "In Review",
       slug: "in-review-2",
-      position: 4,
+      // New columns go after the defaults; Orbit's include Blocked.
+      position: DEFAULT_PROJECT_COLUMNS.length,
     });
     expect(second.status).toBe(200);
     expect(await second.json()).toMatchObject({
       name: "in review",
       slug: "in-review-3",
-      position: 5,
+      position: DEFAULT_PROJECT_COLUMNS.length + 1,
     });
     expect(
       await db.query.taskTable.findFirst({
@@ -118,8 +120,8 @@ describe("column slugs", () => {
       "qa-4",
       "qa-5",
     ]);
-    expect(created.map((column) => column.position).sort()).toEqual([
-      4, 5, 6, 7, 8,
-    ]);
+    expect(created.map((column) => column.position).sort()).toEqual(
+      Array.from({ length: 5 }, (_, i) => DEFAULT_PROJECT_COLUMNS.length + i),
+    );
   });
 });
