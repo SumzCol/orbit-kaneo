@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, expect, it } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
 import { migrateColumns } from "../../apps/api/src/migrations/column-migration";
-import { DEFAULT_PROJECT_COLUMNS } from "../../apps/api/src/project/controllers/create-project";
+import { DEFAULT_PROJECT_COLUMNS } from "../../apps/api/src/project/controllers/insert-project";
 import { resetTestDatabase } from "./helpers/database";
 import {
   createProjectFixture,

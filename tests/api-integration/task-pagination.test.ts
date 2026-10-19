@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import db, { schema } from "../../apps/api/src/database";
 import { createApp } from "../../apps/api/src/index";
-import { DEFAULT_PROJECT_COLUMNS } from "../../apps/api/src/project/controllers/create-project";
+import { DEFAULT_PROJECT_COLUMNS } from "../../apps/api/src/project/controllers/insert-project";
 import * as taskController from "../../apps/api/src/task/controllers/get-tasks";
 import { mockAnonymousSession, mockAuthenticatedSession } from "./helpers/auth";
 import { resetTestDatabase } from "./helpers/database";
