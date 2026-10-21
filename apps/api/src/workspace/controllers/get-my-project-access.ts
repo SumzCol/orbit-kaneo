@@ -1,11 +1,17 @@
-import { getMemberProjectAccess } from "../../project-access/get-member-project-access";
-import { isProjectAccessRestricted } from "../../project-access/is-project-access-restricted";
+import db from "../../database";
+import { listAccessibleProjectIds } from "../../project-access/list-accessible-project-ids";
+import { seesAllProjects } from "../../project-access/sees-all-projects";
 
 async function getMyProjectAccess(workspaceId: string, userId: string) {
-  if (!(await isProjectAccessRestricted(workspaceId, userId))) {
+  if (await seesAllProjects(workspaceId, userId)) {
     return { userId, projectAccess: "all" as const, projectIds: [] };
   }
-  return getMemberProjectAccess(workspaceId, userId);
+  const projectIds = await listAccessibleProjectIds(db, workspaceId, userId);
+  return {
+    userId,
+    projectAccess: "selected" as const,
+    projectIds: [...projectIds],
+  };
 }
 
 export default getMyProjectAccess;

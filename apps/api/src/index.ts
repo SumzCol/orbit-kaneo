@@ -60,7 +60,6 @@ import label from "./label";
 import mattermostIntegration from "./mattermost-integration";
 import mcpRoutes, { mcpWellKnownRoutes } from "./mcp";
 import { migrateColumns } from "./migrations/column-migration";
-import { migrateProjectMemberAccess } from "./migrations/project-member-access-migration";
 import notification from "./notification";
 import notificationPreferences from "./notification-preferences";
 import oauth from "./oauth";
@@ -88,6 +87,7 @@ import user from "./user";
 import getAvatar from "./user/controllers/get-avatar";
 import { apiKeyRejection } from "./utils/api-key-rejection";
 import { applyApiKeyHeaders } from "./utils/apply-api-key-headers";
+import { callerReach, resolveCallerReach } from "./project-access/caller-reach";
 import { authenticateApiRequest } from "./utils/authenticate-api-request";
 import {
   authorizeAssetAccess,
@@ -812,7 +812,9 @@ export function createApp() {
         const windowId = c.req.header("X-Kaneo-Window-Id");
         const userId = c.get("userId");
         const initiatorId = windowId ? `${userId}:${windowId}` : userId;
-        return await eventContext.run({ initiatorId }, next);
+        return await eventContext.run({ initiatorId }, () =>
+          callerReach.run(resolveCallerReach(c), next),
+        );
       } catch (error) {
         if (!(error instanceof HTTPException)) {
           console.error("API authentication failed:", error);
@@ -1044,7 +1046,6 @@ export async function runStartupTasks() {
   await migrateNotificationPreferencesSchema();
   await migrateGitHubIntegration();
   await migrateColumns();
-  await migrateProjectMemberAccess();
   await seedDefaultWorkspaceRoles();
 
   initializePlugins();

@@ -4,6 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import type db from "../../database";
 import { projectTable } from "../../database/schema";
 import type { ImportCounts } from "../import-run-project";
+import { addAssigneeMemberships } from "./add-assignee-memberships";
 import { assignImportTaskNumbers } from "./assign-import-task-numbers";
 import { loadAssignableMembers } from "./load-assignable-members";
 import { createAssigneeMatcher } from "./match-assignees";
@@ -50,7 +51,7 @@ export async function writeProjectContent(
   const columnPlan = planImportColumns(project.columns);
   const board = await writeImportColumns(tx, projectId, columnPlan);
   const assignees = createAssigneeMatcher(
-    await loadAssignableMembers(tx, workspaceId, projectId),
+    await loadAssignableMembers(tx, workspaceId),
   );
 
   const { numbers, lastNumber } = assignImportTaskNumbers(project.tasks);
@@ -71,6 +72,12 @@ export async function writeProjectContent(
     newId: createId,
     assign: assignees.match,
   });
+  await addAssigneeMemberships(
+    tx,
+    workspaceId,
+    projectId,
+    tasks.flatMap((task) => (task.userId ? [task.userId] : [])),
+  );
   await writeImportTasks(tx, projectId, userId, tasks);
 
   const labels = await writeImportLabels(

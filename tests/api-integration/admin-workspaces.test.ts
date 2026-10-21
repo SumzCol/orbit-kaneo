@@ -4,10 +4,10 @@ import db, { schema } from "../../apps/api/src/database";
 import { mockAuthenticatedSession } from "./helpers/auth";
 import { createInstanceAdmin } from "./helpers/admin/create-instance-admin";
 import { resetTestDatabase } from "./helpers/database";
-import { addWorkspaceMember } from "./helpers/project-access/add-workspace-member";
 import { createRestrictedWorkspace } from "./helpers/project-access/create-restricted-workspace";
 import { projectAccessApi } from "./helpers/project-access/project-access-api";
-import { readMemberAccessRows } from "./helpers/project-access/read-member-access-rows";
+import { canAccessProject } from "../../apps/api/src/project-access/can-access-project";
+import { readProjectMemberships } from "./helpers/project-access/read-project-memberships";
 
 beforeEach(resetTestDatabase);
 
@@ -82,9 +82,8 @@ describe("instance admin workspace management", () => {
     expect(response.status).toBe(200);
     expect(await roleOf(ctx.workspace.id, ctx.restricted.id)).toBe("owner");
     expect(await roleOf(ctx.workspace.id, ctx.owner.id)).toBe("admin");
-    expect(
-      await readMemberAccessRows(ctx.workspace.id, ctx.restricted.id),
-    ).toEqual({ rules: [], grants: [] });
+    // As an owner they reach every project by role, not only their own.
+    expect(await canAccessProject(ctx.restricted.id, ctx.beta.id)).toBe(true);
 
     const again = await projectAccessApi()(
       `/admin/workspaces/${ctx.workspace.id}/owner`,
@@ -158,11 +157,11 @@ describe("instance admin workspace management", () => {
     const members = (await response.json()) as { userId: string }[];
     expect(members.map((member) => member.userId)).toEqual([ctx.owner.id]);
     expect(
-      await readMemberAccessRows(ctx.workspace.id, ctx.restricted.id),
-    ).toEqual({ rules: [], grants: [] });
+      await readProjectMemberships(ctx.workspace.id, ctx.restricted.id),
+    ).toEqual([]);
   });
 
-  it("adds an existing user with every project and rejects duplicates", async () => {
+  it("adds an existing user on no projects and rejects duplicates", async () => {
     const ctx = await createRestrictedWorkspace();
     const other = await createRestrictedWorkspace();
     const admin = await createInstanceAdmin();
@@ -178,33 +177,11 @@ describe("instance admin workspace management", () => {
     expect(added.status).toBe(200);
     expect(await roleOf(ctx.workspace.id, other.owner.id)).toBe("member");
     expect(
-      await readMemberAccessRows(ctx.workspace.id, other.owner.id),
-    ).toEqual({ rules: [], grants: [] });
+      await readProjectMemberships(ctx.workspace.id, other.owner.id),
+    ).toEqual([]);
 
     expect((await add(other.owner.id)).status).toBe(409);
     expect((await add("missing-user")).status).toBe(404);
     expect((await add(other.restricted.id, "owner")).status).toBe(400);
-  });
-
-  it("lets an instance admin limit a member's projects without joining", async () => {
-    const ctx = await createRestrictedWorkspace();
-    const member = await addWorkspaceMember(ctx.workspace.id);
-    const admin = await createInstanceAdmin();
-    mockAuthenticatedSession(admin);
-
-    const response = await projectAccessApi()(
-      `/workspace/${ctx.workspace.id}/members/${member.id}/project-access`,
-      {
-        method: "PUT",
-        body: { projectAccess: "selected", projectIds: [ctx.beta.id] },
-      },
-    );
-
-    expect(response.status).toBe(200);
-    expect(
-      (await readMemberAccessRows(ctx.workspace.id, member.id)).grants.map(
-        (grant) => grant.projectId,
-      ),
-    ).toEqual([ctx.beta.id]);
   });
 });

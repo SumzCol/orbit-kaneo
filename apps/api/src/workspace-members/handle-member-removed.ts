@@ -1,7 +1,7 @@
 import { syncWorkspaceSeats } from "../billing/controllers/sync-seats";
 import { removeDepartedMemberFeeds } from "../calendar-feed/prune-calendar-feeds";
 import { publishEvent } from "../events";
-import { clearMemberProjectAccess } from "../project-access/clear-member-project-access";
+import revokeWorkspaceProjectMemberships from "../project/controllers/revoke-workspace-project-memberships";
 import { hasInstanceAdminRole } from "../utils/instance-admin-role";
 import { revokeWorkspaceConnections } from "../ws";
 
@@ -11,9 +11,11 @@ export async function handleMemberRemoved(removal: {
   userRole: string | null | undefined;
 }) {
   const { workspaceId, userId, userRole } = removal;
-  await clearMemberProjectAccess(workspaceId, userId).catch((error) => {
-    console.error("Project access cleanup failed:", error);
-  });
+  await revokeWorkspaceProjectMemberships(workspaceId, userId).catch(
+    (error) => {
+      console.error("Project membership cleanup failed:", error);
+    },
+  );
   await removeDepartedMemberFeeds(workspaceId, userId, userRole);
   await publishEvent("project_members.updated", { workspaceId });
   if (!hasInstanceAdminRole(userRole)) {

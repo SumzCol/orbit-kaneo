@@ -9,11 +9,10 @@ Membership belongs to a workspace. Make sure the workspace name at the top of th
 
 1. Open **Members** in the workspace sidebar.
 2. Choose **Invite member** and enter their email address.
-3. Under **Project access**, tick the projects they need. Invitations start on **Selected projects** with none ticked, so someone invited without any projects joins seeing none until you grant one. Choose **All projects** to give them every project, including future ones. See [Limit a member to selected projects](#limit-a-member-to-selected-projects).
-4. Create the invitation, then copy the link shown in the dialog.
-5. Share the link with that person. With SMTP configured, the instance can also send an invitation email.
+3. Create the invitation, then copy the link shown in the dialog.
+4. Share the link with that person. With SMTP configured, the instance can also send an invitation email.
 
-The person must sign in or sign up with the invited email address and accept the invitation. New invitations created from this dialog use the **Member** role. You can change the role after the person joins.
+The person must sign in or sign up with the invited email address and accept the invitation. New invitations created from this dialog use the **Member** role. You can change the role after the person joins. A new member starts on no projects until someone adds them to one; see [Decide who is on each project](#decide-who-is-on-each-project).
 
 <Frame caption="The Members page shows workspace members, their roles, and invitation controls.">
   <img className="block dark:hidden" src="/images/product/members-light.png" alt="The Members page shows workspace members, their roles, and invitation controls." />
@@ -43,28 +42,18 @@ These are the starting permissions. An administrator can edit the **Viewer**, **
 
 Task assignment and deletion are separate permissions. A member who can edit a task may still be unable to assign or delete it.
 
-## Limit a member to selected projects
+## Decide who is on each project
 
-Members with **All projects** can open every project in the workspace, including projects created later. New invitations start on **Selected projects** instead. To invite a client or contractor without showing them unrelated work, limit them to selected projects:
+A project is visible only to the people added to it. Everyone else in the workspace stops seeing it in the sidebar, in search, on the board, in **My tasks**, in notifications, and over the realtime connection. The same applies to their API keys and MCP clients. This governs signed-in access; turning on public access in **Settings → Projects → Visibility** still lets anyone holding the link view the board.
 
-1. Open **Members** in the workspace sidebar.
-2. In the **Projects** column, choose the member's current access, for example **All projects**.
-3. Choose **Selected projects**, tick the projects they should see, and choose **Save**.
+Two exceptions keep this workable:
 
-If a limited member opens a link to another project, they see **You don't have access to this project** and can ask a workspace admin for access.
+- Whoever administers the workspace (a role with workspace settings management, such as owner or admin) sees every project in it. An API key scoped without that permission only reaches the projects its owner was added to.
+- A workspace member who creates a project is added to it automatically. An instance administrator who creates one in a workspace they haven't joined isn't added, because they reach it through their role. Importing a project also adds the people its tasks are assigned to.
 
-A limited member only sees those projects: their boards, tasks, comments, activity, search results, notifications, and **My tasks**. The same limit applies to their API keys and MCP clients, and a board they have open closes as soon as you remove the project.
+Manage the list in **Settings → Projects → Visibility**, under **Project members**. It shows the people added to the project; administrators can open every project without appearing there. Changing who is on a project needs the same `project:share` permission as its public link. Only people who are already in the workspace can be added, removing a member here always leaves at least one behind, and nobody can remove themselves. Leaving the workspace is a different path: it drops that person from the workspace's projects without that check, so a project can end up with no members at all. Workspace administrators still see it and can add people back.
 
-Project access works alongside roles. The role decides what someone can do; project access decides where. A limited member who can create projects keeps access to the projects they create.
-
-Some rules keep this predictable:
-
-- Owners always have access to every project.
-- You need permission to change roles, and you can't change your own project access.
-- If your own access is limited, you can only give others access to projects you can open, and you can't give anyone **All projects** or limit someone who has it. Projects you can't open stay as they are on the member you edit.
-- Tasks can only be assigned to people who can see the project. Limiting someone unassigns them from tasks in the projects they lose, and moving a task into a project its assignee can't see unassigns it.
-
-Project access set on an invitation applies when the person accepts it. To change it before then, cancel the invitation and invite them again.
+Removing someone takes effect right away: the project leaves their sidebar, a board they have open closes, and they are unassigned from its tasks, since tasks can only be assigned to people who can see the project.
 
 ## Edit roles or create a custom role
 

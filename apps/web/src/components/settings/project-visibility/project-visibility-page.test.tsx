@@ -42,6 +42,10 @@ vi.mock("@/hooks/mutations/project/use-update-project", () => ({
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
+vi.mock(
+  "@/components/settings/project-visibility/project-members-section",
+  () => ({ ProjectMembersSection: () => null }),
+);
 vi.mock("@/lib/toast", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 describe("ProjectVisibilityPage", () => {

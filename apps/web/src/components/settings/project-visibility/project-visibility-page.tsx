@@ -2,6 +2,7 @@ import { useParams } from "@tanstack/react-router";
 import { Globe, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import PageTitle from "@/components/page-title";
+import { ProjectMembersSection } from "@/components/settings/project-visibility/project-members-section";
 import { PublicLinkUrlRow } from "@/components/settings/project-visibility/public-link-url-row";
 import { useCanShareProject } from "@/components/settings/project-visibility/use-can-share-project";
 import { useToggleProjectPublic } from "@/components/settings/project-visibility/use-toggle-project-public";
@@ -50,10 +51,10 @@ export function ProjectVisibilityPage() {
           <SettingsCard>
             <SettingsRow
               icon={<Users />}
-              title={t("settings:projectVisibility.membersTitle", {
+              title={t("settings:projectVisibility.adminsTitle", {
                 workspace: workspaceName,
               })}
-              description={t("settings:projectVisibility.membersDescription")}
+              description={t("settings:projectVisibility.adminsDescription")}
             >
               <span className="text-xs text-muted-foreground">
                 {t("settings:projectVisibility.always")}
@@ -84,6 +85,11 @@ export function ProjectVisibilityPage() {
           </SettingsCard>
           <SettingsNote>{t("settings:projectVisibility.offNote")}</SettingsNote>
         </SettingsSection>
+        <ProjectMembersSection
+          projectId={project?.id}
+          workspaceId={workspace?.id}
+          canShare={canShare}
+        />
       </SettingsPage>
     </>
   );

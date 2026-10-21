@@ -22,12 +22,12 @@ async function post(request: APIRequestContext, path: string, data: object) {
 async function signUp(request: APIRequestContext) {
   const suffix = randomUUID();
   const email = `task-${suffix}@example.com`;
-  await post(request, "auth/sign-up/email", {
+  const created = await post(request, "auth/sign-up/email", {
     name: "Task Tester",
     email,
     password: `Browser-test-${suffix}`,
   });
-  return email;
+  return { email, userId: created.user.id as string };
 }
 
 async function createWorkspace(page: Page) {
@@ -129,7 +129,7 @@ test("another workspace member receives task edits in realtime", async ({
     viewport: { width: 1440, height: 1000 },
   });
   try {
-    const email = await signUp(colleague.request);
+    const { email, userId } = await signUp(colleague.request);
     const invitation = await post(
       page.request,
       "auth/organization/invite-member",
@@ -137,8 +137,6 @@ test("another workspace member receives task edits in realtime", async ({
         organizationId: workspaceId,
         email,
         role: "member",
-        // Left out, an invitation gives no projects.
-        projectAccess: "all",
       },
     );
     await post(colleague.request, "auth/organization/accept-invitation", {
@@ -151,6 +149,9 @@ test("another workspace member receives task edits in realtime", async ({
     const projectId = new URL(boardUrl).pathname
       .split("/project/")[1]
       .split("/")[0];
+    // A project is visible only to its own members. Joining the workspace does
+    // not join its existing projects, so the owner adds them explicitly.
+    await post(page.request, `project/${projectId}/members`, { userId });
     let connectedSocket: WebSocket | undefined;
     const socketErrors: string[] = [];
     observer.on("console", (message) => {

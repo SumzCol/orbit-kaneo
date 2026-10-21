@@ -738,14 +738,9 @@ describe("API integration: import from other tools", () => {
     expect(((await created.json()) as { number: number }).number).toBe(10);
   });
 
-  it("keeps assignments to an importer limited to selected projects", async () => {
+  it("puts the assignees it matches on the imported project", async () => {
     const admin = await createAdmin();
     const workspaceId = admin.workspace.id;
-    await db.insert(schema.workspaceMemberAccessTable).values({
-      workspaceId,
-      userId: admin.user.id,
-      projectAccess: "selected",
-    });
     const project = numberedProject();
     const [first] = project.tasks;
     if (first) first.assignee = { email: admin.user.email };
@@ -754,16 +749,16 @@ describe("API integration: import from other tools", () => {
 
     const imported = await importProject(workspaceId);
 
-    const grants = await db
+    const memberships = await db
       .select()
-      .from(schema.workspaceMemberProjectTable)
+      .from(schema.projectMemberTable)
       .where(
         and(
-          eq(schema.workspaceMemberProjectTable.userId, admin.user.id),
-          eq(schema.workspaceMemberProjectTable.projectId, imported.projectId),
+          eq(schema.projectMemberTable.userId, admin.user.id),
+          eq(schema.projectMemberTable.projectId, imported.projectId),
         ),
       );
-    expect(grants).toHaveLength(1);
+    expect(memberships).toHaveLength(1);
 
     const [assigned] = await db
       .select({ userId: schema.taskTable.userId })

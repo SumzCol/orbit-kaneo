@@ -52,7 +52,7 @@ Project integrations and other project settings are not copied. Set them up agai
 
 **The key is rejected**: check that you created the key on the instance whose URL you entered, and that it hasn't been revoked.
 
-**A project is missing from the list**: the key has the same access as the account that created it. If that account is limited to selected projects in a workspace, only those projects are listed.
+**A project is missing from the list**: the key has the same access as the account that created it. If that account isn't on every project of a workspace and doesn't administer it, only its own projects are listed.
 
 **The other instance can't be reached**: the instance you import into must be able to reach the other one over the network. Kaneo Cloud can't import from a self-hosted instance that is only reachable inside your network. Between two self-hosted instances on a private network, the operator of the importing instance must set `KANEO_ALLOW_PRIVATE_WEBHOOK_DESTINATIONS=true`. See [Self-hosted instances](/core/migrations#self-hosted-instances).
 
