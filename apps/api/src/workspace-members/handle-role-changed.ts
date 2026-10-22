@@ -1,24 +1,23 @@
-import { deleteMemberInaccessibleFeeds } from "../calendar-feed/prune-calendar-feeds";
 import db from "../database";
-import { publishEvent } from "../events";
-import { unassignInaccessibleTasks } from "../project-access/unassign-inaccessible-tasks";
+import { withoutCallerReach } from "../project-access/caller-reach";
+import { publishAccessChange } from "../project-access/publish-access-change";
+import { pruneLostAccess } from "../project-access/prune-lost-access";
 
 // A role holding workspace:manage_settings reaches every project, so a role
 // change can widen or narrow what the member sees.
 export async function handleRoleChanged(workspaceId: string, userId: string) {
   try {
-    const unassigned = await db.transaction(async (tx) => {
-      await deleteMemberInaccessibleFeeds(tx, workspaceId, userId);
-      return unassignInaccessibleTasks(tx, {
+    await withoutCallerReach(async () => {
+      const unassigned = await db.transaction((tx) =>
+        pruneLostAccess(tx, { workspaceId, userId, actorId: userId }),
+      );
+      await publishAccessChange({
         workspaceId,
         userId,
         actorId: userId,
+        unassigned,
       });
     });
-    await publishEvent("project_access.updated", { workspaceId, userId });
-    for (const projectId of new Set(unassigned.map((task) => task.projectId))) {
-      await publishEvent("task.bulk_unassigned", { projectId, userId });
-    }
   } catch (error) {
     console.error("Project access refresh after role change failed:", error);
   }

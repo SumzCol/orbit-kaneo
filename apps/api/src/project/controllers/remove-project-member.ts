@@ -6,6 +6,8 @@ import {
   projectTable,
   workspaceUserTable,
 } from "../../database/schema";
+import { publishAccessChange } from "../../project-access/publish-access-change";
+import { pruneLostAccess } from "../../project-access/prune-lost-access";
 
 async function removeProjectMember(
   projectId: string,
@@ -24,7 +26,7 @@ async function removeProjectMember(
   // Counting and deleting have to be one step. Two administrators removing
   // the last two members concurrently would otherwise each read two rows,
   // each delete a different one, and leave the project with none.
-  const removed = await db.transaction(async (tx) => {
+  const { removed, unassigned } = await db.transaction(async (tx) => {
     // The workspace is checked on the locked row, not only by the middleware:
     // a request authorized in the source workspace can wait here behind a
     // move, and must not then remove a member of the workspace it moved to.
@@ -120,12 +122,20 @@ async function removeProjectMember(
       });
     }
 
-    return row;
+    return {
+      removed: row,
+      unassigned: await pruneLostAccess(tx, { workspaceId, userId, actorId }),
+    };
   });
 
-  // Removal applies from the user's next request and next connection: the
-  // WebSocket upgrade checks access, but a board already open is not closed
-  // here. Ending open sessions as well is its own change.
+  // Events go out only once the removal has committed.
+  await publishAccessChange({
+    workspaceId,
+    userId,
+    actorId,
+    projectIds: [projectId],
+    unassigned,
+  });
 
   return removed;
 }

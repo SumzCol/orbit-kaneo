@@ -51,6 +51,7 @@ import { handleMemberAdded } from "./workspace-members/handle-member-added";
 import { handleMemberRemoved } from "./workspace-members/handle-member-removed";
 import revokeWorkspaceProjectMemberships from "./project/controllers/revoke-workspace-project-memberships";
 import { handleRoleChanged } from "./workspace-members/handle-role-changed";
+import { handleRoleDefinitionsChanged } from "./workspace-members/handle-role-definitions-changed";
 import clearEmailVerificationOnAdminChange from "./user/controllers/clear-email-verification-on-admin-change";
 import deleteAccountData from "./user/controllers/delete-account-data";
 import prepareAdminUserRemoval from "./user/controllers/prepare-admin-user-removal";
@@ -927,6 +928,19 @@ export const auth = betterAuth({
         typeof ctx.body?.userId === "string"
       ) {
         await pruneUserCalendarFeeds(ctx.body.userId);
+      }
+
+      if (
+        (ctx.path === "/organization/update-role" ||
+          ctx.path === "/organization/delete-role") &&
+        !(ctx.context.returned instanceof APIError)
+      ) {
+        const workspaceId =
+          (ctx.body?.organizationId as string | undefined) ??
+          ctx.context.session?.session.activeOrganizationId;
+        if (typeof workspaceId === "string") {
+          await handleRoleDefinitionsChanged(workspaceId);
+        }
       }
 
       if (ctx.path === "/organization/leave") {

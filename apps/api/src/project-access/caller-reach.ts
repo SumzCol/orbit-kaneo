@@ -27,3 +27,9 @@ export function reachesViaRole(userId: unknown) {
   const reach = callerReach.getStore();
   return !reach || reach.userId !== userId || reach.viaRole;
 }
+
+// For work done on the caller's behalf after authorization -- maintenance and
+// event handlers -- where access is a fact about the user, not the key.
+export function withoutCallerReach<T>(fn: () => T): T {
+  return callerReach.exit(fn);
+}

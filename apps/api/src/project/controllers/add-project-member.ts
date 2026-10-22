@@ -6,11 +6,13 @@ import {
   projectTable,
   workspaceUserTable,
 } from "../../database/schema";
+import { publishAccessChange } from "../../project-access/publish-access-change";
 
 async function addProjectMember(
   projectId: string,
   workspaceId: string,
   userId: string,
+  actorId: string = userId,
 ) {
   // One transaction holding the project row, which a move also locks. The
   // workspace check and the upsert otherwise straddle a move, and the add
@@ -94,6 +96,13 @@ async function addProjectMember(
       message: "Failed to add the project member",
     });
   }
+
+  await publishAccessChange({
+    workspaceId,
+    userId,
+    actorId,
+    projectIds: [projectId],
+  });
 
   return added;
 }

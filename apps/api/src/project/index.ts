@@ -33,7 +33,7 @@ import createProjectCtrl from "./controllers/create-project";
 import deleteProjectCtrl from "./controllers/delete-project";
 import getProjectCtrl from "./controllers/get-project";
 import addProjectMemberCtrl from "./controllers/add-project-member";
-import announceProjectMemberChange from "./controllers/announce-project-member-change";
+import { withoutCallerReach } from "../project-access/caller-reach";
 import getProjectMembersCtrl from "./controllers/get-project-members";
 import getProjectsCtrl from "./controllers/get-projects";
 import moveProjectCtrl from "./controllers/move-project";
@@ -806,31 +806,23 @@ const project = apiRouter<BaseVariables & { workspaceId: string }>()
   .openapi(addProjectMemberRoute, async (c) => {
     const { id } = c.req.valid("param");
     const { userId } = c.req.valid("json");
-    const workspaceId = c.get("workspaceId");
-    const added = await addProjectMemberCtrl(id, workspaceId, userId);
-    await announceProjectMemberChange({
-      workspaceId,
-      projectId: id,
-      userId,
-      actorId: c.get("userId"),
-    });
+    // The route already authorized the caller; what follows is maintenance
+    // about the member, which a caller's scoped key must not narrow.
+    const added = await withoutCallerReach(() =>
+      addProjectMemberCtrl(id, c.get("workspaceId"), userId, c.get("userId")),
+    );
     return c.json(added, 200);
   })
   .openapi(removeProjectMemberRoute, async (c) => {
     const { id, userId } = c.req.valid("param");
-    const workspaceId = c.get("workspaceId");
-    const removed = await removeProjectMemberCtrl(
-      id,
-      workspaceId,
-      userId,
-      c.get("userId"),
+    const removed = await withoutCallerReach(() =>
+      removeProjectMemberCtrl(
+        id,
+        c.get("workspaceId"),
+        userId,
+        c.get("userId"),
+      ),
     );
-    await announceProjectMemberChange({
-      workspaceId,
-      projectId: id,
-      userId,
-      actorId: c.get("userId"),
-    });
     return c.json(removed, 200);
   });
 

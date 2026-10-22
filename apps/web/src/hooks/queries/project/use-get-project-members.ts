@@ -12,6 +12,9 @@ function useGetProjectMembers({
     queryFn: () => getProjectMembers({ id: projectId }),
     queryKey: ["project-members", projectId],
     enabled: enabled && !!projectId,
+    // Membership can change from another tab or administrator, and nothing
+    // pushes this list, so each visit reads it again.
+    refetchOnMount: "always",
   });
 }
 
