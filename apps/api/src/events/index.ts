@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { EventEmitter } from "node:events";
+import { withoutCallerReach } from "../project-access/caller-reach";
 
 const EVENTS = new EventEmitter();
 EVENTS.setMaxListeners(100);
@@ -54,7 +55,9 @@ export async function subscribeToEvent<T>(
   try {
     EVENTS.on(eventType, async (payload: EventPayload<T>) => {
       try {
-        await handler(payload.data);
+        // Handlers act on other users' sessions; a scoped key that published
+        // the event must not narrow their access checks.
+        await withoutCallerReach(() => handler(payload.data));
       } catch (error) {
         console.error(`Error processing event ${eventType}:`, error);
       }

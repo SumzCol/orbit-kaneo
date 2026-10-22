@@ -3,7 +3,6 @@ import { HTTPException } from "hono/http-exception";
 import db from "../../database";
 import { workspaceUserTable } from "../../database/schema";
 import { publishEvent } from "../../events";
-import { clearMemberProjectAccess } from "../../project-access/clear-member-project-access";
 import { isOwnerRole } from "../../project-access/is-owner-role";
 import { lockWorkspace } from "../lock-workspace";
 import listWorkspaceMembers from "./list-workspace-members";
@@ -50,7 +49,6 @@ async function transferWorkspaceOwnership(request: {
           eq(workspaceUserTable.userId, userId),
         ),
       );
-    await clearMemberProjectAccess(workspaceId, userId, tx);
   });
 
   await publishEvent("project_access.updated", { workspaceId, userId });

@@ -3,7 +3,6 @@ import {
   CopyIcon,
   EllipsisIcon,
   MailIcon,
-  PencilIcon,
   ShieldIcon,
   TrashIcon,
   MailXIcon,
@@ -16,8 +15,6 @@ import useCancelInvitation from "@/hooks/mutations/workspace-user/use-cancel-inv
 import useDeleteWorkspaceUser from "@/hooks/mutations/workspace-user/use-delete-workspace-user";
 import useUpdateWorkspaceUserRole from "@/hooks/mutations/workspace-user/use-update-workspace-user-role";
 import useWorkspaceRoles from "@/hooks/queries/workspace/use-workspace-roles";
-import useGetMyProjectAccess from "@/hooks/queries/workspace-users/use-get-my-project-access";
-import useGetWorkspaceProjectAccess from "@/hooks/queries/workspace-users/use-get-workspace-project-access";
 import { useCopyInvitationLink } from "@/hooks/use-copy-invitation-link";
 import { useWorkspacePermission } from "@/hooks/use-workspace-permission";
 import { cn } from "@/lib/cn";
@@ -57,13 +54,6 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-import MemberProjectAccessDialog from "./member-project-access-dialog";
-import {
-  ALL_PROJECTS_ACCESS,
-  type ProjectAccessValue,
-} from "./project-access/project-access-value";
-import { findMemberProjectAccess } from "./project-access/find-member-project-access";
-import { getInvitationProjectAccess } from "./project-access/get-invitation-project-access";
 
 type Props = {
   workspaceId: string;
@@ -110,12 +100,6 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
   );
   const [invitationToCancel, setInvitationToCancel] =
     useState<WorkspaceUserInvitation | null>(null);
-  const [accessTarget, setAccessTarget] = useState<{
-    userId: string;
-    name: string;
-    access: ProjectAccessValue;
-  } | null>(null);
-  const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
 
   const { user: currentUser } = useAuth();
   const { mutateAsync: deleteWorkspaceUser, isPending: isDeleting } =
@@ -125,35 +109,12 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
   const { mutateAsync: updateMemberRole } = useUpdateWorkspaceUserRole();
   const { copy: copyInvitationLink } = useCopyInvitationLink();
   const { data: allWorkspaceRoles = [] } = useWorkspaceRoles(workspaceId);
-  const { canManageTeam, canUpdateMembers, canRemoveMembers, canInviteUsers } =
+  const { canManageTeam, canRemoveMembers, canInviteUsers } =
     useWorkspacePermission();
   const canChangeRoles = Boolean(canManageTeam());
-  const canManageProjectAccess = Boolean(canUpdateMembers());
   const canRemove = Boolean(canRemoveMembers());
   const canInvite = Boolean(canInviteUsers());
-  const { data: projectAccessEntries } = useGetWorkspaceProjectAccess(
-    workspaceId,
-    canManageProjectAccess,
-  );
-  const myAccess = useGetMyProjectAccess(workspaceId, canManageProjectAccess);
-  // Unknown (loading or failed) counts as limited: the access list is
-  // redacted for the caller, and only a known "all" may grant everything.
-  const managerLimited = myAccess.data?.projectAccess !== "all";
-  const columnCount = canManageProjectAccess ? 5 : 4;
-
-  const describeAccess = (access: ProjectAccessValue) =>
-    access.projectAccess === "all"
-      ? t("team:projectAccess.allProjects")
-      : access.projectIds.length === 0
-        ? // A limited manager only sees grants for projects they can see.
-          t(
-            managerLimited
-              ? "team:projectAccess.noVisibleProjectAccess"
-              : "team:projectAccess.noProjectAccess",
-          )
-        : t("team:projectAccess.projectCount", {
-            count: access.projectIds.length,
-          });
+  const columnCount = 4;
 
   const customRoles = allWorkspaceRoles.filter(
     (role) => !RESERVED_ROLE_NAMES.has(role.role),
@@ -243,11 +204,6 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
             <TableHead className="text-foreground font-medium">
               {t("team:membersTable.columns.role", { defaultValue: "Role" })}
             </TableHead>
-            {canManageProjectAccess ? (
-              <TableHead className="text-foreground font-medium">
-                {t("team:membersTable.columns.projects")}
-              </TableHead>
-            ) : null}
             <TableHead className="text-foreground font-medium">
               {t("team:membersTable.columns.joined", {
                 defaultValue: "Joined",
@@ -261,17 +217,6 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
             const isSelf = currentUser?.id === member.userId;
             const showRoleSelect =
               canChangeRoles && !isSelf && member.role !== "owner";
-            const access =
-              member.role === "owner"
-                ? ALL_PROJECTS_ACCESS
-                : findMemberProjectAccess(projectAccessEntries, member.userId);
-            const showAccessEdit =
-              canManageProjectAccess &&
-              !isSelf &&
-              member.role !== "owner" &&
-              !(managerLimited && access.projectAccess === "all");
-            const accessLabel = describeAccess(access);
-            const memberName = member.user.name || member.user.email;
             const tone = toneFor(member.user.email);
             return (
               <TableRow key={member.user.email}>
@@ -356,36 +301,6 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
                     </Badge>
                   )}
                 </TableCell>
-                {canManageProjectAccess ? (
-                  <TableCell className="py-3 text-sm text-muted-foreground">
-                    {!projectAccessEntries ? (
-                      "–"
-                    ) : showAccessEdit ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 gap-1.5 px-2 text-muted-foreground"
-                        aria-label={t("team:projectAccess.editAria", {
-                          name: memberName,
-                          access: accessLabel,
-                        })}
-                        onClick={() => {
-                          setAccessTarget({
-                            userId: member.userId,
-                            name: memberName,
-                            access,
-                          });
-                          setIsAccessDialogOpen(true);
-                        }}
-                      >
-                        {accessLabel}
-                        <PencilIcon className="size-3" />
-                      </Button>
-                    ) : (
-                      accessLabel
-                    )}
-                  </TableCell>
-                ) : null}
                 <TableCell className="py-3 text-sm text-muted-foreground tabular-nums">
                   {member.createdAt ? formatDateMedium(member.createdAt) : "–"}
                 </TableCell>
@@ -457,11 +372,6 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
                   })}
                 </Badge>
               </TableCell>
-              {canManageProjectAccess ? (
-                <TableCell className="py-3 text-sm text-muted-foreground">
-                  {describeAccess(getInvitationProjectAccess(invitation))}
-                </TableCell>
-              ) : null}
               <TableCell className="py-3 text-sm text-muted-foreground">
                 –
               </TableCell>
@@ -518,14 +428,6 @@ function MembersTable({ workspaceId, invitations, users }: Props) {
           ) : null}
         </TableBody>
       </Table>
-
-      <MemberProjectAccessDialog
-        workspaceId={workspaceId}
-        open={isAccessDialogOpen}
-        member={accessTarget}
-        access={accessTarget?.access ?? ALL_PROJECTS_ACCESS}
-        onOpenChange={setIsAccessDialogOpen}
-      />
 
       <AlertDialog
         open={!!memberToDelete}

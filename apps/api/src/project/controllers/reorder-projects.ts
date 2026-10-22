@@ -19,8 +19,6 @@ async function reorderProjects(
     });
   }
 
-  await assertProjectAccess(userId, ids);
-
   return db.transaction(async (tx) => {
     // Serialize ordering writes per workspace so a concurrent create (which
     // appends at max(position) + 1) cannot interleave with a renumber.
@@ -53,6 +51,8 @@ async function reorderProjects(
         message: `Project ${foreignId} does not belong to this workspace`,
       });
     }
+
+    await assertProjectAccess(userId, ids);
 
     // Positions are derived server-side rather than trusted from the client:
     // the payload only expresses a relative order. This keeps stored positions

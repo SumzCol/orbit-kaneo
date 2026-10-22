@@ -6,7 +6,6 @@ import {
   emailOTPClient,
   genericOAuthClient,
   inferAdditionalFields,
-  inferOrgAdditionalFields,
   lastLoginMethodClient,
   magicLinkClient,
   organizationClient,
@@ -47,22 +46,6 @@ export const authClient = createAuthClient({
       dynamicAccessControl: {
         enabled: true,
       },
-      schema: inferOrgAdditionalFields({
-        invitation: {
-          additionalFields: {
-            projectAccess: {
-              type: "string",
-              input: true,
-              required: false,
-            },
-            projectIds: {
-              type: "string[]",
-              input: true,
-              required: false,
-            },
-          },
-        },
-      }),
     }),
     genericOAuthClient(),
     deviceAuthorizationClient(),

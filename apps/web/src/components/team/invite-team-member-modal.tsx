@@ -6,8 +6,6 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { z } from "zod/v4";
 import useInviteWorkspaceUser from "@/hooks/mutations/workspace-user/use-invite-workspace-user";
-import useGetProjects from "@/hooks/queries/project/use-get-projects";
-import useGetMyProjectAccess from "@/hooks/queries/workspace-users/use-get-my-project-access";
 import useActiveWorkspace from "@/hooks/queries/workspace/use-active-workspace";
 import { useWorkspacePermission } from "@/hooks/use-workspace-permission";
 import { toast } from "@/lib/toast";
@@ -31,12 +29,6 @@ import {
 } from "../ui/form";
 import { Input } from "../ui/input";
 import InvitationLinkField from "./invitation-link-field";
-import {
-  type ProjectAccessValue,
-  SELECTED_PROJECTS_ACCESS,
-} from "./project-access/project-access-value";
-import { toProjectAccessRequest } from "./project-access/to-project-access-request";
-import ProjectAccessFields from "./project-access-fields";
 
 type Props = {
   open: boolean;
@@ -61,25 +53,6 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
     id: string;
     email: string;
   } | null>(null);
-  const myAccess = useGetMyProjectAccess(workspaceId ?? "", open);
-  const isMyAccessPending = myAccess.isPending;
-  const inviterLimited =
-    myAccess.isError || myAccess.data?.projectAccess === "selected";
-  const [chosenAccess, setProjectAccess] = useState<ProjectAccessValue | null>(
-    null,
-  );
-  // New people start with no projects; the inviter ticks what they need.
-  const projectAccess = chosenAccess ?? SELECTED_PROJECTS_ACCESS;
-  const { data: projects, isLoading: isLoadingProjects } = useGetProjects({
-    workspaceId: workspaceId ?? "",
-    includeArchived: true,
-    enabled: open,
-  });
-
-  // Without the list, a selection would be filtered against nothing and
-  // send an invitation for no projects.
-  const projectsUnavailable =
-    projectAccess.projectAccess === "selected" && !projects;
 
   const form = useForm<TeamMemberFormValues>({
     resolver: standardSchemaResolver(teamMemberSchema),
@@ -100,17 +73,11 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
       toast.error(t("team:inviteModal.error"));
       return;
     }
-    if (projectsUnavailable) return;
-    const access = toProjectAccessRequest(
-      projectAccess,
-      (projects ?? []).map((project) => project.id),
-    );
     try {
       const invitation = await mutateAsync({
         email,
         workspaceId,
         role: "member",
-        ...access,
       }); // TODO: role and email
       await queryClient.refetchQueries({
         queryKey: ["workspace-users", workspaceId],
@@ -124,7 +91,6 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
       if (invitation?.id) {
         setCreatedInvitation({ id: invitation.id, email });
         form.reset();
-        setProjectAccess(null);
         return;
       }
 
@@ -149,7 +115,6 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
     if (isOpen) return;
     setCreatedInvitation(null);
     form.reset();
-    setProjectAccess(null);
   };
 
   return (
@@ -206,14 +171,6 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
                     </FormItem>
                   )}
                 />
-                <ProjectAccessFields
-                  allowAll={!inviterLimited}
-                  value={projectAccess}
-                  onChange={setProjectAccess}
-                  projects={projects}
-                  isLoadingProjects={isLoadingProjects}
-                  disabled={form.formState.isSubmitting || isMyAccessPending}
-                />
               </DialogPanel>
 
               <DialogFooter>
@@ -225,12 +182,7 @@ function InviteTeamMemberModal({ open, onClose }: Props) {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={
-                    !workspaceId ||
-                    !canInvite ||
-                    isMyAccessPending ||
-                    projectsUnavailable
-                  }
+                  disabled={!workspaceId || !canInvite}
                 >
                   {t("team:inviteModal.sendInvitation")}
                 </Button>

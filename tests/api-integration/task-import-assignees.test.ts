@@ -78,7 +78,7 @@ describe("JSON import assignees", () => {
   });
 
   it("prefers an actual user ID over another eligible user's matching email", async () => {
-    const { user, workspace, importUsers } = await fixture();
+    const { user, workspace, project, importUsers } = await fixture();
     const [idHolder] = await db
       .insert(schema.userTable)
       .values({
@@ -94,6 +94,8 @@ describe("JSON import assignees", () => {
       role: "member",
       joinedAt: new Date(),
     });
+    // Eligible means on the project, not only in the workspace.
+    await restrictToProjects(workspace.id, idHolder.id, [project.id]);
     const result = await importUsers([idHolder.id, user.id]);
     expect(result.results.successful).toBe(2);
     expect(result.results.failed).toBe(0);

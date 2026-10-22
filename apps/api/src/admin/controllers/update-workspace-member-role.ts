@@ -5,6 +5,7 @@ import { workspaceUserTable } from "../../database/schema";
 import { isOwnerRole } from "../../project-access/is-owner-role";
 import { isAssignableWorkspaceRole } from "../is-assignable-workspace-role";
 import { lockWorkspace } from "../lock-workspace";
+import { handleRoleChanged } from "../../workspace-members/handle-role-changed";
 import listWorkspaceMembers from "./list-workspace-members";
 
 async function updateWorkspaceMemberRole(request: {
@@ -45,6 +46,7 @@ async function updateWorkspaceMemberRole(request: {
       );
   });
 
+  await handleRoleChanged(workspaceId, userId);
   return listWorkspaceMembers(workspaceId);
 }
 

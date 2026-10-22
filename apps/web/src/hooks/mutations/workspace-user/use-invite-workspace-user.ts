@@ -9,8 +9,6 @@ type InviteWorkspaceUserRequest = {
   email: string;
   role: "admin" | "member" | "owner";
   resend?: boolean;
-  projectAccess?: "all" | "selected";
-  projectIds?: string[];
 };
 
 function useInviteWorkspaceUser() {
@@ -21,15 +19,12 @@ function useInviteWorkspaceUser() {
       email,
       role,
       resend,
-      projectAccess,
-      projectIds,
     }: InviteWorkspaceUserRequest) => {
       const { data, error } = await authClient.organization.inviteMember({
         email,
         role,
         organizationId: workspaceId,
         resend,
-        ...(projectAccess ? { projectAccess, projectIds } : {}),
       });
 
       if (error?.code === "INVITATION_EMAIL_FAILED") {

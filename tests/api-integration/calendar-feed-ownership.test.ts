@@ -11,9 +11,10 @@ import db, { schema } from "../../apps/api/src/database";
 import { calendarFeedTable } from "../../apps/api/src/database/schema";
 import { createApp } from "../../apps/api/src/index";
 import moveProject from "../../apps/api/src/project/controllers/move-project";
-import updateMemberProjectAccess from "../../apps/api/src/workspace/controllers/update-member-project-access";
+import { deleteMemberInaccessibleFeeds } from "../../apps/api/src/calendar-feed/prune-calendar-feeds";
 import { handleMemberRemoved } from "../../apps/api/src/workspace-members/handle-member-removed";
 import { mockAnonymousSession, mockAuthenticatedSession } from "./helpers/auth";
+import { restrictToProjects } from "./helpers/project-access/restrict-to-projects";
 import { resetTestDatabase } from "./helpers/database";
 import {
   createProjectFixture,
@@ -34,20 +35,16 @@ async function addWorkspaceMember(workspaceId: string, role: string) {
   return user;
 }
 
-// Limits a member to the given projects, as an administrator would.
+// Leaves a member on only the given projects, as removing them from the rest
+// would.
 async function restrict(
   workspaceId: string,
-  actorId: string,
+  _actorId: string,
   userId: string,
   projectIds: string[],
 ) {
-  await updateMemberProjectAccess({
-    workspaceId,
-    actorId,
-    userId,
-    projectAccess: "selected",
-    projectIds,
-  });
+  await restrictToProjects(workspaceId, userId, projectIds);
+  await deleteMemberInaccessibleFeeds(db, workspaceId, userId);
 }
 
 // Written directly so a feed can belong to anyone, including a plain member

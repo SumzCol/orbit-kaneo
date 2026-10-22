@@ -2979,9 +2979,6 @@
 								"roleLabel": {
 									"type": "string"
 								},
-								"editAccess": {
-									"type": "string"
-								},
 								"actions": {
 									"type": "string"
 								},
@@ -2999,7 +2996,6 @@
 								"loadError",
 								"empty",
 								"roleLabel",
-								"editAccess",
 								"actions",
 								"makeOwner",
 								"remove"
@@ -6899,10 +6895,10 @@
 						"thisWorkspace": {
 							"type": "string"
 						},
-						"membersTitle": {
+						"adminsTitle": {
 							"type": "string"
 						},
-						"membersDescription": {
+						"adminsDescription": {
 							"type": "string"
 						},
 						"always": {
@@ -6922,6 +6918,54 @@
 						},
 						"offNote": {
 							"type": "string"
+						},
+						"membersSectionTitle": {
+							"type": "string"
+						},
+						"membersSectionSubtitle": {
+							"type": "string"
+						},
+						"membersEmpty": {
+							"type": "string"
+						},
+						"membersLoadError": {
+							"type": "string"
+						},
+						"membersAdd": {
+							"type": "string"
+						},
+						"membersAddPlaceholder": {
+							"type": "string"
+						},
+						"membersAddLabel": {
+							"type": "string"
+						},
+						"memberAddedToast": {
+							"type": "string"
+						},
+						"memberAddErrorToast": {
+							"type": "string"
+						},
+						"memberRemovedToast": {
+							"type": "string"
+						},
+						"memberRemoveErrorToast": {
+							"type": "string"
+						},
+						"memberRemove": {
+							"type": "string"
+						},
+						"memberRemoveLabel": {
+							"type": "string"
+						},
+						"memberRemoveSelfHint": {
+							"type": "string"
+						},
+						"memberRemoveLastHint": {
+							"type": "string"
+						},
+						"membersManageHint": {
+							"type": "string"
 						}
 					},
 					"required": [
@@ -6936,14 +6980,30 @@
 						"toastUpdated",
 						"toastUpdateError",
 						"thisWorkspace",
-						"membersTitle",
-						"membersDescription",
+						"adminsTitle",
+						"adminsDescription",
 						"always",
 						"on",
 						"copied",
 						"copyError",
 						"openPublicPage",
-						"offNote"
+						"offNote",
+						"membersSectionTitle",
+						"membersSectionSubtitle",
+						"membersEmpty",
+						"membersLoadError",
+						"membersAdd",
+						"membersAddPlaceholder",
+						"membersAddLabel",
+						"memberAddedToast",
+						"memberAddErrorToast",
+						"memberRemovedToast",
+						"memberRemoveErrorToast",
+						"memberRemove",
+						"memberRemoveLabel",
+						"memberRemoveSelfHint",
+						"memberRemoveLastHint",
+						"membersManageHint"
 					]
 				},
 				"projectWorkflow": {
@@ -14530,12 +14590,9 @@
 								},
 								"actions": {
 									"type": "string"
-								},
-								"projects": {
-									"type": "string"
 								}
 							},
-							"required": ["name", "role", "joined", "actions", "projects"]
+							"required": ["name", "role", "joined", "actions"]
 						},
 						"memberRolePending": {
 							"type": "string"
@@ -14607,120 +14664,6 @@
 						"roleUpdateSuccess",
 						"roleUpdateError"
 					]
-				},
-				"projectAccess": {
-					"type": "object",
-					"additionalProperties": false,
-					"properties": {
-						"label": {
-							"type": "string"
-						},
-						"description": {
-							"type": "string"
-						},
-						"allProjects": {
-							"type": "string"
-						},
-						"allProjectsDescription": {
-							"type": "string"
-						},
-						"allProjectsUnavailable": {
-							"type": "string"
-						},
-						"selectedProjects": {
-							"type": "string"
-						},
-						"selectedProjectsDescription": {
-							"type": "string"
-						},
-						"projectsLabel": {
-							"type": "string"
-						},
-						"noProjects": {
-							"type": "string"
-						},
-						"noAccessibleProjects": {
-							"type": "string"
-						},
-						"archived": {
-							"type": "string"
-						},
-						"noneSelected": {
-							"type": "string"
-						},
-						"noProjectAccess": {
-							"type": "string"
-						},
-						"noVisibleProjectAccess": {
-							"type": "string"
-						},
-						"noneSelectedLimited": {
-							"type": "string"
-						},
-						"projectsUnavailable": {
-							"type": "string"
-						},
-						"projectCount_one": {
-							"type": "string"
-						},
-						"projectCount_zero": {
-							"type": "string"
-						},
-						"projectCount_two": {
-							"type": "string"
-						},
-						"projectCount_few": {
-							"type": "string"
-						},
-						"projectCount_many": {
-							"type": "string"
-						},
-						"projectCount_other": {
-							"type": "string"
-						},
-						"editAria": {
-							"type": "string"
-						},
-						"dialogTitle": {
-							"type": "string"
-						},
-						"dialogDescription": {
-							"type": "string"
-						},
-						"save": {
-							"type": "string"
-						},
-						"updateSuccess": {
-							"type": "string"
-						},
-						"updateError": {
-							"type": "string"
-						}
-					},
-					"required": [
-						"label",
-						"description",
-						"allProjects",
-						"allProjectsDescription",
-						"allProjectsUnavailable",
-						"selectedProjects",
-						"selectedProjectsDescription",
-						"projectsLabel",
-						"noProjects",
-						"noAccessibleProjects",
-						"archived",
-						"noneSelected",
-						"noProjectAccess",
-						"noVisibleProjectAccess",
-						"noneSelectedLimited",
-						"projectsUnavailable",
-						"editAria",
-						"dialogTitle",
-						"dialogDescription",
-						"save",
-						"updateSuccess",
-						"updateError"
-					]
 				}
 			},
 			"required": [
@@ -14728,8 +14671,7 @@
 				"members",
 				"invitations",
 				"inviteModal",
-				"membersTable",
-				"projectAccess"
+				"membersTable"
 			]
 		},
 		"publicProject": {

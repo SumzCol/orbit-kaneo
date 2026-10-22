@@ -45,13 +45,6 @@ export const memberProjectAccessSchema = z
   })
   .openapi("MemberProjectAccess");
 
-export const memberProjectAccessListSchema = z
-  .array(memberProjectAccessSchema)
-  .openapi({
-    description:
-      "Members limited to selected projects. Members not listed can access every project. Project IDs only include projects the caller can access.",
-  });
-
 const capabilityShape = Object.fromEntries(
   WORKSPACE_CAPABILITY_NAMES.map((name) => [name, z.boolean()]),
 ) as Record<WorkspaceCapability, z.ZodBoolean>;

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type db from "../../database";
 import { columnTable, projectTable } from "../../database/schema";
-import { grantProjectToRestrictedMember } from "../../project-access/grant-project-to-restricted-member";
+import { addCreatorMembership } from "./add-creator-membership";
 import {
   assertProjectKeyAvailable,
   lockProjectOrdering,
@@ -68,7 +68,7 @@ export async function insertProject(
 
   if (createdProject) {
     await seedDefaultColumns(tx, createdProject.id);
-    await grantProjectToRestrictedMember(tx, {
+    await addCreatorMembership(tx, {
       workspaceId,
       userId,
       projectId: createdProject.id,
@@ -89,7 +89,7 @@ export async function insertUnplacedProject(
 
   if (createdProject) {
     await seedDefaultColumns(tx, createdProject.id);
-    await grantProjectToRestrictedMember(tx, {
+    await addCreatorMembership(tx, {
       workspaceId,
       userId,
       projectId: createdProject.id,

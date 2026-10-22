@@ -157,9 +157,13 @@ describe("project access enforcement", () => {
     expect(body).not.toContain("Hidden beta task");
   });
 
-  it("leaves owners and unrestricted members unaffected", async () => {
+  it("leaves owners and members of every project unaffected", async () => {
     const ctx = await createRestrictedWorkspace();
     const unrestricted = await addWorkspaceMember(ctx.workspace.id);
+    await restrictToProjects(ctx.workspace.id, unrestricted.id, [
+      ctx.alpha.id,
+      ctx.beta.id,
+    ]);
 
     for (const user of [ctx.owner, unrestricted]) {
       mockAuthenticatedSession(user);
