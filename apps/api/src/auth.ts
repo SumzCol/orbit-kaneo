@@ -38,6 +38,14 @@ import type { UserWithAnonymous } from "better-auth/plugins/anonymous";
 import { config } from "dotenv-mono";
 import { eq } from "drizzle-orm";
 import {
+  assertBackchannelLogoutEnv,
+  resolveBackchannelLogoutConfig,
+} from "./backchannel-logout/config";
+import {
+  rememberSignInSessionId,
+  takeSignInSessionId,
+} from "./backchannel-logout/sign-in-session-id";
+import {
   findBillableWorkspaces,
   formatBillableWorkspacesMessage,
 } from "./billing/controllers/find-billable-workspaces";
@@ -45,6 +53,7 @@ import { pruneUserCalendarFeeds } from "./calendar-feed/prune-calendar-feeds";
 import { shouldPruneFeedsAfterAdminUpdate } from "./calendar-feed/should-prune-after-admin-update";
 import db, { schema } from "./database";
 import { authDatabaseAdapter } from "./database/auth-adapter";
+import { lockedSessionRevocation } from "./utils/locked-session-revocation";
 import { publishEvent } from "./events";
 import { applyInvitationProjectAccess } from "./project-access/apply-invitation-project-access";
 import { resolveInvitationProjectAccess } from "./project-access/resolve-invitation-project-access";
@@ -55,9 +64,22 @@ import { handleMemberAdded } from "./workspace-members/handle-member-added";
 import { handleMemberRemoved } from "./workspace-members/handle-member-removed";
 import { handleOwnerPromoted } from "./workspace-members/handle-owner-promoted";
 import { hideInaccessibleInvitationProjects } from "./project-access/hide-inaccessible-invitation-projects";
+import assertManagedProfileUnchanged from "./user/controllers/assert-managed-profile-unchanged";
+import { hideInvitationsFromNonInviters } from "./utils/hide-invitations-from-non-inviters";
+import { assertOwnerInvitationResendAllowed } from "./utils/assert-owner-invitation-resend-allowed";
+import {
+  assertNativeAuthApiKeyAllowed,
+  nativeAuthApiKey,
+} from "./utils/native-auth-api-key";
+import {
+  assertNativeOrganizationReadAllowed,
+  readableNativeOrganizations,
+} from "./utils/native-organization-read-access";
+import { satisfies } from "./utils/role-permissions";
 import clearEmailVerificationOnAdminChange from "./user/controllers/clear-email-verification-on-admin-change";
 import deleteAccountData from "./user/controllers/delete-account-data";
 import prepareAdminUserRemoval from "./user/controllers/prepare-admin-user-removal";
+import refreshManagedProfile from "./user/controllers/refresh-managed-profile";
 import { resolveAuthSecret } from "./utils/auth-secret";
 import {
   canSendSignInEmail,
@@ -65,7 +87,15 @@ import {
   userExistsByEmail,
 } from "./utils/check-registration-allowed";
 import { checkWorkspaceName } from "./utils/check-workspace-name";
+import {
+  assertCustomOAuthEnv,
+  parseManagedProfileFields,
+} from "./utils/custom-oauth-env";
 import { mapCustomOAuthProfileToUser } from "./utils/custom-oauth-profile";
+import {
+  rememberCustomOAuthProfile,
+  takeCustomOAuthProfile,
+} from "./utils/custom-oauth-sign-in";
 import { resolveFileSecret } from "./utils/file-secret";
 import { generateDemoName } from "./utils/generate-demo-name";
 import { getEmailRequestContext } from "./utils/email-request-context";
@@ -139,6 +169,14 @@ const authSecret = (() => {
     process.exit(1);
   }
 })();
+
+try {
+  assertCustomOAuthEnv();
+  assertBackchannelLogoutEnv();
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
 
 async function getUserLocale(email: string) {
   const [user] = await db
@@ -342,6 +380,7 @@ export const auth = betterAuth({
     },
   },
   plugins: [
+    lockedSessionRevocation,
     ...(process.env.DISABLE_GUEST_ACCESS !== "true"
       ? [
           anonymous({
@@ -679,7 +718,13 @@ export const auth = betterAuth({
           responseType: process.env.CUSTOM_OAUTH_RESPONSE_TYPE || "code",
           discoveryUrl: process.env.CUSTOM_OAUTH_DISCOVERY_URL || "",
           pkce: process.env.CUSTOM_AUTH_PKCE !== "false",
-          mapProfileToUser: mapCustomOAuthProfileToUser,
+          mapProfileToUser: (profile) => {
+            rememberCustomOAuthProfile(profile);
+            return mapCustomOAuthProfileToUser(
+              profile,
+              parseManagedProfileFields(),
+            );
+          },
         },
       ],
     }),
@@ -705,6 +750,14 @@ export const auth = betterAuth({
     openAPI(),
   ],
   session: {
+    additionalFields: {
+      oidcSid: {
+        type: "string",
+        required: false,
+        input: false,
+        returned: false,
+      },
+    },
     cookieCache: {
       // Consult the session store on every request so password recovery
       // immediately rejects revoked cookies, including caches issued before upgrade.
@@ -752,6 +805,7 @@ export const auth = betterAuth({
               message: "You cannot change your own role.",
             });
           }
+          await assertManagedProfileUnchanged(user, ctx);
           return clearEmailVerificationOnAdminChange(user, ctx);
         },
         // An instance administrator reaches every project, including ones in
@@ -797,14 +851,65 @@ export const auth = betterAuth({
         },
       },
     },
+    account: {
+      create: {
+        before: async (account, ctx) => {
+          rememberSignInSessionId(account.idToken, ctx);
+        },
+      },
+      update: {
+        before: async (account, ctx) => {
+          rememberSignInSessionId(account.idToken, ctx);
+        },
+      },
+    },
+    session: {
+      create: {
+        before: async (_session, ctx) => {
+          const oidcSid = takeSignInSessionId(ctx);
+          if (oidcSid) return { data: { oidcSid } };
+        },
+      },
+    },
   },
   hooks: {
-    before: createAuthMiddleware(async (ctx) => {
+    before: createAuthMiddleware(async (ctx): Promise<void> => {
+      // Runs before provider hooks can turn a key into its owner's session.
+      await assertNativeAuthApiKeyAllowed(ctx);
+      let organizationViewer: {
+        user: { id: string };
+        session: {
+          id?: string;
+          activeOrganizationId?: unknown;
+          activeTeamId?: unknown;
+        };
+      } | null = null;
+      if (ctx.path.startsWith("/organization/")) {
+        const key = nativeAuthApiKey(ctx);
+        // Resolve real bearer sessions through the provider's bearer hook as
+        // well as cookies. The nested /get-session call does not enter here.
+        organizationViewer = key
+          ? { user: { id: key.userId }, session: {} }
+          : await auth.api.getSession({ headers: new Headers(ctx.headers) });
+        await assertNativeOrganizationReadAllowed(ctx, organizationViewer);
+      }
       if (ctx.path === "/admin/remove-user") {
         await prepareAdminUserRemoval(ctx);
       }
 
       if (ctx.path === "/organization/invite-member") {
+        if (ctx.body?.resend === true && typeof ctx.body.email === "string") {
+          const viewer = organizationViewer;
+          const workspaceId =
+            ctx.body.organizationId || viewer?.session.activeOrganizationId;
+          if (viewer && typeof workspaceId === "string") {
+            await assertOwnerInvitationResendAllowed(
+              viewer.user.id,
+              workspaceId,
+              ctx.body.email,
+            );
+          }
+        }
         // Better Auth swallows email failures in runInBackgroundOrAwait.
         // Invitation callers need the delivery result, including on resend.
         ctx.context.runInBackgroundOrAwait = async (promise) => {
@@ -888,6 +993,15 @@ export const auth = betterAuth({
         }
       }
 
+      if (
+        ctx.path === "/callback/:id" &&
+        ctx.params?.id === "custom" &&
+        (parseManagedProfileFields().length > 0 ||
+          resolveBackchannelLogoutConfig().enabled)
+      ) {
+        throw new APIError("NOT_FOUND");
+      }
+
       const isSignUpPath =
         ctx.path === "/sign-up/email" ||
         ctx.path.startsWith("/callback/") ||
@@ -957,19 +1071,80 @@ export const auth = betterAuth({
       }
 
       if (
-        ctx.path === "/organization/list-invitations" ||
-        ctx.path === "/organization/get-full-organization"
+        (ctx.path === "/organization/list" ||
+          ctx.path === "/organization/list-user-teams") &&
+        Array.isArray(ctx.context.returned)
       ) {
+        const viewer = await getSessionFromCtx(ctx);
+        if (viewer) {
+          const organizations = ctx.context.returned as {
+            id: string;
+            organizationId?: string;
+          }[];
+          const visible = await readableNativeOrganizations(
+            viewer.user.id,
+            organizations.map(
+              (workspace) => workspace.organizationId ?? workspace.id,
+            ),
+          );
+          organizations.splice(
+            0,
+            organizations.length,
+            ...organizations.filter((workspace) =>
+              visible.has(workspace.organizationId ?? workspace.id),
+            ),
+          );
+        }
+      }
+      if (
+        ctx.path === "/organization/list-invitations" ||
+        ctx.path === "/organization/get-full-organization" ||
+        ctx.path === "/organization/invite-member"
+      ) {
+        const single = ctx.path === "/organization/invite-member";
         const viewer = await getSessionFromCtx(ctx);
         const returned = ctx.context.returned as
           | { invitations?: unknown }
           | unknown[]
           | null;
-        if (viewer)
-          await hideInaccessibleInvitationProjects(
-            viewer.user.id,
-            Array.isArray(returned) ? returned : returned?.invitations,
-          );
+        const created = returned as {
+          id?: unknown;
+          organizationId?: unknown;
+          role?: unknown;
+        } | null;
+        const invitations = single
+          ? typeof created?.id === "string" &&
+            typeof created.organizationId === "string" &&
+            typeof created.role === "string"
+            ? [created]
+            : undefined
+          : Array.isArray(returned)
+            ? returned
+            : returned?.invitations;
+        if (viewer) {
+          const scope = nativeAuthApiKey(ctx)?.permissions;
+          if (
+            scope &&
+            !satisfies(scope, { invitation: ["create"] }) &&
+            Array.isArray(invitations)
+          ) {
+            invitations.splice(0, invitations.length);
+          }
+          await hideInvitationsFromNonInviters(viewer.user, invitations);
+          // Resending returns the existing invitation's role, which may
+          // differ from the role Better Auth authorized in the request.
+          if (
+            single &&
+            Array.isArray(invitations) &&
+            invitations.length === 0
+          ) {
+            throw new APIError("FORBIDDEN", {
+              code: "YOU_ARE_NOT_ALLOWED_TO_INVITE_USER_WITH_THIS_ROLE",
+              message: "You are not allowed to invite a user with this role",
+            });
+          }
+          await hideInaccessibleInvitationProjects(viewer.user.id, invitations);
+        }
       }
 
       if (ctx.path === "/organization/leave") {
@@ -1016,6 +1191,27 @@ export const auth = betterAuth({
               .set({ activeOrganizationId: activeWorkspaceId })
               .where(eq(schema.sessionTable.id, newSession.session.id));
           }
+        }
+      }
+
+      if (
+        ctx.path === "/oauth2/callback/:providerId" &&
+        ctx.context.newSession
+      ) {
+        const profile = takeCustomOAuthProfile();
+        if (profile) {
+          await refreshManagedProfile(
+            ctx.context.newSession.user.id,
+            profile,
+          ).catch((error) => {
+            // Database errors repeat the query parameters, which hold the claims.
+            const cause = (error as { cause?: unknown } | null)?.cause ?? error;
+            const code = (cause as { code?: unknown } | null)?.code;
+            console.error("Managed profile refresh failed:", {
+              error: error instanceof Error ? error.name : typeof error,
+              code: typeof code === "string" ? code : undefined,
+            });
+          });
         }
       }
     }),
