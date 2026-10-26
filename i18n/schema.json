@@ -3971,6 +3971,19 @@
 						"advancedTitle"
 					]
 				},
+				"managedProfile": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"note": {
+							"type": "string"
+						},
+						"edit": {
+							"type": "string"
+						}
+					},
+					"required": ["note", "edit"]
+				},
 				"developerPage": {
 					"type": "object",
 					"additionalProperties": false,
@@ -9656,6 +9669,7 @@
 				"informationPage",
 				"notificationsPage",
 				"preferencesPage",
+				"managedProfile",
 				"developerPage",
 				"apiKey",
 				"workspaceGeneral",

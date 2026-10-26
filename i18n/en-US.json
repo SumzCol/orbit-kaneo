@@ -149,7 +149,11 @@
 					"amber": "Amber",
 					"terracotta": "Terracotta",
 					"rose": "Rose",
-					"crimson": "Crimson"
+					"crimson": "Crimson",
+					"ocean": "Ocean",
+					"sky": "Sky",
+					"lagoon": "Lagoon",
+					"orchid": "Orchid"
 				}
 			}
 		},
@@ -987,6 +991,10 @@
 			"projectBackgroundsDescription": "Show the image a project sets behind its board.",
 			"advancedTitle": "Advanced"
 		},
+		"managedProfile": {
+			"note": "Managed by your organization.",
+			"edit": "Edit in {{provider}}"
+		},
 		"developerPage": {
 			"pageTitle": "API keys",
 			"title": "API keys",
@@ -1778,6 +1786,8 @@
 			"dragOptionAria": "Reorder {{option}}",
 			"renameOptionAria": "Rename {{option}}",
 			"removeOptionAria": "Remove {{option}}",
+			"hideOptionAria": "Hide {{option}} from new selections",
+			"showOptionAria": "Offer {{option}} for new selections again",
 			"allowSeveral": "Allow several",
 			"allowSeveralDescription": "A task can pick more than one option.",
 			"requiredDescription": "Every task always has a value.",
@@ -3007,7 +3017,11 @@
 					"amber": "Amber",
 					"terracotta": "Terracotta",
 					"rose": "Rose",
-					"crimson": "Crimson"
+					"crimson": "Crimson",
+					"ocean": "Ocean",
+					"sky": "Sky",
+					"lagoon": "Lagoon",
+					"orchid": "Orchid"
 				},
 				"editLabels": "Edit labels"
 			}
@@ -3262,6 +3276,9 @@
 		},
 		"filterBar": {
 			"label": "Active filters",
+			"customFieldsLoading": "Loading custom-field values. Results are shown without custom-field filters.",
+			"customFieldsUnavailable": "Custom-field values could not be loaded. Results are shown without custom-field filters.",
+			"customFieldsRefreshError": "Custom-field values could not be refreshed. Results may be out of date.",
 			"removeFilter": "Remove {{name}} filter",
 			"noMatches": "No tasks match your search or filters."
 		},
@@ -4417,7 +4434,11 @@
 				"amber": "Amber",
 				"terracotta": "Terracotta",
 				"rose": "Rose",
-				"crimson": "Crimson"
+				"crimson": "Crimson",
+				"ocean": "Ocean",
+				"sky": "Sky",
+				"lagoon": "Lagoon",
+				"orchid": "Orchid"
 			},
 			"role": {
 				"owner": "Owner",

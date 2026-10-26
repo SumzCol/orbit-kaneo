@@ -606,6 +606,25 @@
               "null"
             ]
           },
+          "customOAuthManagedProfileFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "name",
+                "image",
+                "locale"
+              ]
+            },
+            "description": "Profile fields the custom OAuth/OIDC provider manages for people with a linked provider account."
+          },
+          "customOAuthAccountUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Account page of the custom OAuth/OIDC provider, where people change managed profile fields. Null when not configured."
+          },
           "billingEnabled": {
             "type": "boolean"
           }
@@ -628,6 +647,8 @@
           "customOAuthName",
           "customOAuthAutoLogin",
           "customOAuthLogoutUrl",
+          "customOAuthManagedProfileFields",
+          "customOAuthAccountUrl",
           "billingEnabled"
         ]
       },
@@ -4675,6 +4696,13 @@
             ]
           },
           "options": {},
+          "hiddenOptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Options no longer offered for new selections. Tasks that already use them keep them."
+          },
           "position": {
             "type": "number"
           },
@@ -4694,6 +4722,7 @@
           "type",
           "required",
           "defaultValue",
+          "hiddenOptions",
           "position",
           "createdAt",
           "updatedAt"
@@ -5274,6 +5303,18 @@
               "string",
               "null"
             ]
+          },
+          "managedProfileFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "name",
+                "image",
+                "locale"
+              ]
+            },
+            "description": "Profile fields the custom OAuth/OIDC provider manages for this user. Kaneo updates them at sign-in and refuses changes to them."
           }
         },
         "required": [
@@ -5281,7 +5322,8 @@
           "name",
           "email",
           "image",
-          "role"
+          "role",
+          "managedProfileFields"
         ]
       },
       "UserAvatar": {
@@ -9082,6 +9124,16 @@
               }
             }
           },
+          "403": {
+            "description": "Missing read permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Workspace not found",
             "content": {
@@ -9241,7 +9293,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -9490,7 +9542,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -10393,7 +10445,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -10507,7 +10559,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -10770,7 +10822,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -11602,7 +11654,7 @@
           "Tasks"
         ],
         "summary": "Get task by ticket ID",
-        "description": "Get a single task by its project key and number, such as KAN-12. A match in an active project takes precedence, then the most recently archived project. If the ticket ID still matches multiple accessible tasks, narrow the lookup to a workspace with workspaceId or workspaceSlug, or to a single project with projectId.",
+        "description": "Get a single task by its project key and number, such as KAN-12. Only tasks with current task:read permission and API key scope are considered. A match in an active project takes precedence, then the most recently archived project. If the ticket ID still matches multiple accessible tasks, narrow the lookup to a workspace with workspaceId or workspaceSlug, or to a single project with projectId.",
         "parameters": [
           {
             "schema": {
@@ -11759,7 +11811,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -12133,7 +12185,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -13136,7 +13188,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -13685,7 +13737,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -13963,7 +14015,7 @@
             }
           },
           "403": {
-            "description": "Not the author, or no access to the project",
+            "description": "Not the author, no access to the project, or missing task:update permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -14044,7 +14096,7 @@
             }
           },
           "403": {
-            "description": "Not the author, or no access to the project",
+            "description": "Not the author, no access to the project, or missing task:update permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -14112,7 +14164,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -14448,7 +14500,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -14513,7 +14565,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -14780,7 +14832,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -14839,6 +14891,16 @@
           },
           "401": {
             "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -15007,7 +15069,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -15400,7 +15462,7 @@
           "Notifications"
         ],
         "summary": "List notifications",
-        "description": "Get up to 50 notifications for the current user, read and unread. Optionally limit them to one workspace before applying the limit.",
+        "description": "Get up to 50 notifications for the current user, read and unread. Resource notifications require current read permission and API key scope. Optionally limit them to one workspace before applying the limit.",
         "parameters": [
           {
             "schema": {
@@ -15550,7 +15612,7 @@
           "Notifications"
         ],
         "summary": "Mark notification read",
-        "description": "Mark one notification as read. Scoped to the current user, so another user's notification is not found.",
+        "description": "Mark one notification as read. Only the current user's notifications with current resource read permission and API key scope are accessible.",
         "parameters": [
           {
             "schema": {
@@ -15605,7 +15667,7 @@
           "Notifications"
         ],
         "summary": "Mark notification unread",
-        "description": "Mark one notification as unread again. Scoped to the current user, so another user's notification is not found.",
+        "description": "Mark one notification as unread again. Only the current user's notifications with current resource read permission and API key scope are accessible.",
         "parameters": [
           {
             "schema": {
@@ -15660,7 +15722,7 @@
           "Notifications"
         ],
         "summary": "Mark all read",
-        "description": "Mark notifications for the current user as read, optionally limited to one workspace.",
+        "description": "Mark accessible notifications for the current user as read, optionally limited to one workspace. Resource notifications require current read permission and API key scope.",
         "parameters": [
           {
             "schema": {
@@ -15708,7 +15770,7 @@
           "Notifications"
         ],
         "summary": "Clear all",
-        "description": "Permanently delete notifications for the current user, optionally limited to one workspace. This cannot be undone.",
+        "description": "Permanently delete accessible notifications for the current user, optionally limited to one workspace. Resource notifications require current read permission and API key scope. This cannot be undone.",
         "parameters": [
           {
             "schema": {
@@ -15756,7 +15818,7 @@
           "Notifications"
         ],
         "summary": "Clear read notifications",
-        "description": "Permanently delete the current user's read notifications, optionally limited to one workspace. Unread notifications are kept. This cannot be undone.",
+        "description": "Permanently delete the current user's accessible read notifications, optionally limited to one workspace. Resource notifications require current read permission and API key scope. Unread notifications are kept. This cannot be undone.",
         "parameters": [
           {
             "schema": {
@@ -15804,7 +15866,7 @@
           "Notifications"
         ],
         "summary": "Delete notification",
-        "description": "Permanently delete one notification. Scoped to the current user, so another user's notification is not found.",
+        "description": "Permanently delete one notification. Only the current user's notifications with current resource read permission and API key scope are accessible. Other notifications are not found.",
         "parameters": [
           {
             "schema": {
@@ -16286,6 +16348,16 @@
           },
           "401": {
             "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing read permission for the requested search type",
             "content": {
               "application/json": {
                 "schema": {
@@ -17413,7 +17485,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing project:read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -18086,7 +18158,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing project:read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -18714,7 +18786,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing project:read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -19145,7 +19217,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing project:read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -19569,7 +19641,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing project:read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -19943,7 +20015,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing project:read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -20317,7 +20389,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing project:read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -20691,7 +20763,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing project:read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -21308,7 +21380,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -21644,7 +21716,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -21795,7 +21867,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -22241,7 +22313,7 @@
             }
           },
           "403": {
-            "description": "No access to the project",
+            "description": "No access to the project, or missing read permission",
             "content": {
               "application/json": {
                 "schema": {
@@ -23263,6 +23335,13 @@
                       "type": "string"
                     },
                     "description": "The full option list for dropdown and multiselect fields, in display order. Adding and reordering options is always allowed. Removing or renaming an option that a task still uses is rejected with 400, so task values are never changed silently."
+                  },
+                  "hiddenOptions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Options to retire without removing them: tasks keep their existing selections, but hidden options can't be picked anew or used as the default. Must be a subset of `options`. Omit to keep the current hidden options that are still options."
                   }
                 }
               }
@@ -23900,6 +23979,16 @@
               }
             }
           },
+          "403": {
+            "description": "The custom OAuth/OIDC provider manages the profile picture",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "408": {
             "description": "Request body timed out",
             "content": {
@@ -23945,6 +24034,16 @@
           },
           "401": {
             "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The custom OAuth/OIDC provider manages the profile picture",
             "content": {
               "application/json": {
                 "schema": {

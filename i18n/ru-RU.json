@@ -148,7 +148,11 @@
 					"amber": "Янтарь",
 					"terracotta": "Терракота",
 					"rose": "Роза",
-					"crimson": "Малиновый"
+					"crimson": "Малиновый",
+					"lagoon": "Лагуна",
+					"ocean": "Океан",
+					"orchid": "Орхидея",
+					"sky": "Небо"
 				},
 				"statusLoadError": "Project statuses couldn’t be loaded."
 			}
@@ -779,6 +783,10 @@
 			"projectBackgrounds": "Project backgrounds",
 			"projectBackgroundsDescription": "Показывать изображение, которое проект задаёт за своей доской.",
 			"advancedTitle": "Дополнительно"
+		},
+		"managedProfile": {
+			"note": "Управляется вашей организацией.",
+			"edit": "Изменить в {{provider}}"
 		},
 		"developerPage": {
 			"pageTitle": "API-ключи",
@@ -1591,6 +1599,8 @@
 			"noDefault": "Без значения по умолчанию",
 			"optionsLabel": "Варианты",
 			"removeOptionAria": "Удалить {{option}}",
+			"hideOptionAria": "Скрыть {{option}} из новых выборов",
+			"showOptionAria": "Снова предлагать {{option}} для новых выборов",
 			"renameOptionAria": "Переименовать {{option}}",
 			"requiredDescription": "У каждой задачи всегда есть значение.",
 			"save": "Сохранить",
@@ -3108,7 +3118,11 @@
 					"amber": "Янтарь",
 					"terracotta": "Терракота",
 					"rose": "Роза",
-					"crimson": "Малиновый"
+					"crimson": "Малиновый",
+					"lagoon": "Лагуна",
+					"ocean": "Океан",
+					"orchid": "Орхидея",
+					"sky": "Небо"
 				},
 				"editLabels": "Изменить метки"
 			}
@@ -3423,7 +3437,10 @@
 		"filterBar": {
 			"label": "Активные фильтры",
 			"removeFilter": "Убрать фильтр «{{name}}»",
-			"noMatches": "Нет задач, подходящих под поиск или фильтры."
+			"noMatches": "Нет задач, подходящих под поиск или фильтры.",
+			"customFieldsLoading": "Loading custom-field values. Results are shown without custom-field filters.",
+			"customFieldsRefreshError": "Custom-field values could not be refreshed. Results may be out of date.",
+			"customFieldsUnavailable": "Custom-field values could not be loaded. Results are shown without custom-field filters."
 		},
 		"filterMenu": {
 			"addFilter": "Добавить фильтр…",
@@ -4621,7 +4638,11 @@
 				"amber": "Янтарь",
 				"terracotta": "Терракота",
 				"rose": "Роза",
-				"crimson": "Малиновый"
+				"crimson": "Малиновый",
+				"ocean": "Океан",
+				"sky": "Небо",
+				"lagoon": "Лагуна",
+				"orchid": "Орхидея"
 			},
 			"role": {
 				"owner": "Владелец",
