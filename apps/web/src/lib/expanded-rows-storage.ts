@@ -1,5 +1,5 @@
 /**
- * Per-viewer, per-project record of which list-view rows are expanded.
+ * Browser-local, per-project record of which list-view rows are expanded.
  *
  * This is a convenience rather than state the app depends on: a value that
  * cannot be read or written simply leaves every row collapsed.
@@ -39,10 +39,19 @@ export function writeExpandedRows(
   rows: Record<string, boolean>,
 ) {
   try {
-    localStorage.setItem(
-      expandedRowsStorageKey(projectId),
-      JSON.stringify(rows),
+    // Only expanded rows are kept, and an empty map removes the key, so a
+    // project the viewer has collapsed everything in leaves nothing behind.
+    const expanded = Object.fromEntries(
+      Object.entries(rows).filter(([, value]) => value === true),
     );
+    if (Object.keys(expanded).length === 0) {
+      localStorage.removeItem(expandedRowsStorageKey(projectId));
+    } else {
+      localStorage.setItem(
+        expandedRowsStorageKey(projectId),
+        JSON.stringify(expanded),
+      );
+    }
   } catch {
     // A private window or blocked site data only costs the restore.
   }
