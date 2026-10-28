@@ -577,6 +577,15 @@ export function useProjectWebSocket(projectId: string) {
           return;
         }
 
+        if (event?.code === 1008 && event.reason === "Workspace archived") {
+          disposed = true;
+          evictProjectCache(queryClient, projectId);
+          void queryClient.invalidateQueries({
+            queryKey: ["workspace-status"],
+          });
+          return;
+        }
+
         if (
           event?.code === 1008 &&
           event.reason === "Workspace access revoked"
@@ -622,6 +631,9 @@ export function useProjectWebSocket(projectId: string) {
           void queryClient.invalidateQueries({
             queryKey: ["tasks", projectId],
           });
+          void queryClient.invalidateQueries({
+            queryKey: ["task-relations", "project", projectId],
+          });
         }, 30_000);
         flushPending();
       }
@@ -650,6 +662,11 @@ export function useProjectWebSocket(projectId: string) {
           markBoardCacheChanged(queryClient, projectId);
           void queryClient.invalidateQueries({
             queryKey: ["tasks", projectId],
+          });
+          // A relation change missed while the socket was down reaches the
+          // list's hierarchy through no message, so it is refetched too.
+          void queryClient.invalidateQueries({
+            queryKey: ["task-relations", "project", projectId],
           });
         }
         const messages = Array.from(pendingMessages.values());

@@ -3,7 +3,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { Archive, ChevronRight, Plus } from "lucide-react";
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,7 +11,7 @@ import { getStatusDisplayLabel } from "@/lib/i18n/domain";
 import { cn } from "@/lib/cn";
 import { getColumnIcon } from "@/lib/column";
 import { EASE_OUT } from "@/lib/motion";
-import { flattenSubtaskRows } from "@/lib/subtask-tree";
+import type { SubtaskRow } from "@/lib/subtask-tree";
 import type { ProjectWithTasks } from "@/types/project";
 import TaskRow from "./task-row";
 
@@ -27,10 +27,11 @@ type ListColumnSectionProps = {
   onToggle: (columnId: string) => void;
   onAddTask: (columnId: string) => void;
   onArchive: (column: Column) => void;
-  // Orbit: subtask rows.
-  subtaskChildren: Map<string, string[]>;
-  tasksById: Map<string, ColumnTask>;
-  expandedTasks: Record<string, boolean>;
+  /**
+   * The section's rows in display order. A subtask keeps its own row and is
+   * repeated, indented, beneath each expanded parent.
+   */
+  rows: SubtaskRow<ColumnTask>[];
   onToggleTaskExpanded: (rowId: string) => void;
   relationsLoading: boolean;
   draggingTaskId: string | null;
@@ -45,9 +46,7 @@ const ListColumnSection = memo(function ListColumnSection({
   onToggle,
   onAddTask,
   onArchive,
-  subtaskChildren,
-  tasksById,
-  expandedTasks,
+  rows,
   onToggleTaskExpanded,
   relationsLoading,
   draggingTaskId,
@@ -57,18 +56,6 @@ const ListColumnSection = memo(function ListColumnSection({
   const { setNodeRef } = useDroppable({
     id: column.id,
     data: { type: "column", column },
-  });
-
-  // A child keeps its own top-level row and is repeated under each expanded
-  // parent. Nothing stays expanded while a drag is in flight: nested repeats
-  // are not in the SortableContext, so they never receive the transforms
-  // applied to the top-level rows, and dragging past an expanded parent would
-  // slide the parent while its children stayed put.
-  const rows = flattenSubtaskRows({
-    tasks: column.tasks,
-    children: subtaskChildren,
-    tasksById,
-    isExpanded: (rowId) => !draggingTaskId && Boolean(expandedTasks[rowId]),
   });
 
   // Reserving the toggle column on every row keeps the titles aligned, but

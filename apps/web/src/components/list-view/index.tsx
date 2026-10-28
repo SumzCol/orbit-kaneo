@@ -15,8 +15,9 @@ import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import { produce } from "immer";
 import { Flag, ArchiveIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "motion/react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
 import { priorityColorsTaskCard } from "@/constants/priority-colors";
 import { useUpdateTask } from "@/hooks/mutations/task/use-update-task";
 import useGetProjectTaskRelations from "@/hooks/queries/task-relation/use-get-project-task-relations";
@@ -27,7 +28,7 @@ import {
   readExpandedRows,
   writeExpandedRows,
 } from "@/lib/expanded-rows-storage";
-import { buildSubtaskChildren } from "@/lib/subtask-tree";
+import { buildSubtaskChildren, flattenSubtaskRows } from "@/lib/subtask-tree";
 import { toast } from "@/lib/toast";
 import useBulkSelectionStore from "@/store/bulk-selection";
 import useProjectStore from "@/store/project";
@@ -70,11 +71,14 @@ function ListView({
     (column) => column.id === columnToArchive,
   );
 
-  // Orbit: subtasks are shown indented beneath their parents.
   // isLoading rather than isPending: a disabled query is also pending, and an
   // empty project should not look like it is still fetching.
-  const { data: relations, isLoading: relationsLoading } =
-    useGetProjectTaskRelations(project?.id ?? "");
+  const {
+    data: relations,
+    isLoading: relationsLoading,
+    isError: relationsFailed,
+    refetch: refetchRelations,
+  } = useGetProjectTaskRelations(project?.id ?? "");
 
   const subtaskChildren = useMemo(
     () => buildSubtaskChildren(relations ?? []),
@@ -94,7 +98,7 @@ function ListView({
     return index;
   }, [project?.columns]);
 
-  // Per viewer and per project, and only a convenience: a row that cannot be
+  // Per browser and per project, and only a convenience: a row that cannot be
   // restored simply starts collapsed.
   const projectId = project?.id ?? "";
   const [expanded, setExpanded] = useState(() => ({
@@ -115,21 +119,53 @@ function ListView({
     writeExpandedRows(projectId, expandedTasks);
   }, [projectId, expandedTasks]);
 
+  // Collapsing removes the row rather than recording false, so the stored map
+  // holds only expanded rows and does not grow with every row ever touched.
   const toggleTaskExpanded = useCallback((rowId: string) => {
-    setExpanded((previous) => ({
-      ...previous,
-      rows: { ...previous.rows, [rowId]: !previous.rows[rowId] },
-    }));
+    setExpanded((previous) => {
+      const rows = { ...previous.rows };
+      if (rows[rowId]) delete rows[rowId];
+      else rows[rowId] = true;
+      return { ...previous, rows };
+    });
   }, []);
+
+  // Each section's rows, in the order they are shown, expanded subtasks
+  // included. Built once per change and shared with the sections, so their
+  // memoization holds. Nothing stays expanded while a drag is in flight.
+  const rowsByColumn = useMemo(
+    () =>
+      new Map(
+        (project?.columns ?? []).map((column) => [
+          column.id,
+          flattenSubtaskRows({
+            tasks: column.tasks,
+            children: subtaskChildren,
+            tasksById,
+            isExpanded: (rowId) => !activeId && Boolean(expandedTasks[rowId]),
+          }),
+        ]),
+      ),
+    [project?.columns, subtaskChildren, tasksById, expandedTasks, activeId],
+  );
+
+  // Bulk actions stay per task, even when the list renders several rows for
+  // it. Shift-click ranges use the first appearance in display order.
+  const shownTaskIds = useCallback(
+    (column: ProjectWithTasks["columns"][number]) => [
+      ...new Set((rowsByColumn.get(column.id) ?? []).map((row) => row.task.id)),
+    ],
+    [rowsByColumn],
+  );
 
   useEffect(() => {
     if (project?.columns) {
       const visibleTaskIds = project.columns
         .filter((column) => isExpanded(column.id))
-        .flatMap((column) => column.tasks.map((task) => task.id));
-      setAvailableTasks(visibleTaskIds);
+        .flatMap(shownTaskIds);
+      setAvailableTasks([...new Set(visibleTaskIds)]);
     }
-  }, [project, isExpanded, setAvailableTasks]);
+  }, [project, isExpanded, setAvailableTasks, shownTaskIds]);
 
   useEffect(() => {
     clearFocus();
@@ -266,8 +302,19 @@ function ListView({
     getGroups: () =>
       project.columns.map((column) => ({
         id: column.id,
-        taskIds: column.tasks.map((task) => task.id),
+        taskIds: shownTaskIds(column),
+        rows: (rowsByColumn.get(column.id) ?? []).map((row) => ({
+          taskId: row.task.id,
+          rowId: row.rowId,
+        })),
         collapsed: !isExpanded(column.id),
+      })),
+    // Repeated children follow their parent for navigation, but reordering
+    // must use their actual status and position rather than their nested row.
+    getMoveGroups: () =>
+      project.columns.map((column) => ({
+        id: column.id,
+        taskIds: column.tasks.map((task) => task.id),
       })),
     project,
     enabled: activeId === null,
@@ -352,6 +399,23 @@ function ListView({
       modifiers={[snapCenterToCursor]}
     >
       <div className="w-full h-full overflow-auto bg-muted/20">
+        {relationsFailed && (
+          // Without relations every task renders as a top-level row, which
+          // reads exactly like a project with no subtasks; this says it isn't.
+          <div
+            role="alert"
+            className="flex items-center justify-between gap-3 border-b border-border/50 px-4 py-2 text-sm text-muted-foreground"
+          >
+            <span>{t("tasks:listView.subtasksLoadError")}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void refetchRelations()}
+            >
+              {t("common:error.tryAgain")}
+            </Button>
+          </div>
+        )}
         <div aria-busy={relationsLoading} className="divide-y divide-border/50">
           {project.columns.map((column) => (
             <ListColumnSection
@@ -366,9 +430,7 @@ function ListView({
               onToggle={toggleSection}
               onAddTask={handleAddTask}
               onArchive={handleArchiveClick}
-              subtaskChildren={subtaskChildren}
-              tasksById={tasksById}
-              expandedTasks={expandedTasks}
+              rows={rowsByColumn.get(column.id) ?? []}
               onToggleTaskExpanded={toggleTaskExpanded}
               relationsLoading={relationsLoading}
               draggingTaskId={activeId === null ? null : String(activeId)}
