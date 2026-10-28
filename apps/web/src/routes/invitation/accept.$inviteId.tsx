@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import {
   createFileRoute,
   Link,
@@ -19,6 +20,7 @@ import { useGetInvitationDetails } from "@/hooks/queries/invitation/use-get-invi
 import { authClient } from "@/lib/auth-client";
 import { formatDateMedium } from "@/lib/format";
 import { toast } from "@/lib/toast";
+import useProjectStore from "@/store/project";
 
 export const Route = createFileRoute("/invitation/accept/$inviteId")({
   component: AcceptInvitation,
@@ -28,6 +30,8 @@ function AcceptInvitation() {
   const { t } = useTranslation();
   const { inviteId } = useParams({ from: "/invitation/accept/$inviteId" });
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { setProject } = useProjectStore();
   const [isAccepting, setIsAccepting] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const { session, isLoading: isSessionLoading } = useSettledSession();
@@ -198,6 +202,10 @@ function AcceptInvitation() {
     setIsSwitching(true);
     try {
       await authClient.signOut();
+      // The next account signs in without a reload, so the previous one's
+      // cached data must not outlive the switch.
+      queryClient.clear();
+      setProject(undefined);
       goToAuth("/auth/sign-in");
     } catch {
       setIsSwitching(false);
