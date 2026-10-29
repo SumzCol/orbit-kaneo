@@ -23,6 +23,15 @@ const m = vi.hoisted(() => ({
   acceptInvitation: vi.fn(),
   setActive: vi.fn(),
   signOut: vi.fn(),
+  clearQueries: vi.fn(),
+  setProject: vi.fn(),
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ clear: m.clearQueries }),
+}));
+vi.mock("@/store/project", () => ({
+  default: () => ({ setProject: m.setProject }),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -149,6 +158,9 @@ describe("signed-in invitee", () => {
       }),
     );
     expect(m.signOut).toHaveBeenCalledTimes(1);
+    // Nothing cached for the previous account survives into the next one.
+    expect(m.clearQueries).toHaveBeenCalledTimes(1);
+    expect(m.setProject).toHaveBeenCalledWith(undefined);
     expect(m.acceptInvitation).not.toHaveBeenCalled();
   });
 });
