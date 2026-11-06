@@ -232,7 +232,10 @@
 			"passwordRequired": "Parolanızı girin.",
 			"passwordTooShort": "En az 8 karakter kullanın.",
 			"disposableEmail": "Kalıcı bir e-posta adresi kullanın. Geçici adreslerle hesap oluşturulamaz.",
-			"continueWithEmail": "E-posta ile devam et"
+			"continueWithEmail": "E-posta ile devam et",
+			"captchaChecking": "Devam etmeden önce kısa bir güvenlik kontrolü yapılıyor.",
+			"captchaFailed": "Güvenlik kontrolü yüklenmedi, bu yüzden giriş duraklatıldı. Bağlantınızı veya içerik engelleyicinizi kontrol edin.",
+			"captchaRetry": "Tekrar dene"
 		},
 		"checkEmail": {
 			"pageTitle": "E-postanızı Kontrol Edin",
@@ -389,8 +392,6 @@
 				}
 			},
 			"progress": "Adım {{current}} / {{total}}",
-			"welcome": "Hoş geldiniz, {{name}}",
-			"settingUp": "{{name}} hazırlanıyor",
 			"continue": "Devam et",
 			"signedInAs": "{{email}} olarak giriş yapıldı",
 			"signOut": "Çıkış yap",
@@ -406,7 +407,7 @@
 				"title": "İlk projenizi başlatın",
 				"description": "Size yol göstermesi için birkaç başlangıç görevi ekleyeceğiz. Bunları istediğiniz zaman yeniden adlandırabilir veya silebilirsiniz.",
 				"label": "Proje adı",
-				"numbered": "Görevler şöyle numaralandırılacak:"
+				"ticketStart": "Görev kimlikleri {{ticket}} ile başlayacak."
 			},
 			"invite": {
 				"title": "Ekibinizi getirin",
@@ -434,7 +435,6 @@
 				"paymentNote": "Ödemeler Creem tarafından işlenir."
 			},
 			"ready": {
-				"eyebrow": "Her şey hazır",
 				"title": "{{name}} hazır",
 				"description": "Kurduklarımız burada. Hepsini daha sonra değiştirebilirsiniz.",
 				"workspace": "Çalışma alanı",
@@ -447,9 +447,6 @@
 				"open": "{{name}} çalışma alanını aç"
 			},
 			"preview": {
-				"live": "Canlı önizleme: {{name}}",
-				"liveNoName": "Canlı önizleme",
-				"ready": "{{name}} hazır",
 				"untitled": "Çalışma alanınız"
 			}
 		},
@@ -3755,7 +3752,11 @@
 		},
 		"board": {
 			"reorderFailed": "Could not move task. Please try again.",
-			"keyboardInstructions": "Önizleme için Boşluk, bu talebi açmak için Enter tuşuna basın. Taşımak için Alt veya Option ile ok tuşlarını kullanın."
+			"keyboardInstructions": "Önizleme için Boşluk, bu talebi açmak için Enter tuşuna basın. Taşımak için Alt veya Option ile ok tuşlarını kullanın.",
+			"loadErrorTitle": "Bu pano yüklenmedi",
+			"loadErrorDescription": "Görevler alınırken bir sorun oluştu. Bağlantınızı kontrol edip tekrar deneyin.",
+			"refreshError": "Pano yenilenemedi, bu yüzden güncel olmayabilir.",
+			"tryAgain": "Tekrar dene"
 		},
 		"recurrence": {
 			"daily_one": "Her gün",
@@ -4172,7 +4173,8 @@
 			"title": "Project management",
 			"titleAccent": "that doesn't become the project.",
 			"description": "Open-source project management with boards, Gantt charts, and GitHub integration. Self-host for free with SSO included, or let Kaneo Cloud handle the hosting.",
-			"pricingCta": "See pricing"
+			"pricingCta": "See pricing",
+			"appStore": "App Store"
 		},
 		"navigation": {
 			"product": "Product",
@@ -4302,6 +4304,11 @@
 				"question": "Can AI clients work with Kaneo?",
 				"answer": "Yes. Kaneo provides an MCP server through the @kaneo/mcp package and an HTTP endpoint. Compatible AI clients can read and update tasks using an API key tied to a user, subject to workspace permissions.",
 				"link": "Read the MCP guide"
+			},
+			"mobile": {
+				"answer": "Yes. Kaneo is on the App Store for iPhone and iPad, and Android is coming soon. The app is free for Kaneo Cloud accounts. Connecting it to a self-hosted server is a one-time $9.99 unlock per person, and like the rest of Kaneo, the app is open source.",
+				"link": "Download on the App Store",
+				"question": "Is there a mobile app?"
 			}
 		},
 		"comparison": {
@@ -4411,6 +4418,21 @@
 				"passwordChanged": "Parola değiştirildi",
 				"photoRemoved": "Fotoğraf kaldırıldı",
 				"photoUpdated": "Fotoğraf güncellendi"
+			},
+			"deleteAccount": {
+				"confirm": "Delete account",
+				"confirmLabel": "Type {{email}} to confirm",
+				"description": "Permanently delete your account and its data.",
+				"modalDescription": "This permanently deletes your account and cannot be undone. Workspaces only you belong to are deleted with it. Elsewhere, your tasks stay and become unassigned, and your comments are removed.",
+				"modalTitle": "Delete your account?",
+				"noPassword": "This account has no password. Leave the field empty.",
+				"password": "Password",
+				"passwordHint": "Leave empty if you sign in without a password.",
+				"sectionTitle": "Danger zone",
+				"sessionTooOld": "For your security, enter your password, or sign out and sign in again before deleting your account.",
+				"success": "Your account was deleted",
+				"title": "Delete account",
+				"wrongPassword": "That password is not correct."
 			}
 		},
 		"activity": {
@@ -4493,21 +4515,20 @@
 		"editor": {
 			"attachment": "Ek",
 			"bold": "Kalın",
-			"boldPlaceholder": "kalın",
 			"code": "Kod",
-			"codePlaceholder": "kod",
-			"description": "Açıklama",
 			"heading": "Başlık",
 			"insertImage": "Görsel ekle",
 			"italic": "İtalik",
-			"italicPlaceholder": "italik",
 			"link": "Bağlantı",
-			"linkPlaceholder": "bağlantı",
 			"list": "Liste",
-			"nothingToPreview": "Önizlenecek bir şey yok",
 			"placeholder": "Açıklama ekleyin… Markdown desteklenir.",
-			"preview": "Önizleme",
-			"write": "Yaz"
+			"applyLink": "Apply",
+			"checklist": "Checklist",
+			"linkUrl": "URL",
+			"numberedList": "Numbered list",
+			"quote": "Quote",
+			"removeLink": "Remove link",
+			"hideKeyboard": "Hide keyboard"
 		},
 		"errors": {
 			"apiKeyRejected": "Bu API anahtarı reddedildi.",
@@ -4965,7 +4986,16 @@
 			},
 			"tagline": "Basit proje yönetimi. Kaneo Cloud'a veya kendi örneğinize bağlanın.",
 			"togglePassword": "Parola görünürlüğünü değiştir",
-			"useApiKey": "API anahtarı kullan"
+			"useApiKey": "API anahtarı kullan",
+			"unlock": {
+				"buy": "Unlock for {{price}}",
+				"buyNoPrice": "Unlock",
+				"message": "Signing in to Kaneo Cloud is always included. Connecting the app to a self-hosted server is a one-time purchase that supports Kaneo's development.",
+				"nothingToRestore": "No earlier purchase was found for this store account.",
+				"restore": "Restore purchase",
+				"title": "Connect your own server",
+				"unavailable": "Purchases aren't available right now. Try again later."
+			}
 		},
 		"taskDetail": {
 			"activity": {
@@ -5023,7 +5053,6 @@
 			"screen": {
 				"addDescription": "Açıklama ekle…",
 				"copyLink": "Bağlantıyı kopyala",
-				"editDescription": "Açıklamayı düzenle",
 				"editTitle": "Başlığı düzenle",
 				"linkCopied": "Bağlantı kopyalandı",
 				"more": "Daha fazla"
