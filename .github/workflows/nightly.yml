@@ -47,7 +47,10 @@ jobs:
           # (conflicts with --sarif), and a container cannot resolve the
           # Blacksmith git mirror backing this checkout, so cloning it there fails.
           # --fail still writes a complete SARIF file before exiting 183.
+          # --no-update keeps the checksummed release; by default TruffleHog
+          # replaces itself with the latest one before scanning.
           "$RUNNER_TEMP/trufflehog" git "file://$PWD" \
+            --no-update \
             --results=verified,unknown \
             --exclude-paths=.trufflehog-exclude \
             --branch "$BRANCH" \
