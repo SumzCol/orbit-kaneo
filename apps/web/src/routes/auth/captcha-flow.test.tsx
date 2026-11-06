@@ -31,6 +31,7 @@ vi.mock("@/lib/auth-client", () => ({
     signIn: m,
     signUp: { email: vi.fn() },
     emailOtp: { sendVerificationOtp: vi.fn() },
+    useSession: () => ({ data: null, isPending: false }),
     getLastUsedLoginMethod: () => null,
   },
 }));
