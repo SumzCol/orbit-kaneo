@@ -51,7 +51,13 @@ function loadScript(): Promise<void> {
     script.defer = true;
     script.setAttribute(SCRIPT_ATTR, "");
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Turnstile"));
+    script.onerror = () => {
+      // Forget the failure so a retry downloads the script again, and drop
+      // the dead tag so that retry does not wait on its load event.
+      script.remove();
+      scriptPromise = null;
+      reject(new Error("Failed to load Turnstile"));
+    };
     document.head.appendChild(script);
   });
   return scriptPromise;

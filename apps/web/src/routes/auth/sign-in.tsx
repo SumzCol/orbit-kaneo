@@ -30,6 +30,7 @@ import { useAuthCaptcha } from "@/components/auth/use-auth-captcha";
 import { useGuestSignIn } from "@/components/auth/use-guest-sign-in";
 import { useProviderName } from "@/components/auth/use-provider-name";
 import { useProviderSignIn } from "@/components/auth/use-provider-sign-in";
+import { useSettledSession } from "@/components/auth/use-settled-session";
 import { buildVerifyOtpPath } from "@/components/auth/verify-otp-path";
 import PageTitle from "@/components/page-title";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -84,7 +85,11 @@ function SignIn() {
       getName,
     });
   const guest = useGuestSignIn(captcha, () => navigate({ to: destination }));
+  // A session here means sign-out navigated in before ending it. Redirecting
+  // to the provider now would race that sign-out, so wait until it is gone.
+  const { session } = useSettledSession();
   const autoLogin =
+    !session &&
     !captcha.siteKey &&
     Boolean(config?.customOAuthAutoLogin && config?.hasCustomOAuth) &&
     !search.error &&
