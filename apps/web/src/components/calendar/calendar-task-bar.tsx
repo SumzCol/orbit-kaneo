@@ -1,5 +1,5 @@
 import CalendarSubtasks from "./calendar-subtasks";
-import type { JSX } from "react";
+import { type JSX, useId } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { formatDateShort } from "@/lib/format";
@@ -43,6 +43,7 @@ export default function CalendarTaskBar({
   onOpenTask,
 }: CalendarTaskBarProps): JSX.Element {
   const { t } = useTranslation();
+  const subtasksId = useId();
   const {
     task,
     lane,
@@ -78,6 +79,9 @@ export default function CalendarTaskBar({
         title: task.title,
         range,
       })}
+      // The label replaces the button's content, so the grouped subtask
+      // titles reach screen readers through the description instead.
+      aria-describedby={task.subtasks?.length ? subtasksId : undefined}
       data-task-status={task.status}
       onClick={() => onOpenTask(task.id)}
       className={cn(
@@ -92,7 +96,7 @@ export default function CalendarTaskBar({
       )}
     >
       <span className="w-full truncate">{task.title}</span>
-      <CalendarSubtasks subtasks={task.subtasks} />
+      <CalendarSubtasks id={subtasksId} subtasks={task.subtasks} />
     </button>
   );
 }

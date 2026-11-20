@@ -75,3 +75,48 @@ it.each(["grid", "agenda", "overflow"])(
     expect(onOpenTask).toHaveBeenCalledWith("parent");
   },
 );
+
+it.each(["grid", "agenda"])(
+  "announces the grouped subtasks of a labelled item in %s",
+  (view) => {
+    const task = {
+      id: "parent",
+      title: "Parent",
+      number: 1,
+      status: "to-do",
+      scheduleStart: new Date(2026, 7, 10),
+      scheduleEnd: new Date(2026, 7, 10),
+      subtasks: [
+        { id: "first", title: "First child" },
+        { id: "second", title: "Second child" },
+      ],
+    };
+    render(
+      view === "grid" ? (
+        <CalendarTaskBar
+          segment={{
+            task,
+            lane: 0,
+            columnStart: 1,
+            columnEnd: 2,
+            continuesBefore: false,
+            continuesAfter: false,
+          }}
+          onOpenTask={vi.fn()}
+        />
+      ) : (
+        <MonthAgenda
+          tasks={[task]}
+          visibleMonth={new Date(2026, 7, 1)}
+          onOpenTask={vi.fn()}
+        />
+      ),
+    );
+    // The aria-label replaces the content as the name, so the children must
+    // come through the description.
+    const item = screen.getByRole("button", {
+      name: "tasks:calendar.taskAriaLabel",
+    });
+    expect(item).toHaveAccessibleDescription("First child Second child");
+  },
+);
