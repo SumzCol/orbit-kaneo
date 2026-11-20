@@ -3180,6 +3180,20 @@
 		"movedFromOtherProject": "moved task from another project to \"{{to}}\""
 	},
 	"tasks": {
+		"dateFilter": {
+			"startDate": "시작일",
+			"noDate": "날짜 없음",
+			"condition": "날짜 조건",
+			"exact": "특정 날짜",
+			"range": "날짜 범위",
+			"before": "지정일 이전",
+			"after": "지정일 이후",
+			"apply": "날짜 필터 적용",
+			"exactValue": "{{date}} 당일",
+			"beforeValue": "{{date}} 이전",
+			"afterValue": "{{date}} 이후",
+			"rangeValue": "{{date}} – {{end}}"
+		},
 		"title": "작업",
 		"status": {
 			"label": "상태",
@@ -3715,7 +3729,9 @@
 			"showOnRows": "행에 표시",
 			"checklistProgress": "체크리스트 진행률",
 			"projectBackground": "프로젝트 배경",
-			"layout": "레이아웃"
+			"layout": "레이아웃",
+			"includeSubtasks": "하위 작업 포함",
+			"useProjectDefault": "프로젝트 기본값 사용"
 		},
 		"filterBar": {
 			"label": "적용된 필터",
@@ -3756,6 +3772,21 @@
 			"startsOn": "시작: {{date}}",
 			"beforeStart": "{{date}}은(는) 시작일 이전입니다",
 			"afterDue": "{{date}}은(는) 마감일 이후입니다"
+		},
+		"timeTracking": {
+			"empty": "아직 기록된 시간이 없습니다.",
+			"loadError": "시간 기록을 불러오지 못했습니다.",
+			"retry": "다시 시도",
+			"running": "실행 중",
+			"start": "타이머 시작",
+			"startError": "타이머를 시작하지 못했습니다.",
+			"stop": "타이머 중지",
+			"stopError": "타이머를 중지하지 못했습니다.",
+			"title": "시간 추적",
+			"unknownUser": "알 수 없음",
+			"durationSeconds": "{{seconds, number}}초",
+			"durationMinutes": "{{minutes, number}}분",
+			"durationHoursMinutes": "{{hours, number}}시간 {{minutes, number}}분"
 		}
 	},
 	"invitations": {
