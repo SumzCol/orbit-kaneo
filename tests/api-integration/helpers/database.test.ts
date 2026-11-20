@@ -1,6 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { Client } from "pg";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vite-plus/test";
 import db, { schema } from "../../../apps/api/src/database";
 import {
   mcpOauthStateTable,
@@ -98,6 +106,49 @@ describe("resetTestDatabase", () => {
 
   afterEach(async () => {
     await resetTestDatabase();
+  });
+
+  it("goes through when a straggling query deadlocks with it", async () => {
+    // TRUNCATE locks tables in list order. A straggler reading the last table
+    // blocks it there; then reading the first, which TRUNCATE already holds,
+    // completes the cycle, as a late event subscriber did in CI.
+    const tables = await db.execute<{ table_name: string }>(sql`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+      ORDER BY table_name
+    `);
+    const first = tables.rows[0]?.table_name;
+    const last = tables.rows.at(-1)?.table_name;
+    const straggler = new Client({
+      connectionString: process.env.DATABASE_URL,
+    });
+    await straggler.connect();
+
+    try {
+      // Postgres aborts whichever side checks first; checking late here makes
+      // that the TRUNCATE, which is the case the retry handles.
+      await straggler.query("SET deadlock_timeout = '10s'");
+      await straggler.query("BEGIN");
+      await straggler.query(`SELECT 1 FROM "${last}" LIMIT 1`);
+
+      const reset = resetTestDatabase();
+      await vi.waitFor(
+        async () => {
+          const waiting = await db.execute(sql`
+            SELECT 1 FROM pg_stat_activity
+            WHERE wait_event_type = 'Lock' AND query LIKE 'TRUNCATE%'
+          `);
+          expect(waiting.rows).toHaveLength(1);
+        },
+        { timeout: 5_000 },
+      );
+
+      await straggler.query(`SELECT 1 FROM "${first}" LIMIT 1`);
+      await straggler.query("COMMIT");
+      await expect(reset).resolves.toBeUndefined();
+    } finally {
+      await straggler.end();
+    }
   });
 
   it("truncates mcp_oauth_state rows", async () => {
