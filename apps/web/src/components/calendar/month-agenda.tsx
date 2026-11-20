@@ -1,6 +1,6 @@
 import CalendarSubtasks from "./calendar-subtasks";
 import { isBefore, isToday, startOfToday } from "date-fns";
-import { type JSX, useLayoutEffect, useMemo, useRef } from "react";
+import { type JSX, useId, useLayoutEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { formatDate, formatDateShort } from "@/lib/format";
@@ -26,6 +26,7 @@ export default function MonthAgenda({
   onOpenTask,
 }: MonthAgendaProps): JSX.Element {
   const { t } = useTranslation();
+  const agendaId = useId();
   const agenda = useMemo(
     () => buildMonthAgenda(visibleMonth, tasks),
     [visibleMonth, tasks],
@@ -85,6 +86,8 @@ export default function MonthAgenda({
                     ? `${projectSlug}-${task.number}`
                     : undefined;
                 const range = `${formatDateShort(task.scheduleStart)} – ${formatDateShort(task.scheduleEnd)}`;
+                // A task spanning several days is listed under each of them.
+                const subtasksId = `${agendaId}-${index}-${task.id}`;
                 return (
                   <li key={task.id}>
                     <button
@@ -94,6 +97,9 @@ export default function MonthAgenda({
                         title: task.title,
                         range,
                       })}
+                      aria-describedby={
+                        task.subtasks?.length ? subtasksId : undefined
+                      }
                       data-task-status={task.status}
                       className={cn(
                         "flex min-h-11 w-full flex-col justify-center gap-0.5 rounded-md border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -106,7 +112,10 @@ export default function MonthAgenda({
                       <span className="text-xs text-muted-foreground">
                         {taskKey ? `${taskKey} · ${range}` : range}
                       </span>
-                      <CalendarSubtasks subtasks={task.subtasks} />
+                      <CalendarSubtasks
+                        id={subtasksId}
+                        subtasks={task.subtasks}
+                      />
                     </button>
                   </li>
                 );

@@ -9,7 +9,11 @@ function useCreateTaskRelation() {
   return useMutation({
     mutationFn: createTaskRelation,
     onSuccess: (_, variables) => {
-      void invalidateRelationTaskProject(queryClient, variables.sourceTaskId);
+      void invalidateRelationTaskProject(
+        queryClient,
+        variables.sourceTaskId,
+        variables.targetTaskId,
+      );
       // Queries default to refetchOnMount: false, so a closed but cached end
       // must refetch now or reopening it shows the old relations.
       queryClient.invalidateQueries({
