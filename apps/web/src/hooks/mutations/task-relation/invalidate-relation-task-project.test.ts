@@ -26,4 +26,28 @@ describe("invalidateRelationTaskProject", () => {
       client.clear();
     },
   );
+
+  it("refreshes the subtask's board when it lives in another project", async () => {
+    const client = new QueryClient();
+    client.setQueryData(["tasks", "parent-project"], {
+      columns: [{ tasks: [{ id: "parent" }] }],
+    });
+    client.setQueryData(["tasks", "child-project"], {
+      columns: [{ tasks: [{ id: "child" }] }],
+    });
+    client.setQueryData(["tasks", "unrelated-project"], {
+      columns: [{ tasks: [{ id: "other" }] }],
+    });
+    await invalidateRelationTaskProject(client, "parent", "child");
+    expect(
+      client.getQueryState(["tasks", "parent-project"])?.isInvalidated,
+    ).toBe(true);
+    expect(
+      client.getQueryState(["tasks", "child-project"])?.isInvalidated,
+    ).toBe(true);
+    expect(
+      client.getQueryState(["tasks", "unrelated-project"])?.isInvalidated,
+    ).toBe(false);
+    client.clear();
+  });
 });
