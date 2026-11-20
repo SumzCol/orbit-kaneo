@@ -3350,6 +3350,20 @@
 		"movedFromOtherProject": "moved task from another project to \"{{to}}\""
 	},
 	"tasks": {
+		"dateFilter": {
+			"startDate": "Дата начала",
+			"noDate": "Без даты",
+			"condition": "Условие по дате",
+			"exact": "Точная дата",
+			"range": "Диапазон дат",
+			"before": "До",
+			"after": "После",
+			"apply": "Применить фильтр по дате",
+			"exactValue": "На {{date}}",
+			"beforeValue": "До {{date}}",
+			"afterValue": "После {{date}}",
+			"rangeValue": "{{date}} – {{end}}"
+		},
 		"title": "Задачи",
 		"status": {
 			"label": "Статус",
@@ -3974,7 +3988,9 @@
 			"showOnRows": "Показывать в строках",
 			"checklistProgress": "Прогресс чек-листа",
 			"projectBackground": "Фон проекта",
-			"layout": "Макет"
+			"layout": "Макет",
+			"includeSubtasks": "Включать подзадачи",
+			"useProjectDefault": "Использовать настройку проекта по умолчанию"
 		},
 		"filterBar": {
 			"label": "Активные фильтры",
@@ -4024,6 +4040,21 @@
 			"startsOn": "Начало: {{date}}",
 			"beforeStart": "{{date}} раньше даты начала",
 			"afterDue": "{{date}} позже срока"
+		},
+		"timeTracking": {
+			"empty": "Время ещё не записано.",
+			"loadError": "Не удалось загрузить записи времени.",
+			"retry": "Повторить",
+			"running": "Идёт отсчёт",
+			"start": "Запустить таймер",
+			"startError": "Не удалось запустить таймер.",
+			"stop": "Остановить таймер",
+			"stopError": "Не удалось остановить таймер.",
+			"title": "Учёт времени",
+			"unknownUser": "Неизвестно",
+			"durationSeconds": "{{seconds, number}} с",
+			"durationMinutes": "{{minutes, number}} мин",
+			"durationHoursMinutes": "{{hours, number}} ч {{minutes, number}} мин"
 		}
 	},
 	"invitations": {
