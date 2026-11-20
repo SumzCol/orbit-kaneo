@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Client } from "pg";
 import db from "../../../apps/api/src/database";
+import { retryOnDeadlock } from "./retry-on-deadlock";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = resolve(currentDir, "../../../apps/api/drizzle");
@@ -108,7 +109,13 @@ export async function resetTestDatabase() {
 
   const formattedTableNames = tableNames.map(quoteIdentifier).join(", ");
 
-  await db.execute(
-    sql.raw(`TRUNCATE TABLE ${formattedTableNames} RESTART IDENTITY CASCADE`),
+  // Work a previous test left running, such as an event subscriber still
+  // writing a notification, can hold a lock TRUNCATE needs while waiting on
+  // one it already took. Postgres then aborts one side; once that work ends,
+  // the TRUNCATE goes through.
+  await retryOnDeadlock(() =>
+    db.execute(
+      sql.raw(`TRUNCATE TABLE ${formattedTableNames} RESTART IDENTITY CASCADE`),
+    ),
   );
 }
