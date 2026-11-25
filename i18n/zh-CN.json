@@ -3180,6 +3180,20 @@
 		"movedFromOtherProject": "将任务从其它项目移动到「{{to}}」"
 	},
 	"tasks": {
+		"dateFilter": {
+			"startDate": "开始日期",
+			"noDate": "无日期",
+			"condition": "日期条件",
+			"exact": "指定日期",
+			"range": "日期范围",
+			"before": "早于",
+			"after": "晚于",
+			"apply": "应用日期筛选",
+			"exactValue": "在 {{date}}",
+			"beforeValue": "早于 {{date}}",
+			"afterValue": "晚于 {{date}}",
+			"rangeValue": "{{date}} – {{end}}"
+		},
 		"title": "任务",
 		"status": {
 			"label": "状态",
@@ -3715,7 +3729,9 @@
 			"showOnRows": "在行中显示",
 			"checklistProgress": "清单进度",
 			"projectBackground": "项目背景",
-			"layout": "布局"
+			"layout": "布局",
+			"includeSubtasks": "包含子任务",
+			"useProjectDefault": "使用项目默认设置"
 		},
 		"filterBar": {
 			"label": "已应用的筛选",
@@ -3756,6 +3772,21 @@
 			"startsOn": "开始于 {{date}}",
 			"beforeStart": "{{date}} 早于开始日期",
 			"afterDue": "{{date}} 晚于截止日期"
+		},
+		"timeTracking": {
+			"empty": "尚未记录时间。",
+			"loadError": "无法加载时间记录。",
+			"retry": "重试",
+			"running": "计时中",
+			"start": "启动计时器",
+			"startError": "无法开始计时。",
+			"stop": "停止计时",
+			"stopError": "无法停止计时。",
+			"title": "时间跟踪",
+			"unknownUser": "未知",
+			"durationSeconds": "{{seconds, number}}秒",
+			"durationMinutes": "{{minutes, number}}分",
+			"durationHoursMinutes": "{{hours, number}}小时 {{minutes, number}}分"
 		}
 	},
 	"invitations": {

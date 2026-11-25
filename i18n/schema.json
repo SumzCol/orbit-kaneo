@@ -15759,6 +15759,12 @@
 						},
 						"layout": {
 							"type": "string"
+						},
+						"includeSubtasks": {
+							"type": "string"
+						},
+						"useProjectDefault": {
+							"type": "string"
 						}
 					},
 					"required": [
@@ -15768,7 +15774,9 @@
 						"showOnRows",
 						"checklistProgress",
 						"projectBackground",
-						"layout"
+						"layout",
+						"includeSubtasks",
+						"useProjectDefault"
 					]
 				},
 				"filterBar": {
@@ -15964,6 +15972,122 @@
 						"beforeStart",
 						"afterDue"
 					]
+				},
+				"dateFilter": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"startDate": {
+							"type": "string"
+						},
+						"noDate": {
+							"type": "string"
+						},
+						"condition": {
+							"type": "string"
+						},
+						"exact": {
+							"type": "string"
+						},
+						"range": {
+							"type": "string"
+						},
+						"before": {
+							"type": "string"
+						},
+						"after": {
+							"type": "string"
+						},
+						"apply": {
+							"type": "string"
+						},
+						"exactValue": {
+							"type": "string"
+						},
+						"beforeValue": {
+							"type": "string"
+						},
+						"afterValue": {
+							"type": "string"
+						},
+						"rangeValue": {
+							"type": "string"
+						}
+					},
+					"required": [
+						"startDate",
+						"noDate",
+						"condition",
+						"exact",
+						"range",
+						"before",
+						"after",
+						"apply",
+						"exactValue",
+						"beforeValue",
+						"afterValue",
+						"rangeValue"
+					]
+				},
+				"timeTracking": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"title": {
+							"type": "string"
+						},
+						"start": {
+							"type": "string"
+						},
+						"stop": {
+							"type": "string"
+						},
+						"running": {
+							"type": "string"
+						},
+						"empty": {
+							"type": "string"
+						},
+						"unknownUser": {
+							"type": "string"
+						},
+						"startError": {
+							"type": "string"
+						},
+						"stopError": {
+							"type": "string"
+						},
+						"loadError": {
+							"type": "string"
+						},
+						"retry": {
+							"type": "string"
+						},
+						"durationSeconds": {
+							"type": "string"
+						},
+						"durationMinutes": {
+							"type": "string"
+						},
+						"durationHoursMinutes": {
+							"type": "string"
+						}
+					},
+					"required": [
+						"title",
+						"start",
+						"stop",
+						"running",
+						"empty",
+						"unknownUser",
+						"startError",
+						"stopError",
+						"loadError",
+						"retry",
+						"durationSeconds",
+						"durationMinutes",
+						"durationHoursMinutes"
+					]
 				}
 			},
 			"required": [
@@ -16013,7 +16137,9 @@
 				"filterMenu",
 				"shortcuts",
 				"due",
-				"datePicker"
+				"datePicker",
+				"dateFilter",
+				"timeTracking"
 			]
 		},
 		"invitations": {

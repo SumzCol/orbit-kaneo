@@ -3635,6 +3635,20 @@
 		}
 	},
 	"tasks": {
+		"dateFilter": {
+			"startDate": "Data rozpoczęcia",
+			"noDate": "Brak daty",
+			"condition": "Warunek daty",
+			"exact": "Dokładna data",
+			"range": "Zakres dat",
+			"before": "Przed",
+			"after": "Po",
+			"apply": "Zastosuj filtr daty",
+			"exactValue": "W dniu {{date}}",
+			"beforeValue": "Przed {{date}}",
+			"afterValue": "Po {{date}}",
+			"rangeValue": "{{date}} – {{end}}"
+		},
 		"title": "Zadania",
 		"actions": {
 			"archive": "Archiwizuj",
@@ -4215,7 +4229,9 @@
 			"showOnRows": "Pokaż w wierszach",
 			"checklistProgress": "Postęp listy kontrolnej",
 			"projectBackground": "Tło projektu",
-			"layout": "Układ"
+			"layout": "Układ",
+			"includeSubtasks": "Uwzględnij podzadania",
+			"useProjectDefault": "Użyj domyślnego ustawienia projektu"
 		},
 		"filterBar": {
 			"label": "Aktywne filtry",
@@ -4265,6 +4281,21 @@
 			"startsOn": "Początek: {{date}}",
 			"beforeStart": "{{date}} jest przed datą rozpoczęcia",
 			"afterDue": "{{date}} jest po terminie"
+		},
+		"timeTracking": {
+			"empty": "Nie zarejestrowano jeszcze czasu.",
+			"loadError": "Nie udało się wczytać wpisów czasu.",
+			"retry": "Spróbuj ponownie",
+			"running": "W toku",
+			"start": "Uruchom licznik",
+			"startError": "Nie udało się uruchomić licznika.",
+			"stop": "Zatrzymaj licznik",
+			"stopError": "Nie udało się zatrzymać licznika.",
+			"title": "Śledzenie czasu",
+			"unknownUser": "Nieznany",
+			"durationSeconds": "{{seconds, number}} s",
+			"durationMinutes": "{{minutes, number}} min",
+			"durationHoursMinutes": "{{hours, number}} godz. {{minutes, number}} min"
 		}
 	},
 	"press": {

@@ -3234,6 +3234,20 @@
 		"movedFromOtherProject": "moved task from another project to \"{{to}}\""
 	},
 	"tasks": {
+		"dateFilter": {
+			"startDate": "Ημερομηνία έναρξης",
+			"noDate": "Χωρίς ημερομηνία",
+			"condition": "Συνθήκη ημερομηνίας",
+			"exact": "Συγκεκριμένη ημερομηνία",
+			"range": "Εύρος ημερομηνιών",
+			"before": "Πριν από",
+			"after": "Μετά από",
+			"apply": "Εφαρμογή φίλτρου ημερομηνίας",
+			"exactValue": "Στις {{date}}",
+			"beforeValue": "Πριν από τις {{date}}",
+			"afterValue": "Μετά τις {{date}}",
+			"rangeValue": "{{date}} – {{end}}"
+		},
 		"title": "Εργασίες",
 		"status": {
 			"label": "Κατάσταση",
@@ -3784,7 +3798,9 @@
 			"showOnRows": "Εμφάνιση στις γραμμές",
 			"checklistProgress": "Πρόοδος λίστας ελέγχου",
 			"projectBackground": "Φόντο έργου",
-			"layout": "Διάταξη"
+			"layout": "Διάταξη",
+			"includeSubtasks": "Συμπερίληψη υποεργασιών",
+			"useProjectDefault": "Χρήση προεπιλογής έργου"
 		},
 		"filterBar": {
 			"label": "Ενεργά φίλτρα",
@@ -3828,6 +3844,21 @@
 			"startsOn": "Ξεκινά {{date}}",
 			"beforeStart": "Η {{date}} είναι πριν από την ημερομηνία έναρξης",
 			"afterDue": "Η {{date}} είναι μετά την προθεσμία"
+		},
+		"timeTracking": {
+			"empty": "Δεν έχει καταγραφεί χρόνος ακόμη.",
+			"loadError": "Αποτυχία φόρτωσης των καταχωρίσεων χρόνου.",
+			"retry": "Δοκιμή ξανά",
+			"running": "Σε εξέλιξη",
+			"start": "Έναρξη χρονομέτρου",
+			"startError": "Αποτυχία εκκίνησης του χρονομέτρου.",
+			"stop": "Διακοπή χρονομέτρου",
+			"stopError": "Αποτυχία διακοπής του χρονομέτρου.",
+			"title": "Παρακολούθηση χρόνου",
+			"unknownUser": "Άγνωστος",
+			"durationSeconds": "{{seconds, number}} δ",
+			"durationMinutes": "{{minutes, number}} λ",
+			"durationHoursMinutes": "{{hours, number}} ώ {{minutes, number}} λ"
 		}
 	},
 	"invitations": {

@@ -3234,6 +3234,20 @@
 		"movedFromOtherProject": "moved task from another project to \"{{to}}\""
 	},
 	"tasks": {
+		"dateFilter": {
+			"startDate": "Başlama tarixi",
+			"noDate": "Tarix yoxdur",
+			"condition": "Tarix şərti",
+			"exact": "Dəqiq tarix",
+			"range": "Tarix aralığı",
+			"before": "Əvvəl",
+			"after": "Sonra",
+			"apply": "Tarix filtrini tətbiq et",
+			"exactValue": "{{date}} tarixində",
+			"beforeValue": "{{date}} tarixindən əvvəl",
+			"afterValue": "{{date}} tarixindən sonra",
+			"rangeValue": "{{date}} – {{end}}"
+		},
 		"title": "Tapşırıqlar",
 		"status": {
 			"label": "Vəziyyət",
@@ -3784,7 +3798,9 @@
 			"showOnRows": "Sətirlərdə göstər",
 			"checklistProgress": "Yoxlama siyahısının gedişatı",
 			"projectBackground": "Layihə fonu",
-			"layout": "Düzən"
+			"layout": "Düzən",
+			"includeSubtasks": "Alt tapşırıqları daxil et",
+			"useProjectDefault": "Layihənin standart ayarından istifadə et"
 		},
 		"filterBar": {
 			"label": "Aktiv süzgəclər",
@@ -3828,6 +3844,21 @@
 			"startsOn": "Başlayır: {{date}}",
 			"beforeStart": "{{date}} başlama tarixindən əvvəldir",
 			"afterDue": "{{date}} son tarixdən sonradır"
+		},
+		"timeTracking": {
+			"empty": "Hələ vaxt qeydə alınmayıb.",
+			"loadError": "Vaxt qeydlərini yükləmək mümkün olmadı.",
+			"retry": "Yenidən cəhd et",
+			"running": "İşləyir",
+			"start": "Taymeri başlat",
+			"startError": "Taymeri başlatmaq mümkün olmadı.",
+			"stop": "Taymeri dayandır",
+			"stopError": "Taymeri dayandırmaq mümkün olmadı.",
+			"title": "Vaxtın izlənməsi",
+			"unknownUser": "Naməlum",
+			"durationSeconds": "{{seconds, number}} san",
+			"durationMinutes": "{{minutes, number}} dəq",
+			"durationHoursMinutes": "{{hours, number}} saat {{minutes, number}} dəq"
 		}
 	},
 	"invitations": {

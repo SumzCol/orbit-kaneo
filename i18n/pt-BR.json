@@ -3288,6 +3288,20 @@
 		"movedFromOtherProject": "moved task from another project to \"{{to}}\""
 	},
 	"tasks": {
+		"dateFilter": {
+			"startDate": "Data de início",
+			"noDate": "Sem data",
+			"condition": "Condição de data",
+			"exact": "Data exata",
+			"range": "Intervalo de datas",
+			"before": "Antes de",
+			"after": "Depois de",
+			"apply": "Aplicar filtro de data",
+			"exactValue": "Em {{date}}",
+			"beforeValue": "Antes de {{date}}",
+			"afterValue": "Depois de {{date}}",
+			"rangeValue": "{{date}} – {{end}}"
+		},
 		"title": "Tarefas",
 		"status": {
 			"label": "Status",
@@ -3853,7 +3867,9 @@
 			"showOnRows": "Mostrar nas linhas",
 			"checklistProgress": "Progresso da checklist",
 			"projectBackground": "Fundo do projeto",
-			"layout": "Layout"
+			"layout": "Layout",
+			"includeSubtasks": "Incluir subtarefas",
+			"useProjectDefault": "Usar o padrão do projeto"
 		},
 		"filterBar": {
 			"label": "Filtros ativos",
@@ -3900,6 +3916,21 @@
 			"startsOn": "Começa em {{date}}",
 			"beforeStart": "{{date}} é antes da data de início",
 			"afterDue": "{{date}} é depois do prazo"
+		},
+		"timeTracking": {
+			"empty": "Nenhum tempo registrado ainda.",
+			"loadError": "Não foi possível carregar os registros de tempo.",
+			"retry": "Tentar novamente",
+			"running": "Em andamento",
+			"start": "Iniciar cronômetro",
+			"startError": "Não foi possível iniciar o cronômetro.",
+			"stop": "Parar cronômetro",
+			"stopError": "Não foi possível parar o cronômetro.",
+			"title": "Controle de tempo",
+			"unknownUser": "Desconhecido",
+			"durationSeconds": "{{seconds, number}}s",
+			"durationMinutes": "{{minutes, number}}min",
+			"durationHoursMinutes": "{{hours, number}}h {{minutes, number}}min"
 		}
 	},
 	"invitations": {
