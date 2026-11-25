@@ -9,7 +9,11 @@ function useDeleteTaskRelation(taskId: string) {
   return useMutation({
     mutationFn: deleteTaskRelation,
     onSuccess: (deleted) => {
-      void invalidateRelationTaskProject(queryClient, deleted.sourceTaskId);
+      void invalidateRelationTaskProject(
+        queryClient,
+        deleted.sourceTaskId,
+        deleted.targetTaskId,
+      );
       // Both ends go stale, and only one of them is the task this hook was
       // opened for. Queries default to refetchOnMount: false, so a closed but
       // cached end must refetch now or reopening it still lists the relation.
